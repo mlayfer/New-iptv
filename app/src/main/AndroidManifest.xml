@@ -18,7 +18,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MaskHai"
+        android:theme="@style/Theme.Telohim"
         android:usesCleartextTraffic="true">
 
         <activity
@@ -27,7 +27,7 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:supportsPictureInPicture="true"
-            android:theme="@style/Theme.MaskHai">
+            android:theme="@style/Theme.Telohim">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

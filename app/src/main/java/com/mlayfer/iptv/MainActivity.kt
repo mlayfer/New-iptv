@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.view.WindowCompat
 import com.mlayfer.iptv.ui.AppRoot
 import com.mlayfer.iptv.ui.LocalIsTv
-import com.mlayfer.iptv.ui.MaskHaiTheme
+import com.mlayfer.iptv.ui.TelohimTheme
 import com.mlayfer.iptv.ui.isTelevision
 import com.mlayfer.iptv.ui.RemoteKeys
 
@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
         // The app is dark everywhere, so the system bar icons have to be light.
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         setContent {
-            MaskHaiTheme {
+            TelohimTheme {
                 // The whole UI is Hebrew, so it reads right-to-left regardless of
                 // the device locale.
                 CompositionLocalProvider(

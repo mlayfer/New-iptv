@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MaskHai"
+rootProject.name = "Telohim"
 include(":app")

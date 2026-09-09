@@ -266,7 +266,7 @@ private fun TopBar(state: UiState, viewModel: AppViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "מסך חי",
+                text = "טלוהים",
                 style = MaterialTheme.typography.titleMedium,
             )
 

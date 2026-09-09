@@ -24,6 +24,6 @@ private val DarkScheme = darkColorScheme(
 )
 
 @Composable
-fun MaskHaiTheme(content: @Composable () -> Unit) {
+fun TelohimTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = DarkScheme, content = content)
 }

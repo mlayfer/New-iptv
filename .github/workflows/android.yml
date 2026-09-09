@@ -30,25 +30,25 @@ jobs:
         run: ./gradlew --no-daemon assembleDebug
 
       - name: Name the APK after the build
-        run: cp app/build/outputs/apk/debug/app-debug.apk mask-hai.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk telohim.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: mask-hai-debug-apk
-          path: mask-hai.apk
+          name: telohim-debug-apk
+          path: telohim.apk
           if-no-files-found: error
 
       # Downloading an Actions artifact means signing in and unzipping, which is
       # painful on the phone the app is meant for. A release asset is a direct
       # link, and keeping the file name fixed makes
-      # /releases/latest/download/mask-hai.apk always point at the newest build.
+      # /releases/latest/download/telohim.apk always point at the newest build.
       - name: Publish the build as a release
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "build-${{ github.run_number }}" mask-hai.apk \
-            --title "מסך חי — בנייה ${{ github.run_number }}" \
+          gh release create "build-${{ github.run_number }}" telohim.apk \
+            --title "טלוהים — בנייה ${{ github.run_number }}" \
             --notes "APK להתקנה ישירה. נבנה מ-${{ github.sha }}." \
             --latest

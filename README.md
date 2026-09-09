@@ -1,4 +1,4 @@
-# מסך חי — נגן IPTV לאנדרואיד
+# טלוהים — נגן IPTV לאנדרואיד
 
 אפליקציית אנדרואיד נייטיבית (Kotlin + Jetpack Compose + Media3/ExoPlayer) לצפייה
 ברשימות IPTV. רצה על טלפון, טאבלט ו-Android TV מאותו APK.
@@ -8,11 +8,11 @@
 ## התקנה
 
 הורדה ישירה, תמיד הבנייה האחרונה:
-**https://github.com/mlayfer/New-iptv/releases/latest/download/mask-hai.apk**
+**https://github.com/mlayfer/New-iptv/releases/latest/download/telohim.apk**
 
 פותחים את הקישור בטלפון או בטלוויזיה, מאשרים "התקנה ממקור לא מוכר" (זו בנייה
 חתומה במפתח debug, לא דרך חנות), ומתקינים. בטלוויזיה הכי נוח דרך Downloader, או
-`adb install mask-hai.apk` מהמחשב.
+`adb install telohim.apk` מהמחשב.
 
 ## למה נייטיב ולא דפדפן
 
@@ -76,7 +76,7 @@
 ## בנייה
 
 כל דחיפה מריצה את הבדיקות ובונה APK ב-GitHub Actions
-(`.github/workflows/android.yml`). ה-APK מחכה כ-artifact בשם `mask-hai-debug-apk`
+(`.github/workflows/android.yml`). ה-APK מחכה כ-artifact בשם `telohim-debug-apk`
 בתוך הריצה — פותחים את הריצה בלשונית Actions ומורידים משם.
 
 מקומית:
