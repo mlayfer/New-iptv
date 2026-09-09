@@ -52,16 +52,16 @@ button,input{font-family:inherit}
 .nowMeta{font-size:21px;color:#a9a9a9;margin-top:8px}
 
 /* ===== Movies and series: poster rows ===== */
-.vodLayout{height:100%;display:grid;grid-template-rows:300px auto 1fr;gap:14px}
+.vodLayout{height:100%;display:grid;grid-template-rows:200px auto 1fr;gap:14px;min-height:0}
 .vodHero{border-radius:26px;border:1px solid #2f2f2f;background:linear-gradient(120deg,rgba(60,16,20,.95),rgba(12,12,12,.98));padding:34px 40px;display:flex;align-items:flex-end;position:relative;overflow:hidden}
 .vodHero::before{content:"";position:absolute;left:-80px;top:-90px;width:340px;height:340px;border-radius:50%;background:rgba(211,25,32,.16)}
-.vodHeroTitle{font-size:46px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:1500px}
+.vodHeroTitle{font-size:44px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:1500px}
 .vodHeroMeta{font-size:24px;color:#c3c3c3;margin-top:12px}
 .vodSearchWrap{display:flex;align-items:center;gap:18px}
 .vodSearchWrap input{flex:1}
 .vodCount{font-size:20px;color:#8f9bab;white-space:nowrap}
-.vodRows{overflow:hidden;display:flex;flex-direction:column;gap:12px;min-height:0}
-.vodRow{min-height:0}
+.vodRows{overflow:hidden;display:flex;flex-direction:column;gap:10px;min-height:0}
+.vodRow{height:296px;overflow:hidden;flex:0 0 auto}
 .vodRowTitle{font-size:24px;font-weight:700;margin:0 6px 8px;color:#e7e7e7}
 .vodRowTrack{display:flex;gap:14px;overflow:hidden}
 .vodCard{flex:0 0 auto;width:158px;border:2px solid transparent;background:#141414;border-radius:18px;padding:8px;color:#fff;text-align:right}
