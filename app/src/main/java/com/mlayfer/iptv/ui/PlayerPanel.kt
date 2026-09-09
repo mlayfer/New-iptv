@@ -1,5 +1,7 @@
 package com.mlayfer.iptv.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +53,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -99,9 +103,14 @@ fun PlayerPanel(
     }
 
     var error by remember { mutableStateOf<String?>(null) }
+    var errorDetail by remember { mutableStateOf<String?>(null) }
     var buffering by remember { mutableStateOf(false) }
     var retries by remember { mutableIntStateOf(0) }
     var reloadToken by remember { mutableIntStateOf(0) }
+    // Which container guess we are on. Not an effect key: the ladder is climbed
+    // from inside the error listener, without restarting playback setup.
+    val attempt = remember { mutableIntStateOf(0) }
+    val currentChannel by rememberUpdatedState(channel)
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -121,7 +130,23 @@ fun PlayerPanel(
                     }
                     return
                 }
+
+                // Providers lie about containers constantly: extension-less HLS,
+                // .m3u8 URLs that answer with MPEG-TS, playlists served as
+                // text/html. Rather than trust the URL, work down the ladder of
+                // container guesses before calling the channel unplayable.
+                val channelNow = currentChannel
+                if (isContainerError(e) && channelNow != null && attempt.intValue < LAST_ATTEMPT) {
+                    attempt.intValue += 1
+                    retries = 0
+                    player.setMediaItem(mediaItemFor(channelNow, attempt.intValue))
+                    player.prepare()
+                    player.play()
+                    return
+                }
+
                 error = describe(e)
+                errorDetail = detailOf(e)
             }
         }
         player.addListener(listener)
@@ -142,7 +167,9 @@ fun PlayerPanel(
 
     LaunchedEffect(channel?.id, reloadToken) {
         error = null
+        errorDetail = null
         retries = 0
+        attempt.intValue = 0
         val current = channel
         if (current == null) {
             player.stop()
@@ -156,9 +183,7 @@ fun PlayerPanel(
         current.referrer?.let { headers["Referer"] = it }
         httpFactory.setDefaultRequestProperties(headers)
 
-        val builder = MediaItem.Builder().setUri(current.url)
-        mimeFor(current.url)?.let { builder.setMimeType(it) }
-        player.setMediaItem(builder.build())
+        player.setMediaItem(mediaItemFor(current, 0))
         player.prepare()
         player.playWhenReady = true
     }
@@ -216,11 +241,25 @@ fun PlayerPanel(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(text = message, color = Color.White)
+                    val detail = errorDetail
+                    if (detail != null) {
+                        Text(
+                            text = detail,
+                            color = Color.White.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
                     Row(
                         modifier = Modifier.padding(top = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Button(onClick = { reloadToken += 1 }) { Text("נסה שוב") }
+                        OutlinedButton(onClick = {
+                            channel?.let { openExternally(context, it.url) }
+                        }) {
+                            Text("נגן חיצוני")
+                        }
                         OutlinedButton(onClick = {
                             channel?.let { clipboard.setText(AnnotatedString(it.url)) }
                         }) {
@@ -295,12 +334,58 @@ fun PlayerPanel(
     }
 }
 
+/** Last rung of the container ladder in [mediaItemFor]. */
+private const val LAST_ATTEMPT = 2
+
+/**
+ * One rung of the container ladder:
+ * 0 — believe the URL's extension (or let ExoPlayer infer when there is none)
+ * 1 — force HLS, which covers the very common extension-less live playlist
+ * 2 — no hint at all, so the bytes themselves decide (MPEG-TS, MP4, …)
+ */
+private fun mediaItemFor(channel: Channel, attempt: Int): MediaItem {
+    val builder = MediaItem.Builder().setUri(channel.url)
+    when (attempt) {
+        0 -> mimeFor(channel.url)?.let { builder.setMimeType(it) }
+        1 -> builder.setMimeType(MimeTypes.APPLICATION_M3U8)
+        else -> Unit
+    }
+    return builder.build()
+}
+
 private fun mimeFor(url: String): String? {
     val lower = url.lowercase()
     return when {
         lower.contains(".m3u8") -> MimeTypes.APPLICATION_M3U8
         lower.contains(".mpd") -> MimeTypes.APPLICATION_MPD
         else -> null
+    }
+}
+
+/** Errors that a different container guess could plausibly fix. */
+private fun isContainerError(e: PlaybackException): Boolean = when (e.errorCode) {
+    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+    PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+    PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+    PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+    PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
+    -> true
+    else -> false
+}
+
+/** The exact failure, so a report about a dead channel is actionable. */
+private fun detailOf(e: PlaybackException): String {
+    val status = (e.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
+    return if (status != null) "${e.errorCodeName} · HTTP $status" else e.errorCodeName
+}
+
+private fun openExternally(context: android.content.Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(Uri.parse(url), "video/*")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "פתיחה בנגן חיצוני"))
     }
 }
 
@@ -323,7 +408,7 @@ private fun describe(e: PlaybackException): String = when (e.errorCode) {
     PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
     PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
     PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
-    -> "הערוץ משדר בפורמט שלא נתמך במכשיר הזה."
+    -> "לא הצלחתי לנגן את השידור באף פורמט שניסיתי. ייתכן שהערוץ מת, שהספק החזיר דף שגיאה במקום וידאו, או שהוא חסום לאזור הזה."
     PlaybackException.ERROR_CODE_DECODING_FAILED,
     PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
     PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
