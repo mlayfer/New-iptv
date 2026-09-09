@@ -29,6 +29,7 @@
       <div class="setupPanel">
         <div class="heroTitle">ברוכים הבאים לטלוהים</div>
         <div class="heroSub">הזן מקור IPTV ולאחר מכן תוכל לבחור בין טלוויזיה בלייב לבין סרטים וסדרות.</div>
+        <div class="formHint">עמוד על שדה ולחץ אישור כדי לפתוח את המקלדת · Back סוגר אותה וממשיך בניווט</div>
 
         <div class="toggleRow" id="sourceTabs">
           <button class="focusable sourceTab active" data-source="m3u">M3U</button>
@@ -84,7 +85,7 @@
         <div id="liveGuide" class="guide">
           <div class="guideHead">
             <div class="paneTitle" id="modeHeader">טלוויזיה בלייב</div>
-            <div class="searchWrap"><input id="search" class="focusable" type="text" placeholder="חיפוש ערוץ"/></div>
+            <div class="searchWrap"><input id="search" class="focusable" type="text" placeholder="חיפוש ערוץ · אישור פותח מקלדת"/></div>
             <div class="paneCount" id="liveCount"></div>
           </div>
           <div id="notes" class="statusLine"></div>
@@ -103,7 +104,7 @@
           </div>
         </div>
         <div class="vodSearchWrap">
-          <input id="vodSearch" class="focusable" type="text" placeholder="חיפוש סרט או סדרה"/>
+          <input id="vodSearch" class="focusable" type="text" placeholder="חיפוש · אישור פותח מקלדת"/>
           <div class="vodCount" id="vodCount"></div>
         </div>
         <div id="vodRows" class="vodRows"></div>
@@ -129,6 +130,7 @@
       </div>
     </div>
   </div>
+  <script src="dev-credentials.js"></script>
   <script src="core.js"></script>
   <script src="app.js"></script>
 </body>

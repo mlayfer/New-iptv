@@ -30,6 +30,8 @@ const state = {
   vodRowStart: 0,
   vodData: [],
   overlayTimer: null,
+  // The field the on-screen keyboard is open on, if any.
+  editingEl: null,
   // What you watched and what you marked — the home screen is built from these.
   history: [],
   favorites: [],
@@ -1207,13 +1209,46 @@ function moveFocus(dir){
   if(next) setFocus(next);
 }
 
+/**
+ * Typing on a TV is a mode of its own. The on-screen keyboard reads the same
+ * D-pad this app navigates with, so while it is open every key belongs to it —
+ * otherwise the arrows move the highlight out of the field mid-word and the
+ * text simply stops arriving. Fields stay read-only (which keeps the keyboard
+ * from erupting on every pass) until OK opens them, and Back closes them.
+ */
+function editableFields(){
+  return $$('input[type="text"], input[type="password"]');
+}
+
+function isEditing(){
+  return !!state.editingEl && document.activeElement === state.editingEl;
+}
+
+function beginEdit(el){
+  if(!el || el.tagName !== 'INPUT') return;
+  el.removeAttribute('readonly');
+  // Focus first: focusing this field blurs the previous one, and that blur
+  // must not be the thing that turns editing back off.
+  try { el.focus(); } catch(e) {}
+  state.editingEl = el;
+  // Put the caret after what is already there rather than over it.
+  try { const v = el.value; el.value = ''; el.value = v; } catch(e) {}
+}
+
+function endEdit(){
+  const el = state.editingEl;
+  state.editingEl = null;
+  if(!el) return;
+  el.setAttribute('readonly', 'readonly');
+  try { el.blur(); } catch(e) {}
+  setFocus(el);
+}
+
 function onEnter(){
   const a = state.focusEl || document.activeElement;
   if(!a) return;
   if(a.tagName === 'BUTTON') { a.click(); return; }
-  if(a.tagName === 'INPUT') {
-    try { a.focus(); } catch(e) {}
-  }
+  if(a.tagName === 'INPUT') { beginEdit(a); return; }
 }
 
 function handleBack(){
@@ -1280,8 +1315,26 @@ function wireStatic(){
   $('#goHome').addEventListener('click', backToHome);
   $('#backToSetup').addEventListener('click', resetToSetup);
 
+  editableFields().forEach(el => {
+    el.setAttribute('readonly', 'readonly');
+    el.addEventListener('blur', () => {
+      // Only the field being edited ends editing; a neighbour losing focus
+      // because this one gained it is not the end of anything.
+      if(state.editingEl === el) state.editingEl = null;
+      el.setAttribute('readonly', 'readonly');
+    });
+    // A pointer (or a remote's cursor mode) should open the keyboard too.
+    el.addEventListener('click', () => { if(!isEditing()) beginEdit(el); });
+  });
+
   document.addEventListener('keydown', (e) => {
     const code = e.keyCode;
+
+    // While the keyboard is open it owns the remote, except for the way out.
+    if(isEditing()){
+      if(code === 10009 || e.key === 'Escape'){ endEdit(); e.preventDefault(); }
+      return;
+    }
     if(e.key === 'ArrowLeft' || code === 37){ moveFocus('left'); e.preventDefault(); return; }
     if(e.key === 'ArrowRight' || code === 39){ moveFocus('right'); e.preventDefault(); return; }
     if(e.key === 'ArrowUp' || code === 38){ moveFocus('up'); e.preventDefault(); return; }
@@ -1389,6 +1442,18 @@ setSourceTab(state.sourceTab);
  * The splash stays up while that happens, so the login form does not flash by.
  */
 function autoConnect(){
+  // A development build can carry its own sign-in details and skip the form.
+  const dev = (typeof window !== 'undefined' && window.TalohimDev) || null;
+  if(!state.source && dev && dev.server && dev.user && dev.pass){
+    setSourceTab('xtream');
+    $('#xtServer').value = dev.server;
+    $('#xtUser').value = dev.user;
+    $('#xtPass').value = dev.pass;
+    $('#xtVod').checked = dev.includeVod !== false;
+    loadXtream();
+    return true;
+  }
+
   const saved = state.source;
   if(!saved) return false;
   if(saved.type === 'm3u' && $('#m3uUrl').value.trim()){ loadM3u(); return true; }

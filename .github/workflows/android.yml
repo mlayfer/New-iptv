@@ -45,6 +45,31 @@ jobs:
       # here is easy; signing it is not — a Samsung TV only installs packages
       # signed with a certificate tied to that TV, so the last step is the
       # owner's to run. The name says so, to save anyone a failed install.
+      # A development build can be born signed in. The details come from
+      # repository secrets, never from the tree: this repository is public.
+      - name: Put the development sign-in details into the build
+        env:
+          XTREAM_SERVER: ${{ secrets.XTREAM_SERVER }}
+          XTREAM_USER: ${{ secrets.XTREAM_USER }}
+          XTREAM_PASS: ${{ secrets.XTREAM_PASS }}
+        run: |
+          if [ -z "$XTREAM_USER" ] || [ -z "$XTREAM_PASS" ]; then
+            echo "no development sign-in details configured; this build asks for them on screen"
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json, os
+          server = os.environ.get('XTREAM_SERVER') or 'http://ilvips.com:80'
+          data = {
+              'server': server,
+              'user': os.environ['XTREAM_USER'],
+              'pass': os.environ['XTREAM_PASS'],
+          }
+          with open('tizen/dev-credentials.js', 'w', encoding='utf-8') as out:
+              out.write('window.TalohimDev = %s;\n' % json.dumps(data, ensure_ascii=False))
+          print('sign-in details written for this build')
+          PY
+
       - name: Package the Tizen app
         run: cd tizen && zip -r -q -X ../telohim-unsigned.wgt . -x README.md
 

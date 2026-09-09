@@ -59,6 +59,7 @@ input::placeholder{color:var(--ink-faint)}
 .checkboxWrap{display:flex;align-items:center;gap:12px;font-size:21px;color:var(--ink-dim)}
 .checkboxWrap input{width:26px;height:26px;flex:0 0 auto}
 .statusLine{margin-top:10px;min-height:28px;font-size:20px;color:#ffb4a8}
+.formHint{text-align:center;font-size:19px;color:var(--ink-faint);margin:-14px 0 20px}
 .serverSuggestWrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 6px}
 .serverSuggestTitle{grid-column:1/-1;font-size:18px;color:var(--ink-faint);margin:2px}
 .serverSuggestion{border:1px solid var(--line);background:#111113;border-radius:12px;padding:12px;font-size:19px;text-align:center;direction:ltr}
