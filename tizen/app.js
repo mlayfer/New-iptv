@@ -279,7 +279,12 @@ function applyFilter(){
   state.vodRow = 0;
   state.vodCol = 0;
   state.vodRowStart = 0;
-  if(state.mode === 'VOD') renderVodRows(); else renderItems();
+  if(state.mode === 'VOD'){
+    renderVodRows();
+  } else {
+    renderItems();
+    renderPreview(state.filtered[0]);
+  }
 }
 
 // ---- Live TV ----------------------------------------------------------------
@@ -334,6 +339,34 @@ function renderItems(){
 }
 
 /** Keeps the focused channel inside the rendered window, scrolling it if needed. */
+/** Shows the highlighted channel on the stage while nothing is playing yet. */
+function renderPreview(item){
+  const box = $('#stagePreview');
+  if(!box) return;
+  const message = $('#playerMessage');
+  if(!item || state.current){
+    box.style.display = 'none';
+    if(message) message.style.display = '';
+    return;
+  }
+  box.style.display = 'flex';
+  // The preview replaces the hint; both at once draw on top of each other.
+  if(message) message.style.display = 'none';
+  const logo = $('#previewLogo');
+  logo.innerHTML = '';
+  if(item.logo){
+    const img = document.createElement('img');
+    img.src = item.logo;
+    img.alt = '';
+    img.onerror = () => { logo.textContent = placeholderText(item.name); img.remove(); };
+    logo.appendChild(img);
+  } else {
+    logo.textContent = placeholderText(item.name);
+  }
+  text($('#previewName'), item.name);
+  text($('#previewMeta'), itemMeta(item));
+}
+
 function focusLive(){
   const index = Math.max(0, Math.min(state.liveIndex, state.filtered.length - 1));
   state.liveIndex = index;
@@ -343,6 +376,7 @@ function focusLive(){
   }
   const el = $('[data-nav="item"][data-index="' + index + '"]');
   if(el) setFocus(el);
+  renderPreview(state.filtered[index]);
 }
 
 function moveLive(delta){
@@ -394,7 +428,7 @@ function renderVodRows(){
     row.items.slice(colStart, colStart + VOD_COL_WINDOW).forEach((item, colOffset) => {
       const colIndex = colStart + colOffset;
       const card = document.createElement('button');
-      card.className = 'focusable vodCard' + (state.current && state.current.id === item.id ? ' playing' : '');
+      card.className = 'focusable posterCard' + (state.current && state.current.id === item.id ? ' playing' : '');
       card.dataset.nav = 'vodCard';
       card.dataset.row = String(rowIndex);
       card.dataset.col = String(colIndex);
@@ -433,7 +467,9 @@ function vodItemAt(row, col){
 function describeVod(item){
   if(!item) return;
   text($('#vodHeroTitle'), item.name);
-  text($('#vodHeroMeta'), itemMeta(item));
+  text($('#vodHeroMeta'), itemMeta(item) + ' · אישור להפעלה');
+  const hero = $('#vodHero');
+  if(hero) hero.style.backgroundImage = item.logo ? `url("${item.logo}")` : '';
 }
 
 function focusVod(){
@@ -481,7 +517,10 @@ function showMode(mode){
     $('#search').value = '';
     renderGroups();
     applyFilter();
-    setTimeout(() => setFocus(visible('[data-nav="item"]')[0] || $('#search')), 60);
+    setTimeout(() => {
+      const first = visible('[data-nav="item"]')[0];
+      if(first){ state.liveIndex = 0; focusLive(); } else { setFocus($('#search')); }
+    }, 60);
     return;
   }
 
@@ -633,6 +672,8 @@ async function activateItem(item){
   text($('#itemMeta'), itemMeta(item));
   state.candidates = streamVariants(item.url);
   state.candidateIndex = 0;
+  const preview = $('#stagePreview');
+  if(preview) preview.style.display = 'none';
   playCandidate();
 }
 
