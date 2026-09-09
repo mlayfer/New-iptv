@@ -261,7 +261,8 @@ async function loadXtream(){
     saveSource();
     finishLoad(items);
     setError('');
-  }catch(e){ setError('שגיאה: ' + e.message); }
+    return true;
+  }catch(e){ setError('שגיאה: ' + e.message); return false; }
 }
 
 function finishLoad(items){
@@ -1441,16 +1442,36 @@ setSourceTab(state.sourceTab);
  * app: when a source is already saved, connect to it and open on the content.
  * The splash stays up while that happens, so the login form does not flash by.
  */
+/**
+ * A build that carries its own details signs itself in. Two portals of the same
+ * account are tried in turn, because one of them is regularly the one that is
+ * down — and a TV app should not answer that with a login form.
+ */
+async function connectDev(dev){
+  const servers = (dev.servers && dev.servers.length ? dev.servers : [dev.server]).filter(Boolean);
+  setSourceTab('xtream');
+  $('#xtUser').value = dev.user;
+  $('#xtPass').value = dev.pass;
+  $('#xtVod').checked = dev.includeVod !== false;
+
+  for(let i = 0; i < servers.length; i++){
+    $('#xtServer').value = servers[i];
+    setError('מתחבר ל-' + servers[i] + '...');
+    if(await loadXtream()) return true;
+  }
+  hideSplash();
+  return false;
+}
+
 function autoConnect(){
   // A development build can carry its own sign-in details and skip the form.
+  // ?setup=1 asks for the form on purpose, so a build that signs itself in can
+  // still be pointed at another source (and so the tests can reach the form).
+  const wantsForm = /[?&]setup=1/.test(location.search);
   const dev = (typeof window !== 'undefined' && window.TalohimDev) || null;
-  if(!state.source && dev && dev.server && dev.user && dev.pass){
-    setSourceTab('xtream');
-    $('#xtServer').value = dev.server;
-    $('#xtUser').value = dev.user;
-    $('#xtPass').value = dev.pass;
-    $('#xtVod').checked = dev.includeVod !== false;
-    loadXtream();
+  const devServers = dev && (dev.servers || dev.server);
+  if(!wantsForm && !state.source && dev && devServers && dev.user && dev.pass){
+    connectDev(dev);
     return true;
   }
 
