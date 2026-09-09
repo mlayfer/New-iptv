@@ -65,4 +65,20 @@ data class ParsedPlaylist(
 
 data class Programme(val start: Long, val stop: Long, val title: String, val desc: String? = null)
 
-data class RecentEntry(val channelId: String, val playlistId: String, val at: Long)
+/**
+ * Something watched, and how far in. The position is what makes "continue
+ * watching" possible; a live channel simply leaves it at zero.
+ */
+data class RecentEntry(
+    val channelId: String,
+    val playlistId: String,
+    val at: Long,
+    val position: Long = 0,
+    val duration: Long = 0,
+    /** A copy of the card, so an episode survives a reload of the catalogue. */
+    val name: String = "",
+    val group: String = "",
+    val kind: String = "",
+    val contentType: String = "",
+    val logo: String? = null,
+)

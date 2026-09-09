@@ -184,6 +184,124 @@
     return out;
   }
 
+  /**
+   * What the home screen shows, decided in one place because both apps must
+   * agree. A home screen is not a menu: it is the answer to "what do I watch
+   * now", so it opens with what you were watching, then what you marked, then
+   * what you watched last, and only then the catalogue.
+   *
+   * input: { items, history: [{id, at, position, duration}], favorites: [id] }
+   */
+  const RESUME_MIN_SECONDS = 30;
+  const RESUME_MAX_RATIO = 0.95;
+
+  function isResumable(entry) {
+    if (!entry || !(entry.position > 0)) return false;
+    if (entry.position < RESUME_MIN_SECONDS) return false;
+    if (entry.duration > 0 && entry.position > entry.duration * RESUME_MAX_RATIO) return false;
+    return true;
+  }
+
+  function progressRatio(entry) {
+    if (!entry || !(entry.duration > 0) || !(entry.position > 0)) return 0;
+    const r = entry.position / entry.duration;
+    return r < 0 ? 0 : (r > 1 ? 1 : r);
+  }
+
+  function topGroups(pool, limit, perRow) {
+    const order = [];
+    const byGroup = {};
+    pool.forEach(function (item) {
+      const g = item.group || 'ללא קטגוריה';
+      if (!byGroup[g]) { byGroup[g] = []; order.push(g); }
+      byGroup[g].push(item);
+    });
+    // Biggest category first; ties keep the order the portal returned them in,
+    // so the home screen does not reshuffle itself between loads. The original
+    // positions are captured before sorting — indexOf on an array being sorted
+    // answers about a half-sorted array.
+    const rank = {};
+    order.forEach(function (g, i) { rank[g] = i; });
+    order.sort(function (a, b) {
+      const d = byGroup[b].length - byGroup[a].length;
+      return d !== 0 ? d : rank[a] - rank[b];
+    });
+    return order.slice(0, limit).map(function (g) {
+      return { key: 'group:' + g, title: g, items: byGroup[g].slice(0, perRow) };
+    });
+  }
+
+  function buildHomeRows(input) {
+    const items = (input && input.items) || [];
+    const history = (input && input.history) || [];
+    const favorites = (input && input.favorites) || [];
+
+    const byId = {};
+    items.forEach(function (item) { byId[item.id] = item; });
+
+    const ordered = history.slice().sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    const favoriteSet = {};
+    favorites.forEach(function (id) { favoriteSet[id] = true; });
+
+    const rows = [];
+
+    const resume = [];
+    ordered.forEach(function (entry) {
+      const item = byId[entry.id];
+      if (!item || item.kind === 'LIVE') return;
+      if (!isResumable(entry)) return;
+      if (resume.length < 12) {
+        const copy = {};
+        Object.keys(item).forEach(function (k) { copy[k] = item[k]; });
+        copy.resumeAt = entry.position;
+        copy.progress = progressRatio(entry);
+        resume.push(copy);
+      }
+    });
+    if (resume.length) rows.push({ key: 'continue', title: 'המשך לצפות', items: resume });
+
+    const favs = [];
+    favorites.forEach(function (id) {
+      const item = byId[id];
+      if (item && favs.length < 20) favs.push(item);
+    });
+    if (favs.length) rows.push({ key: 'favorites', title: 'המועדפים שלי', items: favs });
+
+    const recentLive = [];
+    ordered.forEach(function (entry) {
+      const item = byId[entry.id];
+      if (!item || item.kind !== 'LIVE' || favoriteSet[item.id]) return;
+      if (recentLive.length < 12) recentLive.push(item);
+    });
+    if (recentLive.length) rows.push({ key: 'recentLive', title: 'ערוצים שנצפו לאחרונה', items: recentLive });
+
+    const live = items.filter(function (x) { return x.kind === 'LIVE'; });
+    topGroups(live, 3, 20).forEach(function (row) {
+      rows.push({ key: 'live:' + row.title, title: row.title, items: row.items });
+    });
+
+    const movies = items.filter(function (x) { return x.kind !== 'LIVE' && x.contentType !== 'SERIES'; });
+    topGroups(movies, 3, 20).forEach(function (row) {
+      rows.push({ key: 'movie:' + row.title, title: row.title, items: row.items });
+    });
+
+    const series = items.filter(function (x) { return x.contentType === 'SERIES'; });
+    if (series.length) rows.push({ key: 'series', title: 'סדרות', items: series.slice(0, 20) });
+
+    return rows.filter(function (row) { return row.items.length > 0; });
+  }
+
+  /** Newest first, one entry per item, capped — the same list both apps store. */
+  function mergeHistory(history, entry, limit) {
+    const cap = limit || 60;
+    const out = [{ id: entry.id, at: entry.at, position: entry.position || 0, duration: entry.duration || 0 }];
+    (history || []).forEach(function (old) {
+      if (old.id === entry.id) return;
+      if (out.length < cap) out.push(old);
+    });
+    return out;
+  }
+
   return {
     normalizeServer: normalizeServer,
     attrs: attrs,
@@ -192,6 +310,10 @@
     placeholderText: placeholderText,
     parseM3u: parseM3u,
     streamVariants: streamVariants,
-    episodesFromSeriesInfo: episodesFromSeriesInfo
+    episodesFromSeriesInfo: episodesFromSeriesInfo,
+    isResumable: isResumable,
+    progressRatio: progressRatio,
+    buildHomeRows: buildHomeRows,
+    mergeHistory: mergeHistory
   };
 });

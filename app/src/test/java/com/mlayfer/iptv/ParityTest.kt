@@ -1,5 +1,6 @@
 package com.mlayfer.iptv
 
+import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.M3uParser
 import com.mlayfer.iptv.data.StreamVariants
 import com.mlayfer.iptv.data.XtreamClient
@@ -88,5 +89,63 @@ class ParityTest {
             assertEquals(want.getString("group"), episodes[i].group)
             assertEquals(want.getString("url"), episodes[i].url)
         }
+    }
+
+    @Test
+    fun `lays out the same home screen`() {
+        val spec = fixtures.getJSONObject("home")
+        val items = spec.getJSONArray("items").let { array ->
+            (0 until array.length()).map { i ->
+                val o = array.getJSONObject(i)
+                HomeRows.Card(
+                    id = o.getString("id"),
+                    name = o.getString("name"),
+                    group = o.getString("group"),
+                    kind = o.getString("kind"),
+                    contentType = o.getString("contentType"),
+                )
+            }
+        }
+        val history = spec.getJSONArray("history").let { array ->
+            (0 until array.length()).map { i ->
+                val o = array.getJSONObject(i)
+                HomeRows.Entry(
+                    id = o.getString("id"),
+                    at = o.getLong("at"),
+                    position = o.getLong("position"),
+                    duration = o.getLong("duration"),
+                )
+            }
+        }
+        val favorites = spec.getJSONArray("favorites").let { array ->
+            (0 until array.length()).map { array.getString(it) }
+        }
+
+        val rows = HomeRows.build(items, history, favorites)
+        val expected = spec.getJSONArray("expected")
+
+        assertEquals(expected.length(), rows.size)
+        for (i in 0 until expected.length()) {
+            val want = expected.getJSONObject(i)
+            assertEquals(want.getString("key"), rows[i].key)
+            assertEquals(want.getString("title"), rows[i].title)
+            val wantItems = want.getJSONArray("items")
+            assertEquals(wantItems.length(), rows[i].items.size)
+            val wantResume = want.getJSONArray("resumeAt")
+            for (j in 0 until wantItems.length()) {
+                assertEquals(wantItems.getString(j), rows[i].items[j].id)
+                assertEquals(wantResume.getLong(j), rows[i].items[j].resumeAt)
+            }
+        }
+    }
+
+    @Test
+    fun `keeps one history entry per item, newest first`() {
+        val merged = HomeRows.mergeHistory(
+            listOf(HomeRows.Entry("a", at = 2, position = 10), HomeRows.Entry("b", at = 1)),
+            HomeRows.Entry("b", at = 3, position = 90, duration = 1200),
+        )
+        assertEquals(listOf("b", "a"), merged.map { it.id })
+        assertEquals(90L, merged[0].position)
     }
 }

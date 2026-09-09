@@ -14,8 +14,10 @@
         <div class="brandIdentity"><img src="brand-icon.png" class="brandIcon" alt=""/><div><div class="brandTitle">טלוהים</div><div class="brandSub">טלוויזיה בלייב • סרטים • סדרות</div></div></div>
         <div class="brandSub">Samsung Tizen TV</div>
       </div>
-      <div class="topActions">
+      <div class="topActions" id="topNav">
         <button id="goHome" class="focusable pill hidden">בית</button>
+        <button id="navLive" class="focusable pill hidden">ערוצים</button>
+        <button id="navVod" class="focusable pill hidden">סרטים וסדרות</button>
         <button id="backToSetup" class="focusable pill hidden">החלף מקור</button>
       </div>
     </header>
@@ -63,17 +65,17 @@
     </section>
 
     <section id="browseScreen" class="screen hidden">
-      <div id="homeScreen" class="homeGrid">
-        <button id="cardLive" class="focusable homeCard liveCard">
-          <div class="homeEmoji">📺</div>
-          <div class="homeTitle">טלוויזיה בלייב</div>
-          <div class="homeDesc">ערוצים חיים, חדשות, ספורט ותוכן שידור</div>
-        </button>
-        <button id="cardVod" class="focusable homeCard vodCard">
-          <div class="homeEmoji">🎬</div>
-          <div class="homeTitle">סרטים וסדרות</div>
-          <div class="homeDesc">ספריית VOD, סרטים, סדרות ותוכן לפי קטגוריות</div>
-        </button>
+      <div id="homeScreen" class="homeLayout">
+        <div class="stageHero" id="homeHero">
+          <div class="stageHeroBack" id="homeHeroBack"></div>
+          <div class="stageHeroText">
+            <div class="stageKicker" id="homeKicker">טלוהים</div>
+            <div class="stageTitle" id="homeTitle">מה נצפה עכשיו?</div>
+            <div class="stageMeta" id="homeMeta">בחר מהשורות למטה · אישור מפעיל</div>
+          </div>
+          <div class="stageArt" id="homeArt"></div>
+        </div>
+        <div id="homeRows" class="cardRows"></div>
       </div>
 
       <!-- Live TV: a guide of channel tiles, and playback that takes the screen. -->
@@ -89,21 +91,6 @@
           <div id="items" class="channelGrid"></div>
         </div>
 
-        <div id="livePlayer" class="hidden livePlayer">
-          <div class="playerStage" id="playerStage">
-            <object id="avPlayer" type="application/avplayer"></object>
-            <video id="htmlVideo" autoplay></video>
-            <div id="playerMessage" class="playerMessage"></div>
-          </div>
-          <div id="liveOverlay" class="liveOverlay">
-            <div class="ovLogo" id="ovLogo"></div>
-            <div class="ovText">
-              <div class="ovName" id="itemName">בחר ערוץ</div>
-              <div class="ovMeta" id="itemMeta"></div>
-            </div>
-            <div class="ovHint">מעלה/מטה — ערוץ · Back — למדריך</div>
-          </div>
-        </div>
       </div>
 
       <!-- Movies and series: poster rows, one per category. -->
@@ -122,6 +109,24 @@
       </div>
 
     </section>
+
+    <!-- One player for everything: a channel and a film both take the screen. -->
+    <div id="playerScreen" class="hidden playerScreen">
+      <div class="playerStage" id="playerStage">
+        <object id="avPlayer" type="application/avplayer"></object>
+        <video id="htmlVideo" autoplay></video>
+        <div id="playerMessage" class="playerMessage"></div>
+      </div>
+      <div id="liveOverlay" class="liveOverlay">
+        <div class="ovLogo" id="ovLogo"></div>
+        <div class="ovText">
+          <div class="ovName" id="itemName">בחר ערוץ</div>
+          <div class="ovMeta" id="itemMeta"></div>
+          <div class="ovProgress" id="ovProgress"><div class="ovProgressFill" id="ovProgressFill"></div></div>
+        </div>
+        <div class="ovHint" id="ovHint">מעלה/מטה — ערוץ · צהוב — מועדפים · Back — יציאה</div>
+      </div>
+    </div>
   </div>
   <script src="core.js"></script>
   <script src="app.js"></script>

@@ -108,6 +108,13 @@ class Store(context: Context) {
                         channelId = item.optString("channelId"),
                         playlistId = item.optString("playlistId"),
                         at = item.optLong("at"),
+                        position = item.optLong("position"),
+                        duration = item.optLong("duration"),
+                        name = item.optString("name"),
+                        group = item.optString("group"),
+                        kind = item.optString("kind"),
+                        contentType = item.optString("contentType"),
+                        logo = item.optString("logo").ifBlank { null },
                     )
                 )
             }
@@ -125,6 +132,13 @@ class Store(context: Context) {
                     .put("channelId", entry.channelId)
                     .put("playlistId", entry.playlistId)
                     .put("at", entry.at)
+                    .put("position", entry.position)
+                    .put("duration", entry.duration)
+                    .put("name", entry.name)
+                    .put("group", entry.group)
+                    .put("kind", entry.kind)
+                    .put("contentType", entry.contentType)
+                    .put("logo", entry.logo ?: "")
             )
         }
         return array.toString()

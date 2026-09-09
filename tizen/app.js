@@ -29,7 +29,16 @@ const state = {
   vodCol: 0,
   vodRowStart: 0,
   vodData: [],
-  overlayTimer: null
+  overlayTimer: null,
+  // What you watched and what you marked — the home screen is built from these.
+  history: [],
+  favorites: [],
+  home: {rows: [], row: 0, col: 0, rowStart: 0},
+  playerReturn: 'home',
+  resumeAt: 0,
+  position: 0,
+  duration: 0,
+  progressTimer: null
 };
 
 function text(el, value){ if(el) el.textContent = value; }
@@ -68,7 +77,75 @@ function loadSavedSource(){
     }
   } catch(e) {}
 }
-function setError(msg=''){ text($('#error'), msg); }
+function setError(msg=''){
+  text($('#error'), msg);
+  // A failure has to be readable: never leave the splash over the message.
+  if(msg && msg.indexOf('שגיאה') === 0) hideSplash();
+}
+
+function hideSplash(){
+  const sp = document.getElementById('splashScreen');
+  if(!sp || sp.classList.contains('hiddenSplash')) return;
+  sp.classList.add('hiddenSplash');
+  setTimeout(() => { sp.style.display = 'none'; }, 420);
+}
+
+// ---- what you watched, and what you marked ---------------------------------
+// Kept on the TV, in the same shape the Android app stores, so the home screen
+// means the same thing in both.
+const HISTORY_KEY = 'talohimHistoryV1';
+const FAVORITES_KEY = 'talohimFavoritesV1';
+
+function loadPrefs(){
+  try { state.history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') || []; } catch(e) { state.history = []; }
+  try { state.favorites = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') || []; } catch(e) { state.favorites = []; }
+}
+function savePrefs(){
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history.slice(0, 60)));
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(state.favorites.slice(0, 200)));
+  } catch(e) {}
+}
+
+/** A history entry carries a copy of the card, so an episode you were watching
+ *  still appears after a reload even though episodes are not in the catalogue. */
+function noteWatched(item, position, duration){
+  if(!item || !item.id) return;
+  const card = {
+    id: item.id, name: item.name, group: item.group, kind: item.kind,
+    contentType: item.contentType, logo: item.logo || null, url: item.url || '',
+    seriesId: item.seriesId, isSeriesStub: item.isSeriesStub,
+    server: item.server, user: item.user, pass: item.pass
+  };
+  state.history = Core.mergeHistory(state.history, {
+    id: item.id,
+    at: Date.now(),
+    position: Math.round(position || 0),
+    duration: Math.round(duration || 0),
+    card: card
+  }, 60);
+  savePrefs();
+}
+
+function isFavorite(item){ return item && state.favorites.indexOf(item.id) !== -1; }
+function toggleFavorite(item){
+  if(!item || !item.id) return;
+  const at = state.favorites.indexOf(item.id);
+  if(at === -1) state.favorites.unshift(item.id); else state.favorites.splice(at, 1);
+  savePrefs();
+  return at === -1;
+}
+
+/** The catalogue plus anything remembered that is no longer in it. */
+function homePool(){
+  const seen = {};
+  const pool = state.items.slice();
+  pool.forEach(x => seen[x.id] = true);
+  state.history.forEach(entry => {
+    if(entry.card && !seen[entry.card.id]){ seen[entry.card.id] = true; pool.push(entry.card); }
+  });
+  return pool;
+}
 function normalizeServer(v){ return Core.normalizeServer(v); }
 function enc(v){ return encodeURIComponent(v); }
 async function getText(url){
@@ -192,16 +269,14 @@ function finishLoad(items){
   state.group = 'הכל';
   $('#setupScreen').classList.add('hidden');
   $('#browseScreen').classList.remove('hidden');
-  $('#homeScreen').classList.remove('hidden');
   $('#liveScreen').classList.add('hidden');
   $('#vodScreen').classList.add('hidden');
-  $('#goHome').classList.add('hidden');
   $('#backToSetup').classList.remove('hidden');
-  text($('#itemName'), 'בחר ערוץ');
-  text($('#itemMeta'), 'רשימת הערוצים מימין · אישור מפעיל');
-  playerMessage('בחר ערוץ מהרשימה');
+  $('#navLive').classList.remove('hidden');
+  $('#navVod').classList.remove('hidden');
   stopPlayback();
-  setTimeout(() => setFocus($('#cardLive')), 60);
+  showHome();
+  hideSplash();
 }
 
 // A TV renders a few dozen elements comfortably and tens of thousands not at
@@ -287,6 +362,194 @@ function applyFilter(){
   }
 }
 
+// ---- Home: rows of content, the way a streaming app opens -----------------
+
+const HOME_ROW_WINDOW = 3;
+const HOME_COL_WINDOW = 12;
+
+function buildHome(){
+  state.home.rows = Core.buildHomeRows({
+    items: homePool(),
+    history: state.history,
+    favorites: state.favorites
+  });
+  if(state.home.row >= state.home.rows.length){ state.home.row = 0; state.home.col = 0; state.home.rowStart = 0; }
+}
+
+/** Artwork when the portal gives any, initials when it does not. */
+function fillArt(box, item){
+  if(!box) return;
+  box.innerHTML = '';
+  if(item && item.logo){
+    const img = document.createElement('img');
+    img.src = item.logo;
+    img.alt = '';
+    img.onerror = () => { box.textContent = placeholderText(item.name); img.remove(); };
+    box.appendChild(img);
+  } else if(item){
+    box.textContent = placeholderText(item.name);
+  }
+}
+
+function makeCard(item, navName, row, col){
+  const card = document.createElement('button');
+  const live = item.kind === 'LIVE';
+  const playing = state.current && state.current.id === item.id;
+  card.className = 'focusable ' + (live ? 'wideCard' : 'posterCard homePoster') + (playing ? ' playing' : '');
+  card.dataset.nav = navName;
+  card.dataset.row = String(row);
+  card.dataset.col = String(col);
+  card.innerHTML = (live ? '<div class="wideArt"></div>' : '<div class="vodPoster"></div>') +
+    '<div class="cardName"></div>';
+  fillArt($(live ? '.wideArt' : '.vodPoster', card), item);
+  $('.cardName', card).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
+  if(item.progress > 0){
+    const bar = document.createElement('div');
+    bar.className = 'cardProgress';
+    const fill = document.createElement('div');
+    fill.className = 'cardProgressFill';
+    fill.style.width = Math.round(item.progress * 100) + '%';
+    bar.appendChild(fill);
+    card.appendChild(bar);
+  }
+  card.addEventListener('click', () => {
+    state.home.row = row; state.home.col = col;
+    activateFromHome(item);
+  });
+  return card;
+}
+
+function renderHome(){
+  const box = $('#homeRows');
+  if(!box) return;
+  box.innerHTML = '';
+  const data = state.home.rows;
+
+  if(!data.length){
+    const empty = document.createElement('div');
+    empty.className = 'cardRowTitle';
+    empty.textContent = 'אין תוכן להצגה';
+    box.appendChild(empty);
+    return;
+  }
+
+  data.slice(state.home.rowStart, state.home.rowStart + HOME_ROW_WINDOW).forEach((row, offset) => {
+    const rowIndex = state.home.rowStart + offset;
+    const wrap = document.createElement('div');
+    const allLive = row.items.every(x => x.kind === 'LIVE');
+    wrap.className = 'cardRow ' + (allLive ? 'liveRow' : 'posterRow');
+
+    const title = document.createElement('div');
+    title.className = 'cardRowTitle';
+    title.textContent = row.title;
+
+    const track = document.createElement('div');
+    track.className = 'cardRowTrack';
+    const colStart = rowIndex === state.home.row ? Math.max(0, state.home.col - 2) : 0;
+    row.items.slice(colStart, colStart + HOME_COL_WINDOW).forEach((item, colOffset) => {
+      track.appendChild(makeCard(item, 'homeCard', rowIndex, colStart + colOffset));
+    });
+
+    wrap.appendChild(title);
+    wrap.appendChild(track);
+    box.appendChild(wrap);
+  });
+}
+
+function homeItemAt(row, col){
+  const r = state.home.rows[row];
+  return r ? r.items[col] : null;
+}
+
+function describeHome(item){
+  if(!item){
+    text($('#homeKicker'), 'טלוהים');
+    text($('#homeTitle'), 'מה נצפה עכשיו?');
+    text($('#homeMeta'), 'בחר מהשורות למטה · אישור מפעיל');
+    return;
+  }
+  const row = state.home.rows[state.home.row];
+  text($('#homeKicker'), row ? row.title : 'טלוהים');
+  text($('#homeTitle'), item.name);
+  const resume = item.resumeAt ? ' · המשך מ-' + formatClock(item.resumeAt) : '';
+  const marked = isFavorite(item) ? ' · במועדפים' : '';
+  text($('#homeMeta'), itemMeta(item) + resume + marked + ' · אישור להפעלה');
+
+  const art = $('#homeArt');
+  if(art){
+    art.classList.toggle('poster', item.kind !== 'LIVE');
+    fillArt(art, item);
+  }
+  const back = $('#homeHeroBack');
+  if(back) back.style.backgroundImage = item.logo ? `url("${item.logo}")` : '';
+}
+
+function focusHome(){
+  const data = state.home.rows;
+  if(!data.length){ describeHome(null); return; }
+  state.home.row = Math.max(0, Math.min(state.home.row, data.length - 1));
+  const row = data[state.home.row];
+  state.home.col = Math.max(0, Math.min(state.home.col, row.items.length - 1));
+  state.home.rowStart = Math.max(0, Math.min(state.home.row - 1, Math.max(0, data.length - HOME_ROW_WINDOW)));
+  renderHome();
+  describeHome(homeItemAt(state.home.row, state.home.col));
+  const el = $('[data-nav="homeCard"][data-row="' + state.home.row + '"][data-col="' + state.home.col + '"]');
+  if(el) setFocus(el);
+}
+
+function moveHome(dRow, dCol){
+  const data = state.home.rows;
+  if(!data.length) return;
+  if(dRow){ state.home.row = Math.max(0, Math.min(state.home.row + dRow, data.length - 1)); state.home.col = 0; }
+  if(dCol) state.home.col = Math.max(0, state.home.col + dCol);
+  focusHome();
+}
+
+function showHome(){
+  state.mode = null;
+  state.episodeContext = null;
+  $('#liveScreen').classList.add('hidden');
+  $('#vodScreen').classList.add('hidden');
+  $('#homeScreen').classList.remove('hidden');
+  $('#goHome').classList.add('hidden');
+  renderNotes();
+  buildHome();
+  state.home.row = 0; state.home.col = 0; state.home.rowStart = 0;
+  setTimeout(() => {
+    if(state.home.rows.length) focusHome();
+    else setFocus($('#navLive'));
+  }, 60);
+}
+
+/** A card knows what it is, so the home screen needs no separate menus. */
+function activateFromHome(item){
+  if(!item) return;
+  if(item.isSeriesStub){ showMode('VOD'); openSeries(item); return; }
+  if(item.kind === 'LIVE'){
+    // Line up the live pool so channel up/down works straight from the home row.
+    state.mode = 'LIVE';
+    state.group = 'הכל';
+    state.episodeContext = null;
+    if($('#search')) $('#search').value = '';
+    applyFilter();
+    const at = state.filtered.findIndex(x => x.id === item.id);
+    if(at >= 0) state.liveIndex = at;
+  }
+  activateItem(item, resumeFor(item));
+}
+
+function resumeFor(item){
+  const entry = state.history.find(x => x.id === item.id);
+  return entry && Core.isResumable(entry) ? entry.position : 0;
+}
+
+function formatClock(seconds){
+  const s = Math.max(0, Math.round(seconds || 0));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const pad = n => (n < 10 ? '0' : '') + n;
+  return h ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
+}
+
 // ---- Live TV: a guide of channel tiles, then full-screen playback ----------
 
 const LIVE_COLS = 5;
@@ -318,30 +581,15 @@ function renderItems(){
     tile.dataset.nav = 'item';
     tile.dataset.index = String(index);
     tile.innerHTML = '<div class="tileLogo"></div><div class="tileName"></div><div class="tileMeta"></div>';
-    $('.tileName', tile).textContent = item.name;
+    $('.tileName', tile).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
     $('.tileMeta', tile).textContent = (index + 1) + ' · ' + item.group;
-    fillLogo($('.tileLogo', tile), item);
+    fillArt($('.tileLogo', tile), item);
     tile.addEventListener('click', () => {
       state.liveIndex = index;
       activateItem(item);
     });
     box.appendChild(tile);
   });
-}
-
-/** Shared by the tiles and the playback bar: artwork when there is any, initials when not. */
-function fillLogo(box, item){
-  if(!box) return;
-  box.innerHTML = '';
-  if(item && item.logo){
-    const img = document.createElement('img');
-    img.src = item.logo;
-    img.alt = '';
-    img.onerror = () => { box.textContent = placeholderText(item.name); img.remove(); };
-    box.appendChild(img);
-  } else if(item){
-    box.textContent = placeholderText(item.name);
-  }
 }
 
 function focusChannel(){
@@ -389,22 +637,70 @@ function showOverlay(){
   state.overlayTimer = setTimeout(() => bar.classList.add('faded'), OVERLAY_MS);
 }
 
-function openLivePlayer(item){
-  $('#liveGuide').classList.add('hidden');
-  $('#livePlayer').classList.remove('hidden');
-  text($('#itemName'), item.name);
-  text($('#itemMeta'), itemMeta(item));
-  fillLogo($('#ovLogo'), item);
+/**
+ * A channel and a film both take the whole screen — a small player pane inside a
+ * browsing screen is what a set-top box did, not what a streaming app does.
+ */
+function openPlayer(item, returnTo){
+  state.playerReturn = returnTo;
+  $('#playerScreen').classList.remove('hidden');
+  describePlayer(item);
   showOverlay();
 }
 
-function closeLivePlayer(){
+function describePlayer(item){
+  text($('#itemName'), item.name);
+  text($('#itemMeta'), itemMeta(item));
+  fillArt($('#ovLogo'), item);
+  const onDemand = item.kind !== 'LIVE';
+  text($('#ovHint'), onDemand
+    ? 'ימין/שמאל — דילוג · צהוב — מועדפים · Back — יציאה'
+    : 'מעלה/מטה — ערוץ · צהוב — מועדפים · Back — יציאה');
+  const bar = $('#ovProgress');
+  if(bar) bar.classList.toggle('on', onDemand);
+  renderProgress();
+}
+
+function renderProgress(){
+  const fill = $('#ovProgressFill');
+  if(!fill) return;
+  const ratio = state.duration > 0 ? Math.max(0, Math.min(state.position / state.duration, 1)) : 0;
+  fill.style.width = Math.round(ratio * 100) + '%';
+  const item = state.current;
+  if(item && item.kind !== 'LIVE' && state.duration > 0){
+    text($('#itemMeta'), itemMeta(item) + ' · ' + formatClock(state.position) + ' / ' + formatClock(state.duration));
+  }
+}
+
+function rememberPosition(){
+  const item = state.current;
+  if(!item) return;
+  // A film that never started must not overwrite the position it had before:
+  // a failed attempt would otherwise erase where you actually stopped.
+  if(item.kind !== 'LIVE' && !(state.position > 0)) return;
+  noteWatched(item, item.kind === 'LIVE' ? 0 : state.position, state.duration);
+}
+
+function closePlayer(){
+  rememberPosition();
   stopPlayback();
+  if(state.progressTimer){ clearInterval(state.progressTimer); state.progressTimer = null; }
+  const item = state.current;
   state.current = null;
-  $('#livePlayer').classList.add('hidden');
-  $('#liveGuide').classList.remove('hidden');
-  renderItems();
-  focusChannel();
+  state.position = 0;
+  state.duration = 0;
+  $('#playerScreen').classList.add('hidden');
+
+  if(state.playerReturn === 'live'){
+    renderItems();
+    focusChannel();
+  } else if(state.playerReturn === 'vod'){
+    focusVod();
+  } else {
+    buildHome();
+    focusHome();
+  }
+  return item;
 }
 
 // ---- Movies and series ------------------------------------------------------
@@ -455,7 +751,7 @@ function renderVodRows(){
       card.dataset.row = String(rowIndex);
       card.dataset.col = String(colIndex);
       card.innerHTML = '<div class="vodPoster"></div><div class="vodCardTitle"></div>';
-      $('.vodCardTitle', card).textContent = item.name;
+      $('.vodCardTitle', card).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
       const poster = $('.vodPoster', card);
       if(item.logo){
         const img = document.createElement('img');
@@ -536,8 +832,6 @@ function showMode(mode){
     $('#vodScreen').classList.add('hidden');
     $('#liveScreen').classList.remove('hidden');
     text($('#modeHeader'), 'טלוויזיה בלייב');
-    $('#livePlayer').classList.add('hidden');
-    $('#liveGuide').classList.remove('hidden');
     $('#search').value = '';
     renderGroups();
     applyFilter();
@@ -566,21 +860,20 @@ function closeSeries(){
 }
 
 function backToHome(){
-  state.episodeContext = null;
-  state.mode = null;
-  state.current = null;
-  stopPlayback();
-  $('#livePlayer').classList.add('hidden');
-  $('#liveGuide').classList.remove('hidden');
-  $('#liveScreen').classList.add('hidden');
-  $('#vodScreen').classList.add('hidden');
-  $('#homeScreen').classList.remove('hidden');
-  $('#goHome').classList.add('hidden');
-  setTimeout(() => setFocus($('#cardLive')), 60);
+  if(!$('#playerScreen').classList.contains('hidden')){
+    rememberPosition();
+    stopPlayback();
+    $('#playerScreen').classList.add('hidden');
+    state.current = null;
+  }
+  showHome();
 }
 
 function resetToSetup(){
   stopPlayback();
+  $('#playerScreen').classList.add('hidden');
+  $('#navLive').classList.add('hidden');
+  $('#navVod').classList.add('hidden');
   $('#browseScreen').classList.add('hidden');
   $('#setupScreen').classList.remove('hidden');
   $('#goHome').classList.add('hidden');
@@ -635,8 +928,37 @@ function playHtml(url){
   $('#avPlayer').style.display = 'none';
   v.style.display = 'block';
   v.onerror = () => nextCandidate('הנגן המובנה לא הצליח לנגן את התוכן');
+  v.onloadedmetadata = () => {
+    state.duration = v.duration || 0;
+    if(state.resumeAt > 0){ try { v.currentTime = state.resumeAt; } catch(e) {} state.resumeAt = 0; }
+  };
+  v.ontimeupdate = () => { state.position = v.currentTime || 0; state.duration = v.duration || state.duration; renderProgress(); };
   v.src = url;
   v.play().catch(() => nextCandidate('הנגן המובנה לא הצליח לנגן את התוכן'));
+}
+
+/** Where you stopped is written down while you watch, not only when you leave. */
+function startProgressTicker(){
+  if(state.progressTimer) clearInterval(state.progressTimer);
+  state.progressTimer = setInterval(() => {
+    if(!state.current) return;
+    if(state.current.kind !== 'LIVE' && state.position > 0) rememberPosition();
+  }, 15000);
+}
+
+function seekBy(seconds){
+  const item = state.current;
+  if(!item || item.kind === 'LIVE') return;
+  const target = Math.max(0, state.position + seconds);
+  try {
+    if(window.webapis && webapis.avplay && webapis.avplay.getState() !== 'NONE'){
+      webapis.avplay.seekTo(Math.round(target * 1000));
+    } else {
+      $('#htmlVideo').currentTime = target;
+    }
+    state.position = target;
+    renderProgress();
+  } catch(e) {}
 }
 
 /**
@@ -668,16 +990,27 @@ function playCandidate(){
       webapis.avplay.open(url);
       try { if(item.userAgent) webapis.avplay.setStreamingProperty('USER_AGENT', item.userAgent); } catch(e) {}
       try { if(item.referrer) webapis.avplay.setStreamingProperty('REFERER', item.referrer); } catch(e) {}
-      webapis.avplay.setDisplayRect(594, 152, 1224, 682);
+      webapis.avplay.setDisplayRect(0, 0, 1920, 1080);
       webapis.avplay.setListener({
         onbufferingstart: () => playerMessage('טוען...'),
         onbufferingcomplete: () => playerMessage(''),
-        onstreamcompleted: () => playerMessage('ההפעלה הסתיימה'),
+        onstreamcompleted: () => { rememberPosition(); playerMessage('ההפעלה הסתיימה'); },
         onerror: err => nextCandidate('שגיאת ניגון: ' + err),
-        onevent: () => {}, oncurrentplaytime: () => {}, ondrmevent: () => {}
+        onevent: () => {},
+        oncurrentplaytime: ms => { state.position = (ms || 0) / 1000; renderProgress(); },
+        ondrmevent: () => {}
       });
       webapis.avplay.prepareAsync(
-        () => { playerMessage(''); webapis.avplay.play(); },
+        () => {
+          playerMessage('');
+          try { state.duration = (webapis.avplay.getDuration() || 0) / 1000; } catch(e) {}
+          if(state.resumeAt > 0){
+            try { webapis.avplay.seekTo(Math.round(state.resumeAt * 1000)); } catch(e) {}
+            state.resumeAt = 0;
+          }
+          webapis.avplay.play();
+          renderProgress();
+        },
         err => nextCandidate('שגיאת הכנה: ' + err)
       );
     }catch(e){
@@ -689,12 +1022,19 @@ function playCandidate(){
   playHtml(url);
 }
 
-async function activateItem(item){
+async function activateItem(item, resumeAt){
   if(item.isSeriesStub){ await openSeries(item); return; }
   if(!item.url){ playerMessage('אין כתובת ניגון לפריט זה'); return; }
 
+  const returnTo = state.current ? state.playerReturn : currentNavMode();
   state.current = item;
-  if(state.mode === 'LIVE') openLivePlayer(item);
+  // Anything picked anywhere resumes, not only what the home row offers.
+  state.resumeAt = resumeAt === undefined ? resumeFor(item) : (resumeAt || 0);
+  state.position = state.resumeAt;
+  state.duration = 0;
+  openPlayer(item, returnTo === 'player' ? state.playerReturn : returnTo);
+  noteWatched(item, state.resumeAt, 0);
+  startProgressTicker();
   state.candidates = streamVariants(item.url);
   state.candidateIndex = 0;
   playCandidate();
@@ -735,19 +1075,24 @@ function navSetup(active, dir){
 
 function navHome(active, dir){
   const actions = visible('[data-nav="topAction"]');
-  const cards = visible('[data-nav="homeCard"]');
-  const type = active?.dataset.nav;
+  const type = active && active.dataset ? active.dataset.nav : null;
+
   if(type === 'topAction'){
     if(dir === 'left' || dir === 'right') return moveRtlRow(actions, active, dir) || active;
-    if(dir === 'down') return cards[0] || active;
+    if(dir === 'down'){ if(state.home.rows.length){ focusHome(); return null; } return active; }
     return active;
   }
   if(type === 'homeCard'){
-    if(dir === 'left' || dir === 'right') return moveRtlRow(cards, active, dir) || active;
-    if(dir === 'up') return actions[actions.length - 1] || active;
+    if(dir === 'up' && state.home.row === 0) return actions[0] || active;
+    if(dir === 'up'){ moveHome(-1, 0); return null; }
+    if(dir === 'down'){ moveHome(1, 0); return null; }
+    // The rows read right to left, so right moves back through the row.
+    if(dir === 'right'){ moveHome(0, -1); return null; }
+    if(dir === 'left'){ moveHome(0, 1); return null; }
     return active;
   }
-  return cards[0] || actions[0] || active;
+  if(state.home.rows.length){ focusHome(); return null; }
+  return actions[0] || active;
 }
 
 function navLive(active, dir){
@@ -784,11 +1129,21 @@ function navLive(active, dir){
   return visible('[data-nav="item"]')[0] || $('#search');
 }
 
-/** While watching, the D-pad changes channel and any key wakes the bar. */
+/**
+ * While watching, the D-pad belongs to the content: channels zap up and down,
+ * a film seeks. Any key wakes the bar first, so you can see what you are on.
+ */
 function navPlayer(dir){
   showOverlay();
-  if(dir === 'up') zap(-1);
-  if(dir === 'down') zap(1);
+  const live = state.current && state.current.kind === 'LIVE';
+  if(live){
+    if(dir === 'up') zap(-1);
+    if(dir === 'down') zap(1);
+  } else {
+    // Right is back and left is forward, the way the rest of the app reads.
+    if(dir === 'right') seekBy(-30);
+    if(dir === 'left') seekBy(30);
+  }
   return null;
 }
 
@@ -819,9 +1174,9 @@ function navVod(active, dir){
 }
 
 function currentNavMode(){
+  if(!$('#playerScreen').classList.contains('hidden')) return 'player';
   if(!$('#setupScreen').classList.contains('hidden')) return 'setup';
   if(!$('#homeScreen').classList.contains('hidden')) return 'home';
-  if(!$('#livePlayer').classList.contains('hidden')) return 'player';
   if(!$('#liveScreen').classList.contains('hidden')) return 'live';
   return 'vod';
 }
@@ -850,8 +1205,8 @@ function onEnter(){
 
 function handleBack(){
   if(!$('#setupScreen').classList.contains('hidden')) return;
-  if(!$('#livePlayer').classList.contains('hidden')){
-    closeLivePlayer();
+  if(!$('#playerScreen').classList.contains('hidden')){
+    closePlayer();
     return;
   }
   // Inside a series, Back returns to the series list rather than leaving the mode.
@@ -884,10 +1239,7 @@ function wireStatic(){
 
   $('#search').dataset.nav = 'search';
   $('#vodSearch').dataset.nav = 'vodSearch';
-  $('#goHome').dataset.nav = 'topAction';
-  $('#backToSetup').dataset.nav = 'topAction';
-  $('#cardLive').dataset.nav = 'homeCard';
-  $('#cardVod').dataset.nav = 'homeCard';
+  ['#goHome', '#navLive', '#navVod', '#backToSetup'].forEach(sel => { $(sel).dataset.nav = 'topAction'; });
 
   $$('.serverSuggestion').forEach(btn => {
     btn.dataset.nav = 'setupField';
@@ -909,8 +1261,8 @@ function wireStatic(){
   $('#loadXtream').addEventListener('click', loadXtream);
   $('#search').addEventListener('input', applyFilter);
   $('#vodSearch').addEventListener('input', applyFilter);
-  $('#cardLive').addEventListener('click', () => showMode('LIVE'));
-  $('#cardVod').addEventListener('click', () => showMode('VOD'));
+  $('#navLive').addEventListener('click', () => showMode('LIVE'));
+  $('#navVod').addEventListener('click', () => showMode('VOD'));
   $('#goHome').addEventListener('click', backToHome);
   $('#backToSetup').addEventListener('click', resetToSetup);
 
@@ -922,6 +1274,8 @@ function wireStatic(){
     if(e.key === 'ArrowDown' || code === 40){ moveFocus('down'); e.preventDefault(); return; }
     if(e.key === 'Enter' || code === 13){ onEnter(); e.preventDefault(); return; }
     if(e.key === 'Backspace' || code === 10009){ handleBack(); e.preventDefault(); return; }
+    // The yellow key on a Samsung remote, and F on a desktop keyboard.
+    if(code === 405 || e.key === 'f' || e.key === 'F'){ favoriteFocused(); e.preventDefault(); return; }
     if(state.mode === 'LIVE' && (code === 427 || code === 33)){
       zap(1);
       e.preventDefault();
@@ -949,9 +1303,34 @@ function wireStatic(){
 function registerKeys(){
   try {
     if(window.tizen && tizen.tvinputdevice){
-      ['MediaPlayPause','MediaStop','ChannelUp','ChannelDown'].forEach(k => { try { tizen.tvinputdevice.registerKey(k); } catch(e) {} });
+      ['MediaPlayPause','MediaStop','ChannelUp','ChannelDown','ColorF2Yellow']
+        .forEach(k => { try { tizen.tvinputdevice.registerKey(k); } catch(e) {} });
     }
   } catch(e) {}
+}
+
+/** Whatever is focused — or playing — goes in or out of the favourites row. */
+function favoriteFocused(){
+  const mode = currentNavMode();
+  let item = null;
+  if(mode === 'player') item = state.current;
+  else if(mode === 'home') item = homeItemAt(state.home.row, state.home.col);
+  else if(mode === 'live') item = state.filtered[state.liveIndex];
+  else if(mode === 'vod') item = vodItemAt(state.vodRow, state.vodCol);
+  if(!item) return;
+
+  const added = toggleFavorite(item);
+  if(mode === 'home'){
+    buildHome();
+    focusHome();
+  } else if(mode === 'live'){
+    renderItems();
+    focusChannel();
+  } else if(mode === 'vod'){
+    focusVod();
+  } else {
+    text($('#itemMeta'), itemMeta(item) + (added ? ' · נוסף למועדפים' : ' · הוסר מהמועדפים'));
+  }
 }
 
 /**
@@ -978,6 +1357,7 @@ function demoItems(count){
   return out;
 }
 
+loadPrefs();
 wireStatic();
 registerKeys();
 
@@ -988,8 +1368,28 @@ if(demo){
 }
 loadSavedSource();
 setSourceTab(state.sourceTab);
-setTimeout(() => setFocus(visible('[data-nav="setupTab"]')[0] || $('#m3uUrl')), 150);
-setTimeout(() => { const sp = document.getElementById('splashScreen'); if (sp) { sp.classList.add('hiddenSplash'); setTimeout(() => { sp.style.display='none'; }, 420); } }, 1300);
+
+/**
+ * A TV app that asks you to log in every time you turn it on is a form, not an
+ * app: when a source is already saved, connect to it and open on the content.
+ * The splash stays up while that happens, so the login form does not flash by.
+ */
+function autoConnect(){
+  const saved = state.source;
+  if(!saved) return false;
+  if(saved.type === 'm3u' && $('#m3uUrl').value.trim()){ loadM3u(); return true; }
+  if(saved.type === 'xtream' && $('#xtServer').value.trim()){ loadXtream(); return true; }
+  return false;
+}
+
+const connecting = demo ? false : autoConnect();
+setTimeout(() => {
+  // Only when the form is still what is on screen: the home screen sets its own.
+  if(!$('#setupScreen').classList.contains('hidden')) {
+    setFocus(visible('[data-nav="setupTab"]')[0] || $('#m3uUrl'));
+  }
+}, 150);
+setTimeout(hideSplash, connecting ? 9000 : 1300);
 
 
 })();

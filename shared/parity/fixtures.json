@@ -1,6 +1,5 @@
 {
   "_comment": "One description of how טלוהים must behave, checked by both implementations: app/src/test (Kotlin) and tizen/test (JavaScript). Change behaviour here first, then make both sides pass.",
-
   "m3u": {
     "playlist": "#EXTM3U x-tvg-url=\"https://guide.example.com/epg.xml.gz\"\n#EXTINF:-1 tvg-id=\"kan11.il\" tvg-name=\"כאן 11\" tvg-logo=\"https://logo/kan.png\" group-title=\"ישראל\",כאן 11 HD\n#EXTVLCOPT:http-user-agent=Mozilla/5.0 Player\nhttps://cdn.example.com/kan11/index.m3u8\n#EXTINF:-1 tvg-id=\"keshet12.il\",קשת 12\n#EXTGRP:ישראל\nhttps://cdn.example.com/keshet/playlist.m3u8?token=a,b\n#EXTINF:0,Movie Without Attrs\nhttp://vod.example.com/movies/great-film.mp4\n# stray comment\nnot-a-url\n",
     "expected": [
@@ -27,13 +26,20 @@
       }
     ]
   },
-
   "servers": [
-    { "input": "portal.example.com:8080/", "expected": "http://portal.example.com:8080" },
-    { "input": "https://p.tv/player_api.php?x=1", "expected": "https://p.tv" },
-    { "input": "  http://a.tv:80  ", "expected": "http://a.tv:80" }
+    {
+      "input": "portal.example.com:8080/",
+      "expected": "http://portal.example.com:8080"
+    },
+    {
+      "input": "https://p.tv/player_api.php?x=1",
+      "expected": "https://p.tv"
+    },
+    {
+      "input": "  http://a.tv:80  ",
+      "expected": "http://a.tv:80"
+    }
   ],
-
   "variants": [
     {
       "url": "http://panel.example.com:80/live/USER/PASS/26989.m3u8",
@@ -55,7 +61,9 @@
     },
     {
       "url": "https://cdn.tv/live/index.m3u8",
-      "expected": ["https://cdn.tv/live/index.m3u8"]
+      "expected": [
+        "https://cdn.tv/live/index.m3u8"
+      ]
     },
     {
       "url": "http://h/live/u/p/44.ts",
@@ -67,32 +75,335 @@
       ]
     }
   ],
-
   "episodes": {
     "server": "http://panel:8080",
     "user": "user",
     "pass": "pass",
     "info": {
       "episodes": {
+        "1": [
+          {
+            "id": "12",
+            "episode_num": 1,
+            "title": "Pilot",
+            "container_extension": "mp4"
+          },
+          {
+            "id": "13",
+            "episode_num": 2,
+            "title": "",
+            "container_extension": ""
+          }
+        ],
         "2": [
           {
             "id": "991",
             "episode_num": 1,
             "title": "Return",
             "container_extension": "mkv",
-            "info": { "movie_image": "http://img/2.jpg" }
+            "info": {
+              "movie_image": "http://img/2.jpg"
+            }
           }
-        ],
-        "1": [
-          { "id": "12", "episode_num": 1, "title": "Pilot", "container_extension": "mp4" },
-          { "id": "13", "episode_num": 2, "title": "", "container_extension": "" }
         ]
       }
     },
     "expected": [
-      { "name": "S1E1 · Pilot", "group": "עונה 1", "url": "http://panel:8080/series/user/pass/12.mp4" },
-      { "name": "S1E2 · פרק 2", "group": "עונה 1", "url": "http://panel:8080/series/user/pass/13.mp4" },
-      { "name": "S2E1 · Return", "group": "עונה 2", "url": "http://panel:8080/series/user/pass/991.mkv" }
+      {
+        "name": "S1E1 · Pilot",
+        "group": "עונה 1",
+        "url": "http://panel:8080/series/user/pass/12.mp4"
+      },
+      {
+        "name": "S1E2 · פרק 2",
+        "group": "עונה 1",
+        "url": "http://panel:8080/series/user/pass/13.mp4"
+      },
+      {
+        "name": "S2E1 · Return",
+        "group": "עונה 2",
+        "url": "http://panel:8080/series/user/pass/991.mkv"
+      }
+    ]
+  },
+  "home": {
+    "_comment": "buildHomeRows in tizen/core.js and HomeRows.build in Kotlin must return this.",
+    "items": [
+      {
+        "id": "l1",
+        "name": "כאן 11",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l2",
+        "name": "קשת 12",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l3",
+        "name": "רשת 13",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l4",
+        "name": "ספורט 1",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l5",
+        "name": "ספורט 2",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l6",
+        "name": "ספורט 3",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l7",
+        "name": "i24",
+        "group": "חדשות",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l8",
+        "name": "כאן חדשות",
+        "group": "חדשות",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l9",
+        "name": "לוגי",
+        "group": "ילדים",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "v1",
+        "name": "המסע הארוך",
+        "group": "חדש בקולנוע",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "v2",
+        "name": "אור אחרון",
+        "group": "חדש בקולנוע",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "v3",
+        "name": "שדות של זהב",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "v4",
+        "name": "מעבר לים",
+        "group": "קומדיה",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "v5",
+        "name": "יום שישי",
+        "group": "קומדיה",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "s1",
+        "name": "פאודה",
+        "group": "דרמה",
+        "kind": "VOD",
+        "contentType": "SERIES"
+      },
+      {
+        "id": "s2",
+        "name": "שטיסל",
+        "group": "דרמה",
+        "kind": "VOD",
+        "contentType": "SERIES"
+      }
+    ],
+    "history": [
+      {
+        "id": "v1",
+        "at": 500,
+        "position": 1800,
+        "duration": 5400
+      },
+      {
+        "id": "v2",
+        "at": 400,
+        "position": 10,
+        "duration": 5400
+      },
+      {
+        "id": "v3",
+        "at": 300,
+        "position": 5300,
+        "duration": 5400
+      },
+      {
+        "id": "l4",
+        "at": 250,
+        "position": 0,
+        "duration": 0
+      },
+      {
+        "id": "l1",
+        "at": 200,
+        "position": 0,
+        "duration": 0
+      },
+      {
+        "id": "gone",
+        "at": 100,
+        "position": 900,
+        "duration": 3600
+      }
+    ],
+    "favorites": [
+      "l1",
+      "v4",
+      "missing"
+    ],
+    "expected": [
+      {
+        "key": "continue",
+        "title": "המשך לצפות",
+        "items": [
+          "v1"
+        ],
+        "resumeAt": [
+          1800
+        ]
+      },
+      {
+        "key": "favorites",
+        "title": "המועדפים שלי",
+        "items": [
+          "l1",
+          "v4"
+        ],
+        "resumeAt": [
+          0,
+          0
+        ]
+      },
+      {
+        "key": "recentLive",
+        "title": "ערוצים שנצפו לאחרונה",
+        "items": [
+          "l4"
+        ],
+        "resumeAt": [
+          0
+        ]
+      },
+      {
+        "key": "live:ישראל",
+        "title": "ישראל",
+        "items": [
+          "l1",
+          "l2",
+          "l3"
+        ],
+        "resumeAt": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "key": "live:ספורט",
+        "title": "ספורט",
+        "items": [
+          "l4",
+          "l5",
+          "l6"
+        ],
+        "resumeAt": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "key": "live:חדשות",
+        "title": "חדשות",
+        "items": [
+          "l7",
+          "l8"
+        ],
+        "resumeAt": [
+          0,
+          0
+        ]
+      },
+      {
+        "key": "movie:חדש בקולנוע",
+        "title": "חדש בקולנוע",
+        "items": [
+          "v1",
+          "v2"
+        ],
+        "resumeAt": [
+          0,
+          0
+        ]
+      },
+      {
+        "key": "movie:קומדיה",
+        "title": "קומדיה",
+        "items": [
+          "v4",
+          "v5"
+        ],
+        "resumeAt": [
+          0,
+          0
+        ]
+      },
+      {
+        "key": "movie:אקשן",
+        "title": "אקשן",
+        "items": [
+          "v3"
+        ],
+        "resumeAt": [
+          0
+        ]
+      },
+      {
+        "key": "series",
+        "title": "סדרות",
+        "items": [
+          "s1",
+          "s2"
+        ],
+        "resumeAt": [
+          0,
+          0
+        ]
+      }
     ]
   }
 }

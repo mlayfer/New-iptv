@@ -60,6 +60,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.mlayfer.iptv.data.Channel
+import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Http
 import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.StreamProbe
@@ -91,6 +92,9 @@ fun PlayerPanel(
     onPrev: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Seconds to start from, for something you were already part way through. */
+    resumeAt: Long = 0,
+    onProgress: (position: Long, duration: Long) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -143,7 +147,24 @@ fun PlayerPanel(
         attempt.mimeType?.let { builder.setMimeType(it) }
         player.setMediaItem(builder.build())
         player.prepare()
+        // Live has no meaningful position; a film picks up where it stopped.
+        if (resumeAt > 0 && channelNow?.kind != ChannelKind.LIVE) {
+            player.seekTo(resumeAt * 1000)
+        }
         player.playWhenReady = true
+    }
+
+    // Where playback got to, written down while watching rather than only on the
+    // way out, so a set-top box losing power does not lose the position too.
+    LaunchedEffect(channel?.id) {
+        val watching = channel ?: return@LaunchedEffect
+        if (watching.kind == ChannelKind.LIVE) return@LaunchedEffect
+        while (true) {
+            delay(10_000)
+            val position = player.currentPosition / 1000
+            val duration = player.duration.takeIf { it > 0 }?.div(1000) ?: 0
+            if (position > 0) onProgress(position, duration)
+        }
     }
 
     DisposableEffect(player) {

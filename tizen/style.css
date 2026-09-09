@@ -63,16 +63,49 @@ input::placeholder{color:var(--ink-faint)}
 .serverSuggestTitle{grid-column:1/-1;font-size:18px;color:var(--ink-faint);margin:2px}
 .serverSuggestion{border:1px solid var(--line);background:#111113;border-radius:12px;padding:12px;font-size:19px;text-align:center;direction:ltr}
 
-/* ---- home ---- */
-.homeGrid{display:grid;grid-template-columns:1fr 1fr;gap:24px;height:100%;align-content:center}
-.homeCard{height:340px;border-radius:26px;border:1px solid var(--line);padding:32px;text-align:right;
-  display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;
-  background:linear-gradient(160deg,#1f1f23 0%, #0d0d0f 72%)}
-.homeCard::before{content:"";position:absolute;inset:-40% 55% 40% -40%;border-radius:50%;background:rgba(77,155,255,.12)}
-.liveCard::before{background:rgba(77,155,255,.10)}
-.homeEmoji{font-size:66px;margin-bottom:22px}
-.homeTitle{font-size:40px;font-weight:800}
-.homeDesc{font-size:22px;line-height:1.5;color:var(--ink-dim);margin-top:12px;max-width:78%}
+/* ---- home: what to watch, not a menu of places to go ---- */
+.homeLayout{height:100%;display:grid;grid-template-rows:170px 1fr;gap:10px;min-height:0}
+/* The hero says what is under the cursor: a plate of its artwork, the title,
+   and a dimmed, blurred copy of the same art behind it for depth. */
+.stageHero{border-radius:22px;border:1px solid var(--line);padding:22px 32px;display:flex;align-items:center;gap:28px;
+  position:relative;overflow:hidden;background-color:#141417}
+.stageHeroBack{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(30px);opacity:.35}
+.stageHero::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(270deg,rgba(10,10,11,.97) 34%,rgba(10,10,11,.72) 72%,rgba(10,10,11,.45) 100%)}
+.stageArt{position:relative;z-index:1;width:210px;height:118px;border-radius:14px;border:1px solid var(--line);
+  background:linear-gradient(160deg,#232327,#111113);display:flex;align-items:center;justify-content:center;
+  overflow:hidden;flex:0 0 auto;color:var(--accent);font-size:32px;font-weight:800}
+.stageArt img{max-width:88%;max-height:88%;object-fit:contain}
+.stageArt.poster{width:94px;height:140px}
+.stageArt.poster img{max-width:100%;max-height:100%;object-fit:cover;width:100%;height:100%}
+.stageHeroText{position:relative;z-index:1;min-width:0;flex:1}
+.stageKicker{font-size:18px;letter-spacing:2px;color:var(--accent);font-weight:700}
+.stageTitle{font-size:42px;font-weight:800;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stageMeta{font-size:21px;color:var(--ink-dim);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.cardRows{overflow:hidden;display:flex;flex-direction:column;gap:10px;min-height:0}
+.cardRow{overflow:hidden;flex:0 0 auto}
+.cardRow.posterRow{height:238px}
+.cardRow.liveRow{height:188px}
+.cardRowTitle{font-size:21px;font-weight:700;margin:0 6px 8px;display:flex;align-items:center;gap:10px}
+.cardRowTitle::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+.cardRowTrack{display:flex;gap:12px;overflow:hidden}
+
+/* A channel is a wide card, a film is a poster: the shape says what it is. */
+.wideCard{flex:0 0 auto;width:200px;border:1px solid transparent;background:transparent;border-radius:14px;padding:6px;text-align:right}
+.wideArt{width:100%;height:112px;border-radius:10px;border:1px solid var(--line-soft);overflow:hidden;
+  background:linear-gradient(160deg,#232327,#111113);display:flex;align-items:center;justify-content:center;
+  color:var(--accent);font-size:28px;font-weight:800}
+.wideArt img{max-width:82%;max-height:82%;object-fit:contain}
+.cardName{font-size:17px;margin-top:8px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.focused .cardName{color:var(--ink)}
+.homePoster{width:124px}
+.homePoster .vodPoster{height:150px}
+
+/* How far into something you already are, on the card and in the overlay. */
+.cardProgress{height:4px;border-radius:3px;background:rgba(255,255,255,.16);margin-top:6px;overflow:hidden}
+.cardProgressFill{height:100%;background:var(--accent)}
+.favMark{color:var(--accent);font-size:16px;margin-left:6px}
 
 /* ---- live: a channel guide, the way a TV provider lays one out ---- */
 .liveLayout{height:100%}
@@ -98,7 +131,7 @@ input::placeholder{color:var(--ink-faint)}
 .channelTile .tileNumber{position:absolute}
 
 /* Playback takes the whole screen; the bar tells you what you are on and fades. */
-.livePlayer{position:fixed;inset:0;z-index:500;background:#000}
+.playerScreen{position:fixed;inset:0;z-index:500;background:#000}
 .playerStage{position:absolute;inset:0;background:#000}
 .playerStage object,.playerStage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
 #htmlVideo{display:none}
@@ -115,6 +148,9 @@ input::placeholder{color:var(--ink-faint)}
 .ovName{font-size:40px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ovMeta{font-size:22px;color:var(--ink-dim);margin-top:6px}
 .ovHint{font-size:18px;color:var(--ink-faint);white-space:nowrap}
+.ovProgress{height:6px;border-radius:4px;background:rgba(255,255,255,.18);margin-top:12px;overflow:hidden;display:none}
+.ovProgress.on{display:block}
+.ovProgressFill{height:100%;width:0;background:var(--accent)}
 
 /* ---- movies and series ---- */
 .vodLayout{height:100%;display:grid;grid-template-rows:200px auto 1fr;gap:14px;min-height:0}

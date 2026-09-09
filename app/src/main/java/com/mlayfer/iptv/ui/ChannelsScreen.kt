@@ -75,6 +75,10 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
     var fullscreen by remember { mutableStateOf(false) }
     BackHandler(enabled = fullscreen) { fullscreen = false }
     BackHandler(enabled = !fullscreen && state.openSeries != null) { viewModel.closeSeries() }
+    // Back out of a catalogue lands on the home screen, not out of the app.
+    BackHandler(enabled = !fullscreen && state.openSeries == null) {
+        viewModel.setScreen(Screen.HOME)
+    }
     ImmersiveWhileFullscreen(fullscreen)
 
     val visible = remember(
@@ -244,6 +248,10 @@ private fun PlayerFor(
         onPrev = onPrev,
         onNext = onNext,
         modifier = modifier,
+        resumeAt = selected?.let { viewModel.resumeFor(it.id) } ?: 0,
+        onProgress = { position, duration ->
+            selected?.let { viewModel.noteProgress(it, position, duration) }
+        },
     )
 }
 
@@ -265,10 +273,12 @@ private fun TopBar(state: UiState, viewModel: AppViewModel) {
                 .padding(horizontal = Gutter),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "טלוהים",
-                style = MaterialTheme.typography.titleMedium,
-            )
+            TextButton(
+                onClick = { viewModel.setScreen(Screen.HOME) },
+                modifier = Modifier.focusHighlight(),
+            ) {
+                Text(text = "טלוהים", style = MaterialTheme.typography.titleMedium)
+            }
 
             Spacer(modifier = Modifier.width(8.dp))
 

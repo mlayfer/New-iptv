@@ -50,3 +50,27 @@ test('builds the same episode list', () => {
     assert.strictEqual(episodes[i].url, want.url);
   });
 });
+
+test('lays out the same home screen', () => {
+  const f = fixtures.home;
+  const rows = core.buildHomeRows({
+    items: f.items, history: f.history, favorites: f.favorites,
+  });
+
+  assert.strictEqual(rows.length, f.expected.length);
+  f.expected.forEach((want, i) => {
+    assert.strictEqual(rows[i].key, want.key);
+    assert.strictEqual(rows[i].title, want.title);
+    assert.deepStrictEqual(rows[i].items.map((x) => x.id), want.items);
+    assert.deepStrictEqual(rows[i].items.map((x) => x.resumeAt || 0), want.resumeAt);
+  });
+});
+
+test('keeps one history entry per item, newest first', () => {
+  const merged = core.mergeHistory(
+    [{ id: 'a', at: 2, position: 10, duration: 0 }, { id: 'b', at: 1, position: 0, duration: 0 }],
+    { id: 'b', at: 3, position: 90, duration: 1200 },
+  );
+  assert.deepStrictEqual(merged.map((x) => x.id), ['b', 'a']);
+  assert.strictEqual(merged[0].position, 90);
+});

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
+import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.Playlist
 import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.RecentEntry
@@ -23,7 +24,7 @@ enum class ListView { ALL, FAVORITES, RECENT }
 /** What the list is showing: everything, live TV, films, or series. */
 enum class Catalog { ALL, LIVE, MOVIES, SERIES }
 
-enum class Screen { CHANNELS, SOURCES }
+enum class Screen { HOME, CHANNELS, SOURCES }
 
 data class UiState(
     val playlists: List<Playlist> = emptyList(),
@@ -64,7 +65,71 @@ data class UiState(
     val selectedChannel: Channel?
         get() = channels.firstOrNull { it.id == selectedId }
             ?: episodes.firstOrNull { it.id == selectedId }
+
+    /**
+     * The home screen, decided by the rules in HomeRows — the same ones the
+     * Tizen app runs, so both open on the same thing.
+     */
+    val homeRows: List<HomeRows.Row>
+        get() = HomeRows.build(
+            items = homeCards,
+            history = recent.map {
+                HomeRows.Entry(it.channelId, it.at, it.position, it.duration)
+            },
+            // Most recently watched favourites first; a Set has no order of its own.
+            favorites = (recent.map { it.channelId } + favorites).distinct()
+                .filter { it in favorites },
+        )
+
+    /** The catalogue plus anything remembered that is no longer in it. */
+    private val homeCards: List<HomeRows.Card>
+        get() {
+            val cards = LinkedHashMap<String, HomeRows.Card>()
+            for (channel in channels) cards[channel.id] = channel.toCard()
+            for (item in series) {
+                cards[seriesCardId(item.id)] = HomeRows.Card(
+                    id = seriesCardId(item.id),
+                    name = item.name,
+                    group = item.group ?: "סדרות",
+                    kind = "VOD",
+                    contentType = "SERIES",
+                    logo = item.logo,
+                )
+            }
+            for (entry in recent) {
+                if (entry.name.isBlank() || cards.containsKey(entry.channelId)) continue
+                cards[entry.channelId] = HomeRows.Card(
+                    id = entry.channelId,
+                    name = entry.name,
+                    group = entry.group,
+                    kind = entry.kind.ifBlank { "VOD" },
+                    contentType = entry.contentType.ifBlank { "MOVIE" },
+                    logo = entry.logo,
+                )
+            }
+            return cards.values.toList()
+        }
+
+    fun resumeFor(id: String): Long {
+        val entry = recent.firstOrNull { it.channelId == id } ?: return 0
+        return if (HomeRows.isResumable(
+                HomeRows.Entry(entry.channelId, entry.at, entry.position, entry.duration)
+            )
+        ) entry.position else 0
+    }
 }
+
+/** Series live in their own list, so their cards carry a prefix of their own. */
+fun seriesCardId(id: String): String = "series:" + id
+
+fun Channel.toCard(): HomeRows.Card = HomeRows.Card(
+    id = id,
+    name = name,
+    group = group ?: if (kind == ChannelKind.LIVE) "ערוצים" else "סרטים",
+    kind = if (kind == ChannelKind.LIVE) "LIVE" else "VOD",
+    contentType = if (kind == ChannelKind.LIVE) "LIVE" else "MOVIE",
+    logo = logo,
+)
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -83,7 +148,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             activeId = active,
             favorites = store.favorites,
             recent = store.recent,
-            screen = if (playlists.isEmpty()) Screen.SOURCES else Screen.CHANNELS,
+            screen = if (playlists.isEmpty()) Screen.SOURCES else Screen.HOME,
         )
         active?.let { selectPlaylist(it) }
     }
@@ -209,11 +274,76 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun select(channel: Channel) {
-        val entry = RecentEntry(channel.id, _state.value.activeId.orEmpty(), System.currentTimeMillis())
+        remember(channel, position = 0, duration = 0)
+        _state.value = _state.value.copy(selectedId = channel.id)
+    }
+
+    /**
+     * Where playback got to. Called while watching, not only when leaving, so a
+     * set-top box losing power does not lose the position too.
+     */
+    fun noteProgress(channel: Channel, position: Long, duration: Long) {
+        if (channel.kind == ChannelKind.LIVE) return
+        val known = _state.value.recent.firstOrNull { it.channelId == channel.id }
+        if (known != null && known.position == position) return
+        remember(channel, position, duration)
+    }
+
+    private fun remember(channel: Channel, position: Long, duration: Long) {
+        val entry = RecentEntry(
+            channelId = channel.id,
+            playlistId = _state.value.activeId.orEmpty(),
+            at = System.currentTimeMillis(),
+            position = position,
+            duration = duration,
+            name = channel.name,
+            group = channel.group.orEmpty(),
+            kind = if (channel.kind == ChannelKind.LIVE) "LIVE" else "VOD",
+            contentType = if (channel.kind == ChannelKind.LIVE) "LIVE" else "MOVIE",
+            logo = channel.logo,
+        )
         val recent = (listOf(entry) + _state.value.recent.filterNot { it.channelId == channel.id })
             .take(MAX_RECENT)
         store.recent = recent
-        _state.value = _state.value.copy(selectedId = channel.id, recent = recent)
+        _state.value = _state.value.copy(recent = recent)
+    }
+
+    /** Seconds to start from for an item that was left part way through. */
+    fun resumeFor(id: String): Long = _state.value.resumeFor(id)
+
+    /** A home card is either a channel, a film, or a series to open. */
+    fun openCard(card: HomeRows.Card) {
+        if (card.contentType == "SERIES") {
+            val id = card.id.removePrefix("series:")
+            val match = _state.value.series.firstOrNull { it.id == id } ?: return
+            _state.value = _state.value.copy(
+                screen = Screen.CHANNELS,
+                catalog = Catalog.SERIES,
+                view = ListView.ALL,
+                query = "",
+                group = null,
+            )
+            openSeries(match)
+            return
+        }
+        val channel = _state.value.channels.firstOrNull { it.id == card.id }
+            ?: _state.value.episodes.firstOrNull { it.id == card.id }
+            ?: return
+        _state.value = _state.value.copy(
+            screen = Screen.CHANNELS,
+            catalog = if (channel.kind == ChannelKind.LIVE) Catalog.LIVE else Catalog.MOVIES,
+            view = ListView.ALL,
+            query = "",
+            group = null,
+        )
+        select(channel)
+    }
+
+    fun toggleFavoriteId(id: String) {
+        val favorites = _state.value.favorites.toMutableSet()
+        if (!favorites.add(id)) favorites.remove(id)
+        store.favorites = favorites
+        _state.value = _state.value.copy(favorites = favorites)
     }
 
     fun toggleFavorite(channel: Channel) {
