@@ -39,11 +39,20 @@ jobs:
       - name: Name the APK after the build
         run: cp app/build/outputs/apk/debug/app-debug.apk telohim.apk
 
+      # A .wgt is a zip of the web app with config.xml at its root. Building it
+      # here is easy; signing it is not — a Samsung TV only installs packages
+      # signed with a certificate tied to that TV, so the last step is the
+      # owner's to run. The name says so, to save anyone a failed install.
+      - name: Package the Tizen app
+        run: cd tizen && zip -r -q -X ../telohim-unsigned.wgt . -x README.md
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: telohim-debug-apk
-          path: telohim.apk
+          name: telohim-builds
+          path: |
+            telohim.apk
+            telohim-unsigned.wgt
           if-no-files-found: error
 
       # Downloading an Actions artifact means signing in and unzipping, which is
@@ -55,7 +64,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "build-${{ github.run_number }}" telohim.apk \
+          gh release create "build-${{ github.run_number }}" telohim.apk telohim-unsigned.wgt \
             --title "טלוהים — בנייה ${{ github.run_number }}" \
-            --notes "APK להתקנה ישירה. נבנה מ-${{ github.sha }}." \
+            --notes "telohim.apk — אנדרואיד ו-Android TV, מוכן להתקנה. telohim-unsigned.wgt — Samsung Tizen, דורש חתימה בתעודה שלך לפני התקנה. נבנה מ-${{ github.sha }}." \
             --latest

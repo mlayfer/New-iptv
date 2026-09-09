@@ -29,14 +29,22 @@
 בטלוויזיה: Apps ← להקליד `12345` בשלט ← Developer mode ← On, ולהזין את כתובת ה-IP
 של המחשב. מאתחלים את הטלוויזיה.
 
-במחשב:
+כל בנייה מפרסמת גם `telohim-unsigned.wgt` — החבילה בנויה, אבל **לא חתומה**.
+טלוויזיית Samsung מתקינה רק חבילה חתומה בתעודה שקשורה לחשבון Samsung שלך ול-DUID
+של המכשיר, ולכן זה השלב היחיד שחייב לרוץ אצלך:
+
+```sh
+tizen package -t wgt -s <שם-הפרופיל> -- telohim-unsigned.wgt
+sdb connect <IP-של-הטלוויזיה>
+tizen install -n telohim-unsigned.wgt -t <שם-המכשיר>
+```
+
+או לבנות מהמקור, אם נוח יותר:
 
 ```sh
 cd tizen
 tizen build-web -e ".*" -e gitignore
 tizen package -t wgt -s <שם-הפרופיל> -- .buildResult
-sdb connect <IP-של-הטלוויזיה>
-tizen install -n Talohim.wgt -t <שם-המכשיר>
 ```
 
 `config.xml` מגדיר את מזהה החבילה, ההרשאות (אינטרנט, מקשי שלט) ומצב לרוחב.
