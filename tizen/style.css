@@ -132,6 +132,20 @@ input::placeholder{color:var(--ink-faint)}
 
 /* Playback takes the whole screen; the bar tells you what you are on and fades. */
 .playerScreen{position:fixed;inset:0;z-index:500;background:#000}
+
+/*
+ * On a Samsung TV the AVPlay video is not drawn by the browser: it is a plane
+ * behind the page, and the page has to get out of its way. Anything opaque
+ * between the viewer and that plane produces the classic symptom — sound, no
+ * picture. While AVPlay is running the page turns transparent and everything
+ * that is not the overlay stops painting.
+ */
+html.avplayOn,
+html.avplayOn body,
+html.avplayOn #app,
+html.avplayOn .playerScreen,
+html.avplayOn .playerStage{background:transparent!important;background-image:none!important}
+html.avplayOn #browseScreen{visibility:hidden}
 .playerStage{position:absolute;inset:0;background:#000}
 .playerStage object,.playerStage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
 #htmlVideo{display:none}

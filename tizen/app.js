@@ -274,6 +274,7 @@ function finishLoad(items){
   $('#backToSetup').classList.remove('hidden');
   $('#navLive').classList.remove('hidden');
   $('#navVod').classList.remove('hidden');
+  $('#navSeries').classList.remove('hidden');
   stopPlayback();
   showHome();
   hideSplash();
@@ -287,10 +288,14 @@ const LIVE_WINDOW = 24;
 const VOD_ROW_WINDOW = 3;
 const VOD_COL_WINDOW = 12;
 
+/** Films and series share a screen shape but never share a list. */
+function isVodMode(){ return state.mode === 'MOVIES' || state.mode === 'SERIES'; }
+
 function currentPool(){
   if(state.episodeContext) return state.episodeContext.episodes;
   if(state.mode === 'LIVE') return state.items.filter(x => x.kind === 'LIVE');
-  if(state.mode === 'VOD') return state.items.filter(x => x.kind !== 'LIVE');
+  if(state.mode === 'MOVIES') return state.items.filter(x => x.kind !== 'LIVE' && x.contentType !== 'SERIES');
+  if(state.mode === 'SERIES') return state.items.filter(x => x.contentType === 'SERIES');
   return [];
 }
 
@@ -338,7 +343,7 @@ function itemMeta(item){
 }
 
 function searchText(){
-  const box = state.mode === 'VOD' ? $('#vodSearch') : $('#search');
+  const box = isVodMode() ? $('#vodSearch') : $('#search');
   return ((box && box.value) || '').trim().toLowerCase();
 }
 
@@ -346,7 +351,7 @@ function applyFilter(){
   const q = searchText();
   const pool = currentPool();
   state.filtered = pool.filter(item => {
-    const matchGroup = state.mode === 'VOD' || state.group === 'הכל' || item.group === state.group;
+    const matchGroup = isVodMode() || state.group === 'הכל' || item.group === state.group;
     const matchText = !q || item.name.toLowerCase().includes(q) || item.group.toLowerCase().includes(q);
     return matchGroup && matchText;
   });
@@ -355,7 +360,7 @@ function applyFilter(){
   state.vodRow = 0;
   state.vodCol = 0;
   state.vodRowStart = 0;
-  if(state.mode === 'VOD'){
+  if(isVodMode()){
     renderVodRows();
   } else {
     renderItems();
@@ -524,7 +529,7 @@ function showHome(){
 /** A card knows what it is, so the home screen needs no separate menus. */
 function activateFromHome(item){
   if(!item) return;
-  if(item.isSeriesStub){ showMode('VOD'); openSeries(item); return; }
+  if(item.isSeriesStub){ showMode('SERIES'); openSeries(item); return; }
   if(item.kind === 'LIVE'){
     // Line up the live pool so channel up/down works straight from the home row.
     state.mode = 'LIVE';
@@ -844,8 +849,10 @@ function showMode(mode){
 
   $('#liveScreen').classList.add('hidden');
   $('#vodScreen').classList.remove('hidden');
-  text($('#vodHeroTitle'), 'סרטים וסדרות');
-  text($('#vodHeroMeta'), 'בחר שורה ופריט');
+  const isSeries = mode === 'SERIES';
+  text($('#vodHeroTitle'), isSeries ? 'סדרות' : 'סרטים');
+  text($('#vodHeroMeta'), isSeries ? 'בחר סדרה כדי לראות את הפרקים' : 'בחר שורה ופריט');
+  $('#vodSearch').placeholder = isSeries ? 'חיפוש סדרה' : 'חיפוש סרט';
   $('#vodSearch').value = '';
   applyFilter();
   setTimeout(() => { focusVod(); }, 60);
@@ -853,8 +860,8 @@ function showMode(mode){
 
 function closeSeries(){
   state.episodeContext = null;
-  text($('#vodHeroTitle'), 'סרטים וסדרות');
-  text($('#vodHeroMeta'), 'בחר שורה ופריט');
+  text($('#vodHeroTitle'), state.mode === 'SERIES' ? 'סדרות' : 'סרטים');
+  text($('#vodHeroMeta'), state.mode === 'SERIES' ? 'בחר סדרה כדי לראות את הפרקים' : 'בחר שורה ופריט');
   applyFilter();
   focusVod();
 }
@@ -874,6 +881,7 @@ function resetToSetup(){
   $('#playerScreen').classList.add('hidden');
   $('#navLive').classList.add('hidden');
   $('#navVod').classList.add('hidden');
+  $('#navSeries').classList.add('hidden');
   $('#browseScreen').classList.add('hidden');
   $('#setupScreen').classList.remove('hidden');
   $('#goHome').classList.add('hidden');
@@ -888,6 +896,7 @@ function playerMessage(msg){
 }
 
 function stopPlayback(){
+  document.documentElement.classList.remove('avplayOn');
   try {
     if(window.webapis && webapis.avplay){
       const s = webapis.avplay.getState();
@@ -990,7 +999,11 @@ function playCandidate(){
       webapis.avplay.open(url);
       try { if(item.userAgent) webapis.avplay.setStreamingProperty('USER_AGENT', item.userAgent); } catch(e) {}
       try { if(item.referrer) webapis.avplay.setStreamingProperty('REFERER', item.referrer); } catch(e) {}
+      // The page must stop painting where the video plane is, or the viewer
+      // gets sound and a black screen.
+      document.documentElement.classList.add('avplayOn');
       webapis.avplay.setDisplayRect(0, 0, 1920, 1080);
+      try { webapis.avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX'); } catch(e) {}
       webapis.avplay.setListener({
         onbufferingstart: () => playerMessage('טוען...'),
         onbufferingcomplete: () => playerMessage(''),
@@ -1239,7 +1252,7 @@ function wireStatic(){
 
   $('#search').dataset.nav = 'search';
   $('#vodSearch').dataset.nav = 'vodSearch';
-  ['#goHome', '#navLive', '#navVod', '#backToSetup'].forEach(sel => { $(sel).dataset.nav = 'topAction'; });
+  ['#goHome', '#navLive', '#navVod', '#navSeries', '#backToSetup'].forEach(sel => { $(sel).dataset.nav = 'topAction'; });
 
   $$('.serverSuggestion').forEach(btn => {
     btn.dataset.nav = 'setupField';
@@ -1262,7 +1275,8 @@ function wireStatic(){
   $('#search').addEventListener('input', applyFilter);
   $('#vodSearch').addEventListener('input', applyFilter);
   $('#navLive').addEventListener('click', () => showMode('LIVE'));
-  $('#navVod').addEventListener('click', () => showMode('VOD'));
+  $('#navVod').addEventListener('click', () => showMode('MOVIES'));
+  $('#navSeries').addEventListener('click', () => showMode('SERIES'));
   $('#goHome').addEventListener('click', backToHome);
   $('#backToSetup').addEventListener('click', resetToSetup);
 
