@@ -28,7 +28,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -64,6 +66,7 @@ import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Filtering
 import com.mlayfer.iptv.data.M3uParser
+import com.mlayfer.iptv.data.Series
 import com.mlayfer.iptv.data.XmltvParser
 
 private val Gutter = 12.dp
@@ -72,6 +75,7 @@ private val Gutter = 12.dp
 fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
     var fullscreen by remember { mutableStateOf(false) }
     BackHandler(enabled = fullscreen) { fullscreen = false }
+    BackHandler(enabled = !fullscreen && state.openSeries != null) { viewModel.closeSeries() }
     ImmersiveWhileFullscreen(fullscreen)
 
     val visible = remember(
@@ -351,14 +355,34 @@ private fun ChannelListPane(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             GroupPicker(state, viewModel)
-            KindPicker(state, viewModel)
+            CatalogPicker(state, viewModel)
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = if (state.loading) "טוען…" else "${channels.size}",
+                text = when {
+                    state.loading -> "טוען…"
+                    state.catalog == Catalog.SERIES && state.openSeries == null -> "${state.series.size}"
+                    else -> "${channels.size}"
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 8.dp),
             )
+        }
+
+        if (state.notes.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Gutter, vertical = 4.dp),
+            ) {
+                state.notes.forEach { note ->
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            }
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
@@ -387,6 +411,8 @@ private fun ChannelListPane(
                     Text("נסה שוב")
                 }
             }
+
+            state.catalog == Catalog.SERIES -> SeriesContent(state, viewModel)
 
             channels.isEmpty() -> Box(
                 modifier = Modifier
@@ -423,12 +449,121 @@ private fun ChannelListPane(
 }
 
 @Composable
+private fun SeriesContent(state: UiState, viewModel: AppViewModel) {
+    val open = state.openSeries
+
+    if (open == null) {
+        val filtered = remember(state.series, state.query, state.group) {
+            val needle = Filtering.normalize(state.query.trim())
+            state.series.filter { series ->
+                val group = series.group?.trim().takeUnless { it.isNullOrEmpty() } ?: M3uParser.NO_GROUP
+                (state.group == null || group == state.group) &&
+                    (
+                        needle.isEmpty() ||
+                            Filtering.normalize(series.name).contains(needle) ||
+                            Filtering.normalize(series.group ?: "").contains(needle)
+                        )
+            }
+        }
+
+        if (filtered.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (state.series.isEmpty()) {
+                        "המקור הזה לא מספק סדרות. רשימות M3U מגישות סדרות כקבצים בודדים — הן יופיעו תחת \"סרטים\"."
+                    } else {
+                        "אין סדרות שתואמות לסינון"
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            return
+        }
+
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(filtered, key = { it.id }) { series ->
+                SeriesRow(series) { viewModel.openSeries(series) }
+            }
+        }
+        return
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { viewModel.closeSeries() }
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = { viewModel.closeSeries() }) {
+                Icon(Icons.Default.ArrowForward, contentDescription = "חזרה לרשימת הסדרות")
+            }
+            Text(
+                text = open.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+        val episodesError = state.episodesError
+        when {
+            state.episodesLoading -> Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+
+            episodesError != null -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(text = episodesError, color = MaterialTheme.colorScheme.error)
+            }
+
+            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(state.episodes, key = { it.id }) { episode ->
+                    ChannelRow(
+                        channel = episode,
+                        selected = episode.id == state.selectedId,
+                        favorite = state.favorites.contains(episode.id),
+                        nowTitle = null,
+                        onClick = { viewModel.select(episode) },
+                        onToggleFavorite = { viewModel.toggleFavorite(episode) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GroupPicker(state: UiState, viewModel: AppViewModel) {
     var open by remember { mutableStateOf(false) }
-    val groups = remember(state.channels, state.kind) {
-        M3uParser.groups(
-            if (state.kind == null) state.channels else state.channels.filter { it.kind == state.kind }
-        )
+    val groups = remember(state.channels, state.series, state.catalog) {
+        if (state.catalog == Catalog.SERIES) {
+            state.series
+                .groupingBy { it.group?.trim().takeUnless { g -> g.isNullOrEmpty() } ?: M3uParser.NO_GROUP }
+                .eachCount()
+                .toList()
+                .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+        } else {
+            val kind = state.kind
+            M3uParser.groups(
+                if (kind == null) state.channels else state.channels.filter { it.kind == kind }
+            )
+        }
     }
 
     Box {
@@ -464,33 +599,86 @@ private fun GroupPicker(state: UiState, viewModel: AppViewModel) {
 }
 
 @Composable
-private fun KindPicker(state: UiState, viewModel: AppViewModel) {
+private fun CatalogPicker(state: UiState, viewModel: AppViewModel) {
     var open by remember { mutableStateOf(false) }
-    val label = when (state.kind) {
-        ChannelKind.LIVE -> "שידור חי"
-        ChannelKind.VOD -> "סרטים"
-        null -> "הכל"
-    }
 
     Box {
         TextButton(onClick = { open = true }) {
-            Text(label, maxLines = 1, style = MaterialTheme.typography.bodyMedium)
+            Text(labelOf(state.catalog), maxLines = 1, style = MaterialTheme.typography.bodyMedium)
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("הכל") }, onClick = {
-                open = false
-                viewModel.setKind(null)
-            })
-            DropdownMenuItem(text = { Text("שידור חי") }, onClick = {
-                open = false
-                viewModel.setKind(ChannelKind.LIVE)
-            })
-            DropdownMenuItem(text = { Text("סרטים") }, onClick = {
-                open = false
-                viewModel.setKind(ChannelKind.VOD)
-            })
+            Catalog.entries.forEach { catalog ->
+                DropdownMenuItem(
+                    text = { Text(labelOf(catalog)) },
+                    onClick = {
+                        open = false
+                        viewModel.setCatalog(catalog)
+                    },
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun SeriesRow(series: Series, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = Gutter),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (series.logo != null) {
+                AsyncImage(
+                    model = series.logo,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = series.name,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = series.group ?: "סדרה",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        Icon(
+            Icons.Default.KeyboardArrowLeft,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -576,4 +764,11 @@ private fun labelOf(view: ListView): String = when (view) {
     ListView.ALL -> "הכל"
     ListView.FAVORITES -> "מועדפים"
     ListView.RECENT -> "אחרונים"
+}
+
+private fun labelOf(catalog: Catalog): String = when (catalog) {
+    Catalog.ALL -> "הכל"
+    Catalog.LIVE -> "שידור חי"
+    Catalog.MOVIES -> "סרטים"
+    Catalog.SERIES -> "סדרות"
 }

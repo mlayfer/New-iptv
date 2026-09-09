@@ -5,6 +5,7 @@ class Repository {
 
     private val playlistCache = HashMap<String, ParsedPlaylist>()
     private val epgCache = HashMap<String, Map<String, List<Programme>>>()
+    private val episodeCache = HashMap<String, List<Channel>>()
 
     /** Blocking: call from a background dispatcher. */
     fun loadPlaylist(playlist: Playlist, force: Boolean = false): ParsedPlaylist {
@@ -39,7 +40,24 @@ class Repository {
         return parsed
     }
 
+    /**
+     * Blocking: call from a background dispatcher. Episodes are fetched per
+     * series because a portal with thousands of series can't be expanded up front.
+     */
+    fun loadEpisodes(playlist: Playlist, seriesId: String): List<Channel> {
+        val source = playlist.source
+        if (source !is PlaylistSource.Xtream) return emptyList()
+
+        val key = "${'$'}{playlist.id}#${'$'}seriesId"
+        episodeCache[key]?.let { return it }
+
+        val episodes = XtreamClient.loadEpisodes(source, seriesId)
+        episodeCache[key] = episodes
+        return episodes
+    }
+
     fun forget(playlistId: String) {
         playlistCache.remove(playlistId)
+        episodeCache.keys.removeAll { it.startsWith("${'$'}playlistId#") }
     }
 }

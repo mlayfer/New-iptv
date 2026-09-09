@@ -9,6 +9,7 @@ import com.mlayfer.iptv.data.Playlist
 import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.RecentEntry
 import com.mlayfer.iptv.data.Repository
+import com.mlayfer.iptv.data.Series
 import com.mlayfer.iptv.data.Store
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,12 +20,18 @@ import kotlinx.coroutines.withContext
 
 enum class ListView { ALL, FAVORITES, RECENT }
 
+/** What the list is showing: everything, live TV, films, or series. */
+enum class Catalog { ALL, LIVE, MOVIES, SERIES }
+
 enum class Screen { CHANNELS, SOURCES }
 
 data class UiState(
     val playlists: List<Playlist> = emptyList(),
     val activeId: String? = null,
     val channels: List<Channel> = emptyList(),
+    val series: List<Series> = emptyList(),
+    /** What the portal refused or cut short — shown instead of silently omitted. */
+    val notes: List<String> = emptyList(),
     val epg: Map<String, List<Programme>> = emptyMap(),
     val favorites: Set<String> = emptySet(),
     val recent: List<RecentEntry> = emptyList(),
@@ -32,15 +39,31 @@ data class UiState(
     val error: String? = null,
     val query: String = "",
     val group: String? = null,
-    val kind: ChannelKind? = null,
+    val catalog: Catalog = Catalog.ALL,
     val view: ListView = ListView.ALL,
+    /** Non-null while an individual series is open on its episode list. */
+    val openSeries: Series? = null,
+    val episodes: List<Channel> = emptyList(),
+    val episodesLoading: Boolean = false,
+    val episodesError: String? = null,
     val selectedId: String? = null,
     val screen: Screen = Screen.CHANNELS,
     val addBusy: Boolean = false,
     val addError: String? = null,
 ) {
     val activePlaylist: Playlist? get() = playlists.firstOrNull { it.id == activeId }
-    val selectedChannel: Channel? get() = channels.firstOrNull { it.id == selectedId }
+
+    val kind: ChannelKind?
+        get() = when (catalog) {
+            Catalog.LIVE -> ChannelKind.LIVE
+            Catalog.MOVIES -> ChannelKind.VOD
+            else -> null
+        }
+
+    /** Episodes are playable too, so a selection can come from either list. */
+    val selectedChannel: Channel?
+        get() = channels.firstOrNull { it.id == selectedId }
+            ?: episodes.firstOrNull { it.id == selectedId }
 }
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -72,6 +95,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             activeId = id,
             selectedId = null,
             channels = emptyList(),
+            series = emptyList(),
+            notes = emptyList(),
+            openSeries = null,
+            episodes = emptyList(),
             epg = emptyMap(),
             group = null,
             error = null,
@@ -92,6 +119,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val parsed = withContext(Dispatchers.IO) { repository.loadPlaylist(playlist, force) }
                 _state.value = _state.value.copy(
                     channels = parsed.channels,
+                    series = parsed.series,
+                    notes = parsed.notes,
                     loading = false,
                     error = null,
                 )
@@ -100,6 +129,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     channels = emptyList(),
+                    series = emptyList(),
+                    notes = emptyList(),
                     loading = false,
                     error = e.message ?: "טעינת הרשימה נכשלה",
                 )
@@ -132,6 +163,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     playlists = playlists,
                     activeId = playlist.id,
                     channels = parsed.channels,
+                    series = parsed.series,
+                    notes = parsed.notes,
                     selectedId = null,
                     group = null,
                     epg = emptyMap(),
@@ -198,8 +231,49 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(group = group)
     }
 
-    fun setKind(kind: ChannelKind?) {
-        _state.value = _state.value.copy(kind = kind, group = null)
+    fun setCatalog(catalog: Catalog) {
+        _state.value = _state.value.copy(
+            catalog = catalog,
+            group = null,
+            openSeries = null,
+            episodes = emptyList(),
+            episodesError = null,
+        )
+    }
+
+    fun openSeries(series: Series) {
+        val playlist = _state.value.activePlaylist ?: return
+        _state.value = _state.value.copy(
+            openSeries = series,
+            episodes = emptyList(),
+            episodesLoading = true,
+            episodesError = null,
+        )
+        viewModelScope.launch {
+            try {
+                val episodes = withContext(Dispatchers.IO) {
+                    repository.loadEpisodes(playlist, series.id)
+                }
+                _state.value = _state.value.copy(
+                    episodes = episodes,
+                    episodesLoading = false,
+                    episodesError = if (episodes.isEmpty()) "לא נמצאו פרקים לסדרה הזו" else null,
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    episodesLoading = false,
+                    episodesError = e.message ?: "טעינת הפרקים נכשלה",
+                )
+            }
+        }
+    }
+
+    fun closeSeries() {
+        _state.value = _state.value.copy(
+            openSeries = null,
+            episodes = emptyList(),
+            episodesError = null,
+        )
     }
 
     fun setView(view: ListView) {

@@ -44,7 +44,24 @@ data class Playlist(
         }
 }
 
-data class ParsedPlaylist(val channels: List<Channel>, val epgUrl: String? = null)
+/**
+ * A series is not playable by itself: its episodes live behind another request,
+ * and a portal with thousands of series can't be expanded up front.
+ */
+data class Series(
+    val id: String,
+    val name: String,
+    val logo: String? = null,
+    val group: String? = null,
+)
+
+data class ParsedPlaylist(
+    val channels: List<Channel>,
+    val epgUrl: String? = null,
+    val series: List<Series> = emptyList(),
+    /** What the portal refused or cut short, so the UI can say so out loud. */
+    val notes: List<String> = emptyList(),
+)
 
 data class Programme(val start: Long, val stop: Long, val title: String, val desc: String? = null)
 
