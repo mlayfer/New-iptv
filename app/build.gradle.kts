@@ -71,4 +71,6 @@ dependencies {
     implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
+    // org.json ships with Android, but the unit-test android.jar only stubs it.
+    testImplementation(libs.json)
 }

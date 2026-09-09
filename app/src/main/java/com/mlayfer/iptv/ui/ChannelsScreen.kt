@@ -26,11 +26,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -502,7 +502,7 @@ private fun SeriesContent(state: UiState, viewModel: AppViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = { viewModel.closeSeries() }) {
-                Icon(Icons.Default.ArrowForward, contentDescription = "חזרה לרשימת הסדרות")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה לרשימת הסדרות")
             }
             Text(
                 text = open.name,
@@ -675,7 +675,7 @@ private fun SeriesRow(series: Series, onClick: () -> Unit) {
         }
 
         Icon(
-            Icons.Default.KeyboardArrowLeft,
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

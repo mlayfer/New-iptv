@@ -19,7 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -118,7 +118,7 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (state.playlists.isNotEmpty()) {
                     IconButton(onClick = { viewModel.setScreen(Screen.CHANNELS) }) {
-                        Icon(Icons.Default.ArrowForward, contentDescription = "חזרה")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה")
                     }
                 }
                 Text("מקורות תוכן", style = MaterialTheme.typography.titleLarge)
