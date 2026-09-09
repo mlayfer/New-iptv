@@ -28,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -111,6 +110,7 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 // the keyboard — this screen is nothing but text fields.
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .imePadding()
+                .then(if (LocalIsTv.current) Modifier.padding(horizontal = 24.dp) else Modifier)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -138,6 +138,7 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
                             .background(MaterialTheme.colorScheme.surface)
+                            .focusHighlight()
                             .clickable {
                                 viewModel.selectPlaylist(playlist.id)
                                 viewModel.setScreen(Screen.CHANNELS)
@@ -185,21 +186,19 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 )
             }
 
-            OutlinedTextField(
+            FormTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("שם לרשימה (רשות)") },
-                singleLine = true,
+                label = "שם לרשימה (רשות)",
                 modifier = Modifier.fillMaxWidth(),
             )
 
             when (kind) {
                 SourceKind.URL -> {
-                    OutlinedTextField(
+                    FormTextField(
                         value = url,
                         onValueChange = { url = it },
-                        label = { Text("כתובת M3U") },
-                        singleLine = true,
+                        label = "כתובת M3U",
                         modifier = Modifier.fillMaxWidth(),
                     )
                     EpgField(epgUrl) { epgUrl = it }
@@ -219,10 +218,11 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                     ) {
                         Text(fileName.ifBlank { "בחירת קובץ M3U מהמכשיר" })
                     }
-                    OutlinedTextField(
+                    FormTextField(
                         value = content,
                         onValueChange = { content = it },
-                        label = { Text("או הדבקה של תוכן ה-M3U") },
+                        label = "או הדבקה של תוכן ה-M3U",
+                        singleLine = false,
                         minLines = 4,
                         maxLines = 8,
                         modifier = Modifier.fillMaxWidth(),
@@ -238,26 +238,23 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 }
 
                 SourceKind.XTREAM -> {
-                    OutlinedTextField(
+                    FormTextField(
                         value = server,
                         onValueChange = { server = it },
-                        label = { Text("כתובת השרת") },
-                        placeholder = { Text("http://portal.example.com:8080") },
-                        singleLine = true,
+                        label = "כתובת השרת",
+                        placeholder = "http://portal.example.com:8080",
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    FormTextField(
                         value = username,
                         onValueChange = { username = it },
-                        label = { Text("שם משתמש") },
-                        singleLine = true,
+                        label = "שם משתמש",
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    FormTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("סיסמה") },
-                        singleLine = true,
+                        label = "סיסמה",
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -308,11 +305,10 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
 
 @Composable
 private fun EpgField(value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(
+    FormTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text("כתובת מדריך שידורים XMLTV (רשות)") },
-        singleLine = true,
+        label = "כתובת מדריך שידורים XMLTV (רשות)",
         modifier = Modifier.fillMaxWidth(),
     )
 }

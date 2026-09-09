@@ -45,7 +45,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -160,7 +159,16 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
             return@Surface
         }
 
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    // TVs crop the edges of the picture; keep the UI inside the
+                    // area that is actually visible.
+                    if (LocalIsTv.current) Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                    else Modifier
+                )
+        ) {
             TopBar(state, viewModel)
 
             BoxWithConstraints(
@@ -175,7 +183,7 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                             state = state,
                             viewModel = viewModel,
                             channels = visible,
-                            modifier = Modifier.width(360.dp).fillMaxHeight(),
+                            modifier = Modifier.width(if (LocalIsTv.current) 420.dp else 360.dp).fillMaxHeight(),
                         )
                         PlayerFor(
                             state = state,
@@ -313,10 +321,10 @@ private fun ChannelListPane(
     Column(modifier = modifier.background(MaterialTheme.colorScheme.background)) {
         // Search sits with the list it filters, not in the app bar, so the video
         // keeps the top of the screen.
-        OutlinedTextField(
+        FormTextField(
             value = state.query,
             onValueChange = viewModel::setQuery,
-            placeholder = { Text("חיפוש ערוץ או קטגוריה") },
+            placeholder = "חיפוש ערוץ או קטגוריה",
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
                 if (state.query.isNotEmpty()) {
@@ -325,8 +333,6 @@ private fun ChannelListPane(
                     }
                 }
             },
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Gutter, vertical = 10.dp),
@@ -623,17 +629,20 @@ private fun CatalogPicker(state: UiState, viewModel: AppViewModel) {
 
 @Composable
 private fun SeriesRow(series: Series, onClick: () -> Unit) {
+    val isTv = LocalIsTv.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(68.dp)
+            .height(if (isTv) 84.dp else 68.dp)
+            .focusHighlight()
             .clickable(onClick = onClick)
             .padding(horizontal = Gutter),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(if (isTv) 56.dp else 44.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
@@ -661,7 +670,11 @@ private fun SeriesRow(series: Series, onClick: () -> Unit) {
         ) {
             Text(
                 text = series.name,
-                style = MaterialTheme.typography.bodyLarge,
+                style = if (isTv) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.bodyLarge
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -691,20 +704,23 @@ private fun ChannelRow(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
 ) {
+    val isTv = LocalIsTv.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(68.dp)
+            .height(if (isTv) 84.dp else 68.dp)
             .background(
                 if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
             )
+            .focusHighlight()
             .clickable(onClick = onClick)
             .padding(horizontal = Gutter),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(if (isTv) 56.dp else 44.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
@@ -732,14 +748,22 @@ private fun ChannelRow(
         ) {
             Text(
                 text = channel.name,
-                style = MaterialTheme.typography.bodyLarge,
+                style = if (isTv) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.bodyLarge
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = nowTitle ?: channel.group
                     ?: if (channel.kind == ChannelKind.VOD) "ספריית תוכן" else "שידור חי",
-                style = MaterialTheme.typography.labelSmall,
+                style = if (isTv) {
+                    MaterialTheme.typography.bodyMedium
+                } else {
+                    MaterialTheme.typography.labelSmall
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

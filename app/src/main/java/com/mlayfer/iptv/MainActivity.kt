@@ -10,7 +10,9 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.view.WindowCompat
 import com.mlayfer.iptv.ui.AppRoot
+import com.mlayfer.iptv.ui.LocalIsTv
 import com.mlayfer.iptv.ui.MaskHaiTheme
+import com.mlayfer.iptv.ui.isTelevision
 import com.mlayfer.iptv.ui.RemoteKeys
 
 class MainActivity : ComponentActivity() {
@@ -23,7 +25,10 @@ class MainActivity : ComponentActivity() {
             MaskHaiTheme {
                 // The whole UI is Hebrew, so it reads right-to-left regardless of
                 // the device locale.
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides LayoutDirection.Rtl,
+                    LocalIsTv provides isTelevision(this),
+                ) {
                     AppRoot()
                 }
             }
