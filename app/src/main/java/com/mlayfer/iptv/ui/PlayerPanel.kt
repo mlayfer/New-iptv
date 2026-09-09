@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -325,35 +326,50 @@ fun PlayerPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(start = 4.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // The name leads the row, the way the list reads.
+            Text(
+                text = channel?.name ?: "",
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 8.dp),
+            )
+
+            IconButton(onClick = onToggleFavorite, enabled = channel != null) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "מועדפים",
+                    tint = if (isFavorite) {
+                        MaterialTheme.colorScheme.secondary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
+                Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש")
+            }
             IconButton(onClick = onPrev) {
                 Icon(Icons.Default.KeyboardArrowRight, contentDescription = "הערוץ הקודם")
             }
             IconButton(onClick = onNext) {
                 Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "הערוץ הבא")
             }
-            IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
-                Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש")
-            }
-            IconButton(onClick = onToggleFavorite, enabled = channel != null) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "מועדפים",
-                    tint = if (isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = channel?.name ?: "",
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
         }
 
         if (!fullscreen && now != null) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

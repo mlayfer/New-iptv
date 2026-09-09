@@ -3,17 +3,22 @@ package com.mlayfer.iptv
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.view.WindowCompat
 import com.mlayfer.iptv.ui.AppRoot
 import com.mlayfer.iptv.ui.MaskHaiTheme
 import com.mlayfer.iptv.ui.RemoteKeys
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // The app is dark everywhere, so the system bar icons have to be light.
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         setContent {
             MaskHaiTheme {
                 // The whole UI is Hebrew, so it reads right-to-left regardless of
