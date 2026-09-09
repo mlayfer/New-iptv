@@ -22,7 +22,7 @@ button,input{font-family:inherit}
 .sidebar,.contentArea{background:rgba(14,14,14,.97);border:1px solid #2f2f2f;border-radius:26px;overflow:hidden}
 .sidebar{padding:22px 18px 18px;display:grid;grid-template-rows:auto auto auto 1fr}.modeHeader{font-size:34px;font-weight:700;margin:4px 8px 18px}.searchWrap{padding:0 6px 10px}.groupStrip{display:flex;gap:10px;overflow-x:auto;padding:0 6px 14px}.groupChip{white-space:nowrap;border:1px solid #3a3a3a;background:#151515;color:#e4e4e4;font-size:20px;border-radius:14px;padding:12px 16px}
 .itemList{overflow-y:auto;padding:0 6px 6px}.itemCard{display:flex;gap:14px;align-items:center;border:1px solid transparent;background:#141414;border-radius:18px;padding:12px;margin:0 0 10px}.poster{width:72px;height:72px;border-radius:14px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;color:#333;font-weight:700;overflow:hidden;flex:0 0 auto}.poster img{width:100%;height:100%;object-fit:cover}.itemText{min-width:0;flex:1}.itemCardTitle{font-size:23px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.itemCardMeta{font-size:18px;color:#a9a9a9;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.contentArea{display:grid;grid-template-rows:1fr 124px}.playerStage{position:relative;background:#000}.playerStage object,.playerStage video{position:absolute;inset:0;width:100%;height:100%;background:#000}#htmlVideo{display:none}.playerMessage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cad6e4;font-size:34px;pointer-events:none}
+.contentArea{display:grid;grid-template-rows:1fr 124px}.playerStage{position:relative;background:#000}.playerStage object,.playerStage video{position:absolute;inset:0;width:100%;height:100%;background:#000}#htmlVideo{display:none}#avPlayer{display:none}.playerMessage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cad6e4;font-size:34px;pointer-events:none}
 .contentInfo{padding:22px 28px;border-top:1px solid #213247;background:#0d0d0d}.itemName{font-size:32px;font-weight:700}.itemMeta{font-size:21px;color:#aaaaaa;margin-top:8px}
 .focused{outline:none;border-color:#fff!important;box-shadow:0 0 0 4px rgba(255,255,255,.16),0 0 0 8px rgba(211,25,32,.30);transform:scale(1.01)}
 .sourceTab.active,.groupChip.active{background:linear-gradient(90deg,#8f1117,#d31920);border-color:#169bff;color:#fff}.itemCard.playing{background:#2a1517;border-color:#8f2025}
@@ -31,3 +31,41 @@ button,input{font-family:inherit}
 .brandIdentity{display:flex;align-items:center;gap:16px}.brandIcon{width:58px;height:58px;border-radius:14px;object-fit:cover}.splashScreen{position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at center,#1b1b1b 0%,#080808 56%,#000 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .35s ease}.splashScreen.hiddenSplash{opacity:0;pointer-events:none}.splashIcon{width:220px;height:220px;border-radius:44px;box-shadow:0 22px 80px rgba(0,0,0,.55)}.splashTitle{font-size:72px;font-weight:800;margin-top:26px;letter-spacing:.5px}.splashSub{font-size:26px;color:#bcbcbc;margin-top:12px}.homeCard:focus,.homeCard.focused{border-color:#d31920}.primary{box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
 
 .serverSuggestWrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 8px}.serverSuggestTitle{grid-column:1/-1;font-size:19px;color:#97a9bd;margin:2px 2px 0}.serverSuggestion{border:1px solid #39485a;background:#121820;color:#f4f5f7;border-radius:14px;padding:13px 14px;font-size:20px;text-align:center;direction:ltr}.serverSuggestion:hover{background:#191f28}
+
+/* ===== Live TV: channel column beside the picture ===== */
+.liveLayout{display:grid;grid-template-columns:620px 1fr;gap:22px;height:100%}
+.channelPane{background:rgba(14,14,14,.97);border:1px solid #2f2f2f;border-radius:26px;padding:20px 16px 12px;display:grid;grid-template-rows:auto auto auto auto 1fr;overflow:hidden}
+.paneHeader{display:flex;align-items:baseline;justify-content:space-between;margin:2px 8px 14px}
+.paneTitle{font-size:34px;font-weight:700}.paneCount{font-size:20px;color:#8f9bab}
+.channelList{overflow:hidden;padding:0 6px 6px;position:relative}
+.channelRow{display:flex;gap:16px;align-items:center;border:2px solid transparent;background:#141414;border-radius:18px;padding:10px 14px;margin:0 0 8px;height:92px;text-align:right;width:100%;color:#fff}
+.channelNumber{font-size:22px;color:#8b98a8;min-width:46px;font-weight:700;text-align:center}
+.channelLogo{width:78px;height:64px;border-radius:12px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;color:#333;font-weight:700;overflow:hidden;flex:0 0 auto}
+.channelLogo img{width:100%;height:100%;object-fit:contain;background:#fff}
+.channelText{min-width:0;flex:1}
+.channelName{font-size:26px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.channelMeta{font-size:19px;color:#9aa6b5;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.channelRow.playing{background:#2a1517;border-color:#8f2025}
+.stageArea{background:rgba(14,14,14,.97);border:1px solid #2f2f2f;border-radius:26px;overflow:hidden;display:grid;grid-template-rows:1fr 128px}
+.nowBar{padding:22px 30px;border-top:1px solid #232323;background:#0d0d0d}
+.nowTitle{font-size:34px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nowMeta{font-size:21px;color:#a9a9a9;margin-top:8px}
+
+/* ===== Movies and series: poster rows ===== */
+.vodLayout{height:100%;display:grid;grid-template-rows:300px auto 1fr;gap:14px}
+.vodHero{border-radius:26px;border:1px solid #2f2f2f;background:linear-gradient(120deg,rgba(60,16,20,.95),rgba(12,12,12,.98));padding:34px 40px;display:flex;align-items:flex-end;position:relative;overflow:hidden}
+.vodHero::before{content:"";position:absolute;left:-80px;top:-90px;width:340px;height:340px;border-radius:50%;background:rgba(211,25,32,.16)}
+.vodHeroTitle{font-size:46px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:1500px}
+.vodHeroMeta{font-size:24px;color:#c3c3c3;margin-top:12px}
+.vodSearchWrap{display:flex;align-items:center;gap:18px}
+.vodSearchWrap input{flex:1}
+.vodCount{font-size:20px;color:#8f9bab;white-space:nowrap}
+.vodRows{overflow:hidden;display:flex;flex-direction:column;gap:12px;min-height:0}
+.vodRow{min-height:0}
+.vodRowTitle{font-size:24px;font-weight:700;margin:0 6px 8px;color:#e7e7e7}
+.vodRowTrack{display:flex;gap:14px;overflow:hidden}
+.vodCard{flex:0 0 auto;width:158px;border:2px solid transparent;background:#141414;border-radius:18px;padding:8px;color:#fff;text-align:right}
+.vodPoster{width:100%;height:206px;border-radius:12px;background:#1d1d1d;display:flex;align-items:center;justify-content:center;color:#8b8b8b;font-size:34px;font-weight:700;overflow:hidden}
+.vodPoster img{width:100%;height:100%;object-fit:cover}
+.vodCardTitle{font-size:18px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vodCard.playing{border-color:#8f2025}

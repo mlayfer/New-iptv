@@ -76,30 +76,52 @@
         </button>
       </div>
 
-      <div id="browserScreen" class="hidden browserLayout">
-        <aside class="sidebar">
-          <div class="modeHeader" id="modeHeader">טלוויזיה בלייב</div>
-          <div class="searchWrap">
-            <input id="search" class="focusable" type="text" placeholder="חיפוש"/>
+      <!-- Live TV: a channel column beside the picture, the way Israeli TV apps lay it out. -->
+      <div id="liveScreen" class="hidden liveLayout">
+        <aside class="channelPane">
+          <div class="paneHeader">
+            <div class="paneTitle" id="modeHeader">טלוויזיה בלייב</div>
+            <div class="paneCount" id="liveCount"></div>
           </div>
+          <div class="searchWrap">
+            <input id="search" class="focusable" type="text" placeholder="חיפוש ערוץ"/>
+          </div>
+          <div id="notes" class="statusLine"></div>
           <div id="groups" class="groupStrip"></div>
-          <div id="items" class="itemList"></div>
+          <div id="items" class="channelList"></div>
         </aside>
 
-        <main class="contentArea">
+        <main class="stageArea">
           <div class="playerStage" id="playerStage">
             <object id="avPlayer" type="application/avplayer"></object>
             <video id="htmlVideo" controls autoplay></video>
-            <div id="playerMessage" class="playerMessage">בחר פריט</div>
+            <div id="playerMessage" class="playerMessage">בחר ערוץ</div>
           </div>
-          <div class="contentInfo">
-            <div id="itemName" class="itemName">בחר פריט</div>
-            <div id="itemMeta" class="itemMeta">בחר ערוץ, סרט או סדרה כדי להתחיל</div>
+          <div class="nowBar">
+            <div id="itemName" class="nowTitle">בחר ערוץ</div>
+            <div id="itemMeta" class="nowMeta">רשימת הערוצים מימין · אישור מפעיל</div>
           </div>
         </main>
       </div>
+
+      <!-- Movies and series: poster rows, one per category. -->
+      <div id="vodScreen" class="hidden vodLayout">
+        <div class="vodHero" id="vodHero">
+          <div class="vodHeroText">
+            <div class="vodHeroTitle" id="vodHeroTitle">סרטים וסדרות</div>
+            <div class="vodHeroMeta" id="vodHeroMeta">בחר שורה ופריט</div>
+          </div>
+        </div>
+        <div class="vodSearchWrap">
+          <input id="vodSearch" class="focusable" type="text" placeholder="חיפוש סרט או סדרה"/>
+          <div class="vodCount" id="vodCount"></div>
+        </div>
+        <div id="vodRows" class="vodRows"></div>
+      </div>
+
     </section>
   </div>
+  <script src="core.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

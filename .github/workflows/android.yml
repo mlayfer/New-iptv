@@ -20,7 +20,9 @@ jobs:
       # syntactically valid and its manifest well-formed.
       - name: Check the Tizen app
         run: |
+          node --check tizen/core.js
           node --check tizen/app.js
+          node --test tizen/test/parity.test.js
           python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('tizen/config.xml')"
 
       - uses: actions/setup-java@v4

@@ -14,7 +14,21 @@ const state = {
   focusEl: null,
   lastGroupFocus: 0,
   lastItemFocus: 0,
-  remembered: {}
+  remembered: {},
+  // Set while a series is open; its episodes replace the browsing pool.
+  episodeContext: null,
+  // The endpoint ladder for whatever is playing, and how far down it we are.
+  candidates: [],
+  candidateIndex: 0,
+  // Catalogues the portal refused, shown instead of quietly missing.
+  notes: [],
+  // Windowed rendering: which item has focus, and where each window starts.
+  liveIndex: 0,
+  liveStart: 0,
+  vodRow: 0,
+  vodCol: 0,
+  vodRowStart: 0,
+  vodData: []
 };
 
 function text(el, value){ if(el) el.textContent = value; }
@@ -54,92 +68,24 @@ function loadSavedSource(){
   } catch(e) {}
 }
 function setError(msg=''){ text($('#error'), msg); }
-function normalizeServer(v){ let s=(v||'').trim().replace(/\/+$/,''); if(!/^https?:\/\//i.test(s)) s='http://'+s; return s.replace(/\/player_api\.php.*$/i,''); }
+function normalizeServer(v){ return Core.normalizeServer(v); }
 function enc(v){ return encodeURIComponent(v); }
 async function getText(url){
   const r = await fetch(url, {method:'GET'});
   if(!r.ok) throw new Error('HTTP ' + r.status);
   return await r.text();
 }
-function attrs(s){
-  const out={}; const re=/([\w-]+)\s*=\s*"([^"]*)"/g; let m;
-  while((m=re.exec(s))) out[m[1].toLowerCase()] = m[2];
-  return out;
-}
-function looksLikeSeries(name='', group=''){
-  const v = (name + ' ' + group).toLowerCase();
-  return /(series|serial|episode|season|episodes|סדרה|סדרות|עונה)/i.test(v);
-}
-function guessKind(url, group='', name=''){
-  if(/\/(movie|series)\//i.test(url)) return 'VOD';
-  if(/\.(mp4|mkv|avi|mov|m4v|flv|webm)(\?|$)/i.test(url)) return 'VOD';
-  if(/(vod|movies?|series|סרט|סרטים|סדרות|סדרה)/i.test(group + ' ' + name)) return 'VOD';
-  return 'LIVE';
-}
-function placeholderText(name=''){
-  return (name || '?').trim().slice(0,2).toUpperCase();
-}
-function parseM3u(textBody){
-  const lines = textBody.replace(/\r/g,'').split('\n');
-  const out = [];
-  let pending = null;
-  let extgrp = null;
-  for(const raw of lines){
-    const line = raw.trim();
-    if(!line) continue;
-    if(line.startsWith('#EXTINF')){
-      let rest=line.substring(line.indexOf(':')+1), q=false, cut=-1;
-      for(let i=0;i<rest.length;i++){
-        if(rest[i] === '"') q = !q;
-        else if(rest[i] === ',' && !q){ cut = i; break; }
-      }
-      const left = cut >= 0 ? rest.slice(0, cut) : rest;
-      const name = cut >= 0 ? rest.slice(cut+1).trim() : '';
-      const a = attrs(left);
-      pending = {
-        name: name || a['tvg-name'] || 'ללא שם',
-        group: a['group-title'] || null,
-        logo: a['tvg-logo'] || null,
-        userAgent: null,
-        referrer: null
-      };
-      extgrp = null;
-      continue;
-    }
-    if(line.startsWith('#EXTGRP')){ extgrp = line.split(':').slice(1).join(':').trim() || null; continue; }
-    if(line.startsWith('#EXTVLCOPT') || line.startsWith('#KODIPROP')){
-      const val = line.split(':').slice(1).join(':');
-      const idx = val.indexOf('=');
-      if(idx > 0 && pending){
-        const k = val.slice(0, idx).trim().toLowerCase();
-        const v = val.slice(idx+1).trim();
-        if(k.endsWith('user-agent')) pending.userAgent = v;
-        if(k.endsWith('http-referrer') || k.endsWith('referer')) pending.referrer = v;
-      }
-      continue;
-    }
-    if(line.startsWith('#')) continue;
-    if(/^[a-z][a-z0-9+.-]*:\/\//i.test(line)){
-      const base = pending || {name: line};
-      const group = base.group || extgrp || 'ללא קטגוריה';
-      const kind = guessKind(line, group, base.name);
-      out.push({
-        id: 'm' + out.length,
-        name: base.name,
-        group,
-        kind,
-        contentType: kind === 'LIVE' ? 'LIVE' : (looksLikeSeries(base.name, group) ? 'SERIES' : 'MOVIE'),
-        url: line,
-        logo: base.logo || null,
-        userAgent: base.userAgent || null,
-        referrer: base.referrer || null,
-      });
-      pending = null;
-      extgrp = null;
-    }
-  }
-  return out;
-}
+// Parsing, kind detection, endpoint variants and episode building all live in
+// core.js, which the Kotlin app mirrors and the parity tests check against the
+// same fixtures. Nothing below may reimplement them.
+const Core = (typeof window !== 'undefined' ? window : globalThis).TalohimCore;
+const attrs = Core.attrs;
+const looksLikeSeries = Core.looksLikeSeries;
+const guessKind = Core.guessKind;
+const placeholderText = Core.placeholderText;
+const parseM3u = Core.parseM3u;
+const streamVariants = Core.streamVariants;
+const episodesFromSeriesInfo = Core.episodesFromSeriesInfo;
 
 async function loadM3u(){
   try{
@@ -169,6 +115,7 @@ async function loadXtream(){
     if(account.user_info && String(account.user_info.auth) === '0') throw new Error('שם משתמש או סיסמה שגויים');
 
     const items = [];
+    const notes = [];
 
     const liveCats = {};
     try { (JSON.parse(await getText(base + '&action=get_live_categories')) || []).forEach(x => liveCats[String(x.category_id)] = x.category_name); } catch(e) {}
@@ -204,7 +151,7 @@ async function loadXtream(){
             logo: x.stream_icon || null
           });
         });
-      } catch(e) {}
+      } catch(e) { notes.push('ספריית הסרטים לא נטענה: ' + (e.message || 'שגיאה')); }
 
       const seriesCats = {};
       try { (JSON.parse(await getText(base + '&action=get_series_categories')) || []).forEach(x => seriesCats[String(x.category_id)] = x.category_name); } catch(e) {}
@@ -225,10 +172,11 @@ async function loadXtream(){
             server, user, pass
           });
         });
-      } catch(e) {}
+      } catch(e) { notes.push('רשימת הסדרות לא נטענה: ' + (e.message || 'שגיאה')); }
     }
 
     if(!items.length) throw new Error('השרת לא החזיר תוכן');
+    state.notes = notes;
     state.source = {type:'xtream', server, user, pass, includeVod};
     saveSource();
     finishLoad(items);
@@ -244,17 +192,27 @@ function finishLoad(items){
   $('#setupScreen').classList.add('hidden');
   $('#browseScreen').classList.remove('hidden');
   $('#homeScreen').classList.remove('hidden');
-  $('#browserScreen').classList.add('hidden');
+  $('#liveScreen').classList.add('hidden');
+  $('#vodScreen').classList.add('hidden');
   $('#goHome').classList.add('hidden');
   $('#backToSetup').classList.remove('hidden');
-  text($('#itemName'), 'בחר פריט');
-  text($('#itemMeta'), 'בחר ערוץ, סרט או סדרה כדי להתחיל');
-  playerMessage('בחר טלוויזיה בלייב או סרטים וסדרות');
+  text($('#itemName'), 'בחר ערוץ');
+  text($('#itemMeta'), 'רשימת הערוצים מימין · אישור מפעיל');
+  playerMessage('בחר ערוץ מהרשימה');
   stopPlayback();
   setTimeout(() => setFocus($('#cardLive')), 60);
 }
 
+// A TV renders a few dozen elements comfortably and tens of thousands not at
+// all: building 19,000 rows with 19,000 logos freezes the app before the screen
+// even repaints. Everything below draws a window around the focused item and
+// moves that window, so the DOM stays small no matter how large the playlist.
+const LIVE_WINDOW = 24;
+const VOD_ROW_WINDOW = 3;
+const VOD_COL_WINDOW = 12;
+
 function currentPool(){
+  if(state.episodeContext) return state.episodeContext.episodes;
   if(state.mode === 'LIVE') return state.items.filter(x => x.kind === 'LIVE');
   if(state.mode === 'VOD') return state.items.filter(x => x.kind !== 'LIVE');
   return [];
@@ -267,10 +225,19 @@ function groupList(){
   return ['הכל', ...Object.keys(counts).sort((a,b) => counts[b] - counts[a])];
 }
 
+function renderNotes(){
+  const box = $('#notes');
+  if(!box) return;
+  const notes = state.notes || [];
+  box.textContent = notes.join(' · ');
+  box.style.display = notes.length ? 'block' : 'none';
+}
+
 function renderGroups(){
   const box = $('#groups');
+  if(!box) return;
   box.innerHTML = '';
-  groupList().forEach((g, idx) => {
+  groupList().slice(0, 40).forEach((g, idx) => {
     const btn = document.createElement('button');
     btn.className = 'focusable groupChip' + (g === state.group ? ' active' : '');
     btn.dataset.nav = 'group';
@@ -281,86 +248,269 @@ function renderGroups(){
       state.lastGroupFocus = idx;
       renderGroups();
       applyFilter();
-      const first = visible('[data-nav="item"]')[0] || visible('[data-nav="group"]')[idx] || $('#search');
-      setFocus(first);
+      setFocus(visible('[data-nav="item"]')[0] || visible('[data-nav="group"]')[idx] || $('#search'));
     });
     box.appendChild(btn);
   });
-}
-
-function posterHtml(item){
-  if(item.logo) return `<div class="poster"><img src="${item.logo}" alt=""/></div>`;
-  return `<div class="poster">${placeholderText(item.name)}</div>`;
 }
 
 function itemMeta(item){
   if(item.kind === 'LIVE') return 'שידור חי · ' + item.group;
   if(item.contentType === 'SERIES') return 'סדרה · ' + item.group;
-  return 'סרט / VOD · ' + item.group;
+  if(item.contentType === 'EPISODE') return item.group;
+  return 'סרט · ' + item.group;
+}
+
+function searchText(){
+  const box = state.mode === 'VOD' ? $('#vodSearch') : $('#search');
+  return ((box && box.value) || '').trim().toLowerCase();
 }
 
 function applyFilter(){
-  const q = ($('#search').value || '').trim().toLowerCase();
+  const q = searchText();
   const pool = currentPool();
   state.filtered = pool.filter(item => {
-    const matchGroup = state.group === 'הכל' || item.group === state.group;
+    const matchGroup = state.mode === 'VOD' || state.group === 'הכל' || item.group === state.group;
     const matchText = !q || item.name.toLowerCase().includes(q) || item.group.toLowerCase().includes(q);
     return matchGroup && matchText;
   });
-  renderItems();
+  state.liveIndex = 0;
+  state.liveStart = 0;
+  state.vodRow = 0;
+  state.vodCol = 0;
+  state.vodRowStart = 0;
+  if(state.mode === 'VOD') renderVodRows(); else renderItems();
 }
+
+// ---- Live TV ----------------------------------------------------------------
 
 function renderItems(){
   const box = $('#items');
+  if(!box) return;
   box.innerHTML = '';
+
+  const count = $('#liveCount');
+  if(count) count.textContent = state.filtered.length ? state.filtered.length + ' ערוצים' : '';
+
   if(!state.filtered.length){
     const empty = document.createElement('div');
-    empty.className = 'itemCard';
-    empty.innerHTML = `<div class="itemText"><div class="itemCardTitle">לא נמצאו תוצאות</div><div class="itemCardMeta">נסה לחפש משהו אחר או לעבור קטגוריה</div></div>`;
+    empty.className = 'channelRow';
+    empty.innerHTML = '<div class="channelText"><div class="channelName">לא נמצאו ערוצים</div><div class="channelMeta">נסה חיפוש אחר או קטגוריה אחרת</div></div>';
     box.appendChild(empty);
     return;
   }
-  state.filtered.forEach((item, idx) => {
+
+  const start = state.liveStart;
+  state.filtered.slice(start, start + LIVE_WINDOW).forEach((item, offset) => {
+    const index = start + offset;
     const btn = document.createElement('button');
-    btn.className = 'focusable itemCard' + (state.current && state.current.id === item.id ? ' playing' : '');
+    btn.className = 'focusable channelRow' + (state.current && state.current.id === item.id ? ' playing' : '');
     btn.dataset.nav = 'item';
-    btn.dataset.index = String(idx);
-    btn.innerHTML = `${posterHtml(item)}<div class="itemText"><div class="itemCardTitle"></div><div class="itemCardMeta"></div></div>`;
-    $('.itemCardTitle', btn).textContent = item.name;
-    $('.itemCardMeta', btn).textContent = itemMeta(item);
-    btn.addEventListener('click', async () => {
-      state.lastItemFocus = idx;
-      await activateItem(item);
+    btn.dataset.index = String(index);
+    btn.innerHTML = '<div class="channelNumber"></div>' +
+      '<div class="channelLogo"></div>' +
+      '<div class="channelText"><div class="channelName"></div><div class="channelMeta"></div></div>';
+    $('.channelNumber', btn).textContent = String(index + 1);
+    $('.channelName', btn).textContent = item.name;
+    $('.channelMeta', btn).textContent = itemMeta(item);
+    const logo = $('.channelLogo', btn);
+    if(item.logo){
+      const img = document.createElement('img');
+      img.src = item.logo;
+      img.alt = '';
+      img.onerror = () => { logo.textContent = placeholderText(item.name); img.remove(); };
+      logo.appendChild(img);
+    } else {
+      logo.textContent = placeholderText(item.name);
+    }
+    btn.addEventListener('click', () => {
+      state.liveIndex = index;
+      activateItem(item);
       renderItems();
-      const refocus = visible('[data-nav="item"]')[Math.min(idx, visible('[data-nav="item"]').length - 1)] || btn;
-      setFocus(refocus);
+      focusLive();
     });
     box.appendChild(btn);
   });
 }
 
+/** Keeps the focused channel inside the rendered window, scrolling it if needed. */
+function focusLive(){
+  const index = Math.max(0, Math.min(state.liveIndex, state.filtered.length - 1));
+  state.liveIndex = index;
+  if(index < state.liveStart || index >= state.liveStart + LIVE_WINDOW){
+    state.liveStart = Math.max(0, index - Math.floor(LIVE_WINDOW / 2));
+    renderItems();
+  }
+  const el = $('[data-nav="item"][data-index="' + index + '"]');
+  if(el) setFocus(el);
+}
+
+function moveLive(delta){
+  if(!state.filtered.length) return;
+  state.liveIndex = Math.max(0, Math.min(state.liveIndex + delta, state.filtered.length - 1));
+  focusLive();
+}
+
+// ---- Movies and series ------------------------------------------------------
+
+function vodGroups(){
+  const rows = [];
+  const byGroup = {};
+  state.filtered.forEach(item => {
+    if(!byGroup[item.group]){ byGroup[item.group] = []; rows.push({name: item.group, items: byGroup[item.group]}); }
+    byGroup[item.group].push(item);
+  });
+  return rows;
+}
+
+function renderVodRows(){
+  const box = $('#vodRows');
+  if(!box) return;
+  box.innerHTML = '';
+  state.vodData = vodGroups();
+
+  const count = $('#vodCount');
+  if(count) count.textContent = state.filtered.length ? state.filtered.length + ' פריטים' : '';
+
+  if(!state.vodData.length){
+    const empty = document.createElement('div');
+    empty.className = 'vodRowTitle';
+    empty.textContent = 'לא נמצאו פריטים';
+    box.appendChild(empty);
+    return;
+  }
+
+  state.vodData.slice(state.vodRowStart, state.vodRowStart + VOD_ROW_WINDOW).forEach((row, offset) => {
+    const rowIndex = state.vodRowStart + offset;
+    const wrap = document.createElement('div');
+    wrap.className = 'vodRow';
+    const title = document.createElement('div');
+    title.className = 'vodRowTitle';
+    title.textContent = row.name + ' · ' + row.items.length;
+    const track = document.createElement('div');
+    track.className = 'vodRowTrack';
+
+    const colStart = rowIndex === state.vodRow ? Math.max(0, state.vodCol - 2) : 0;
+    row.items.slice(colStart, colStart + VOD_COL_WINDOW).forEach((item, colOffset) => {
+      const colIndex = colStart + colOffset;
+      const card = document.createElement('button');
+      card.className = 'focusable vodCard' + (state.current && state.current.id === item.id ? ' playing' : '');
+      card.dataset.nav = 'vodCard';
+      card.dataset.row = String(rowIndex);
+      card.dataset.col = String(colIndex);
+      card.innerHTML = '<div class="vodPoster"></div><div class="vodCardTitle"></div>';
+      $('.vodCardTitle', card).textContent = item.name;
+      const poster = $('.vodPoster', card);
+      if(item.logo){
+        const img = document.createElement('img');
+        img.src = item.logo;
+        img.alt = '';
+        img.onerror = () => { poster.textContent = placeholderText(item.name); img.remove(); };
+        poster.appendChild(img);
+      } else {
+        poster.textContent = placeholderText(item.name);
+      }
+      card.addEventListener('click', () => {
+        state.vodRow = rowIndex;
+        state.vodCol = colIndex;
+        activateItem(item);
+      });
+      track.appendChild(card);
+    });
+
+    wrap.appendChild(title);
+    wrap.appendChild(track);
+    box.appendChild(wrap);
+  });
+}
+
+function vodItemAt(row, col){
+  const data = state.vodData || [];
+  const r = data[row];
+  return r ? r.items[col] : null;
+}
+
+function describeVod(item){
+  if(!item) return;
+  text($('#vodHeroTitle'), item.name);
+  text($('#vodHeroMeta'), itemMeta(item));
+}
+
+function focusVod(){
+  const data = state.vodData || [];
+  if(!data.length) return;
+  state.vodRow = Math.max(0, Math.min(state.vodRow, data.length - 1));
+  const row = data[state.vodRow];
+  state.vodCol = Math.max(0, Math.min(state.vodCol, row.items.length - 1));
+
+  // Keep the focused row as the second one on screen, the way a TV grid scrolls.
+  state.vodRowStart = Math.max(0, Math.min(state.vodRow - 1, Math.max(0, data.length - VOD_ROW_WINDOW)));
+  renderVodRows();
+  describeVod(vodItemAt(state.vodRow, state.vodCol));
+
+  const el = $('[data-nav="vodCard"][data-row="' + state.vodRow + '"][data-col="' + state.vodCol + '"]');
+  if(el) setFocus(el);
+}
+
+function moveVod(dRow, dCol){
+  const data = state.vodData || [];
+  if(!data.length) return;
+  if(dRow){
+    state.vodRow = Math.max(0, Math.min(state.vodRow + dRow, data.length - 1));
+    state.vodCol = 0;
+  }
+  if(dCol) state.vodCol = Math.max(0, state.vodCol + dCol);
+  focusVod();
+}
+
+// ---- Screens ----------------------------------------------------------------
+
 function showMode(mode){
   state.mode = mode;
   state.group = 'הכל';
   state.lastGroupFocus = 0;
-  state.lastItemFocus = 0;
+  state.episodeContext = null;
   $('#homeScreen').classList.add('hidden');
-  $('#browserScreen').classList.remove('hidden');
   $('#goHome').classList.remove('hidden');
-  text($('#modeHeader'), mode === 'LIVE' ? 'טלוויזיה בלייב' : 'סרטים וסדרות');
-  $('#search').value = '';
-  renderGroups();
+  renderNotes();
+
+  if(mode === 'LIVE'){
+    $('#vodScreen').classList.add('hidden');
+    $('#liveScreen').classList.remove('hidden');
+    text($('#modeHeader'), 'טלוויזיה בלייב');
+    $('#search').value = '';
+    renderGroups();
+    applyFilter();
+    setTimeout(() => setFocus(visible('[data-nav="item"]')[0] || $('#search')), 60);
+    return;
+  }
+
+  $('#liveScreen').classList.add('hidden');
+  $('#vodScreen').classList.remove('hidden');
+  text($('#vodHeroTitle'), 'סרטים וסדרות');
+  text($('#vodHeroMeta'), 'בחר שורה ופריט');
+  $('#vodSearch').value = '';
   applyFilter();
-  setTimeout(() => setFocus($('#search')), 80);
+  setTimeout(() => { focusVod(); }, 60);
+}
+
+function closeSeries(){
+  state.episodeContext = null;
+  text($('#vodHeroTitle'), 'סרטים וסדרות');
+  text($('#vodHeroMeta'), 'בחר שורה ופריט');
+  applyFilter();
+  focusVod();
 }
 
 function backToHome(){
-  $('#browserScreen').classList.add('hidden');
+  state.episodeContext = null;
+  state.mode = null;
+  state.current = null;
+  stopPlayback();
+  $('#liveScreen').classList.add('hidden');
+  $('#vodScreen').classList.add('hidden');
   $('#homeScreen').classList.remove('hidden');
   $('#goHome').classList.add('hidden');
-  state.mode = null;
-  state.group = 'הכל';
-  playerMessage('בחר טלוויזיה בלייב או סרטים וסדרות');
   setTimeout(() => setFocus($('#cardLive')), 60);
 }
 
@@ -390,28 +540,28 @@ function stopPlayback(){
   try { v.pause(); v.removeAttribute('src'); v.load(); } catch(e) {}
 }
 
-async function resolveSeriesEpisode(item){
-  if(!item.isSeriesStub) return item;
-  try {
+/**
+ * Opening a series shows its episodes, the way the Android app does — the
+ * seasons become the category strip, so the existing navigation keeps working.
+ */
+async function openSeries(item){
+  text($('#vodHeroTitle'), item.name);
+  text($('#vodHeroMeta'), 'טוען פרקים...');
+  try{
     const api = `${item.server}/player_api.php?username=${enc(item.user)}&password=${enc(item.pass)}&action=get_series_info&series_id=${enc(item.seriesId)}`;
     const info = JSON.parse(await getText(api));
-    const episodes = info.episodes || {};
-    const seasons = Object.keys(episodes).sort((a,b) => Number(a) - Number(b));
-    for(const season of seasons){
-      const eps = episodes[season] || [];
-      if(eps.length){
-        const ep = eps[0];
-        const ext = ep.container_extension || 'mp4';
-        return Object.assign({}, item, {
-          name: `${item.name} · פרק 1`,
-          url: `${item.server}/series/${enc(item.user)}/${enc(item.pass)}/${ep.id}.${ext}`,
-          isSeriesStub: false
-        });
-      }
-    }
-    throw new Error('לא נמצאו פרקים לניגון');
-  } catch(e) {
-    throw new Error('שגיאה בטעינת סדרה');
+    const episodes = episodesFromSeriesInfo(info, {
+      server: item.server, user: item.user, pass: item.pass, logo: item.logo
+    });
+    if(!episodes.length) throw new Error('לא נמצאו פרקים לסדרה הזו');
+
+    // The seasons become the rows, so the same grid renders the episodes.
+    state.episodeContext = { series: item, episodes };
+    text($('#vodHeroMeta'), episodes.length + ' פרקים · חזרה עם Back');
+    applyFilter();
+    focusVod();
+  }catch(e){
+    text($('#vodHeroMeta'), e.message || 'שגיאה בטעינת סדרה');
   }
 }
 
@@ -419,44 +569,71 @@ function playHtml(url){
   const v = $('#htmlVideo');
   $('#avPlayer').style.display = 'none';
   v.style.display = 'block';
+  v.onerror = () => nextCandidate('הנגן המובנה לא הצליח לנגן את התוכן');
   v.src = url;
-  v.play().catch(() => playerMessage('הנגן המובנה לא הצליח לנגן את התוכן'));
+  v.play().catch(() => nextCandidate('הנגן המובנה לא הצליח לנגן את התוכן'));
 }
 
-async function activateItem(item){
-  try {
-    let target = item;
-    if(item.isSeriesStub) target = await resolveSeriesEpisode(item);
-    if(!target.url) throw new Error('אין כתובת ניגון לפריט זה');
-    state.current = target;
-    text($('#itemName'), target.name);
-    text($('#itemMeta'), itemMeta(target));
-    playerMessage('טוען...');
-    stopPlayback();
+/**
+ * Providers disable endpoints without saying so: the URL a playlist hands out
+ * can answer with an error page while the same channel plays fine as .ts. Each
+ * failure moves to the next candidate before the channel is called dead.
+ */
+function nextCandidate(reason){
+  if(state.candidateIndex + 1 < (state.candidates || []).length){
+    state.candidateIndex += 1;
+    playCandidate();
+    return;
+  }
+  playerMessage(reason || 'לא הצלחתי לנגן את הפריט באף כתובת שניסיתי');
+}
 
-    if(window.webapis && webapis.avplay){
-      $('#htmlVideo').style.display = 'none';
-      $('#avPlayer').style.display = 'block';
-      webapis.avplay.open(target.url);
-      try { if(target.userAgent) webapis.avplay.setStreamingProperty('USER_AGENT', target.userAgent); } catch(e) {}
-      try { if(target.referrer) webapis.avplay.setStreamingProperty('REFERER', target.referrer); } catch(e) {}
+function playCandidate(){
+  const url = (state.candidates || [])[state.candidateIndex];
+  if(!url){ playerMessage('אין כתובת ניגון לפריט זה'); return; }
+
+  const item = state.current || {};
+  playerMessage('טוען...');
+  stopPlayback();
+
+  if(window.webapis && webapis.avplay){
+    $('#htmlVideo').style.display = 'none';
+    $('#avPlayer').style.display = 'block';
+    try{
+      webapis.avplay.open(url);
+      try { if(item.userAgent) webapis.avplay.setStreamingProperty('USER_AGENT', item.userAgent); } catch(e) {}
+      try { if(item.referrer) webapis.avplay.setStreamingProperty('REFERER', item.referrer); } catch(e) {}
       webapis.avplay.setDisplayRect(594, 152, 1224, 682);
       webapis.avplay.setListener({
         onbufferingstart: () => playerMessage('טוען...'),
         onbufferingcomplete: () => playerMessage(''),
         onstreamcompleted: () => playerMessage('ההפעלה הסתיימה'),
-        onerror: err => playerMessage('שגיאת ניגון: ' + err),
+        onerror: err => nextCandidate('שגיאת ניגון: ' + err),
         onevent: () => {}, oncurrentplaytime: () => {}, ondrmevent: () => {}
       });
-      webapis.avplay.prepareAsync(() => { playerMessage(''); webapis.avplay.play(); }, err => {
-        playerMessage('שגיאת הכנה: ' + err);
-      });
-    } else {
-      playHtml(target.url);
+      webapis.avplay.prepareAsync(
+        () => { playerMessage(''); webapis.avplay.play(); },
+        err => nextCandidate('שגיאת הכנה: ' + err)
+      );
+    }catch(e){
+      nextCandidate('שגיאת ניגון: ' + (e.message || e));
     }
-  } catch(e) {
-    playerMessage(e.message || 'שגיאה בניגון');
+    return;
   }
+
+  playHtml(url);
+}
+
+async function activateItem(item){
+  if(item.isSeriesStub){ await openSeries(item); return; }
+  if(!item.url){ playerMessage('אין כתובת ניגון לפריט זה'); return; }
+
+  state.current = item;
+  text($('#itemName'), item.name);
+  text($('#itemMeta'), itemMeta(item));
+  state.candidates = streamVariants(item.url);
+  state.candidateIndex = 0;
+  playCandidate();
 }
 
 function setSourceTab(type){
@@ -509,43 +686,67 @@ function navHome(active, dir){
   return cards[0] || actions[0] || active;
 }
 
-function navBrowser(active, dir){
-  const actions = visible('[data-nav="topAction"]');
-  const search = $('#search');
+function navLive(active, dir){
+  const type = active && active.dataset ? active.dataset.nav : null;
   const groups = visible('[data-nav="group"]');
-  const items = visible('[data-nav="item"]');
-  const type = active?.dataset.nav;
+  const actions = visible('[data-nav="topAction"]');
 
-  if(type === 'topAction'){
-    if(dir === 'left' || dir === 'right') return moveRtlRow(actions, active, dir) || active;
-    if(dir === 'down') return search;
+  if(type === 'item'){
+    if(dir === 'up' && state.liveIndex === 0) return $('#search');
+    if(dir === 'up'){ moveLive(-1); return null; }
+    if(dir === 'down'){ moveLive(1); return null; }
     return active;
   }
   if(type === 'search'){
-    if(dir === 'up') return actions[actions.length - 1] || active;
-    if(dir === 'down') return groups[0] || items[0] || active;
+    if(dir === 'down') return groups[0] || visible('[data-nav="item"]')[0] || active;
+    if(dir === 'up') return actions[0] || active;
     return active;
   }
   if(type === 'group'){
-    const moved = (dir === 'left' || dir === 'right') ? moveRtlRow(groups, active, dir) : null;
-    if(moved) return moved;
-    if(dir === 'down') return items[0] || active;
-    if(dir === 'up') return search;
+    if(dir === 'left' || dir === 'right') return moveRtlRow(groups, active, dir) || active;
+    if(dir === 'down') return visible('[data-nav="item"]')[0] || active;
+    if(dir === 'up') return $('#search');
     return active;
   }
-  if(type === 'item'){
-    const idx = items.indexOf(active);
-    if(dir === 'down') return items[idx + 1] || active;
-    if(dir === 'up') return idx <= 0 ? (groups[state.lastGroupFocus] || search) : items[idx - 1];
+  if(type === 'topAction'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(actions, active, dir) || active;
+    if(dir === 'down') return $('#search');
     return active;
   }
-  return search || groups[0] || items[0] || active;
+  return visible('[data-nav="item"]')[0] || $('#search');
+}
+
+function navVod(active, dir){
+  const type = active && active.dataset ? active.dataset.nav : null;
+  const actions = visible('[data-nav="topAction"]');
+
+  if(type === 'vodCard'){
+    if(dir === 'up' && state.vodRow === 0) return $('#vodSearch');
+    if(dir === 'up'){ moveVod(-1, 0); return null; }
+    if(dir === 'down'){ moveVod(1, 0); return null; }
+    // The rows read right to left, so right moves back through the row.
+    if(dir === 'right'){ moveVod(0, -1); return null; }
+    if(dir === 'left'){ moveVod(0, 1); return null; }
+    return active;
+  }
+  if(type === 'vodSearch'){
+    if(dir === 'down'){ focusVod(); return null; }
+    if(dir === 'up') return actions[0] || active;
+    return active;
+  }
+  if(type === 'topAction'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(actions, active, dir) || active;
+    if(dir === 'down') return $('#vodSearch');
+    return active;
+  }
+  return $('#vodSearch');
 }
 
 function currentNavMode(){
   if(!$('#setupScreen').classList.contains('hidden')) return 'setup';
-  if(!$('#browseScreen').classList.contains('hidden') && !$('#homeScreen').classList.contains('hidden')) return 'home';
-  return 'browser';
+  if(!$('#homeScreen').classList.contains('hidden')) return 'home';
+  if(!$('#liveScreen').classList.contains('hidden')) return 'live';
+  return 'vod';
 }
 
 function moveFocus(dir){
@@ -554,7 +755,9 @@ function moveFocus(dir){
   const mode = currentNavMode();
   if(mode === 'setup') next = navSetup(active, dir);
   else if(mode === 'home') next = navHome(active, dir);
-  else next = navBrowser(active, dir);
+  else if(mode === 'live') next = navLive(active, dir);
+  else next = navVod(active, dir);
+  // A null answer means the screen moved its own selection already.
   if(next) setFocus(next);
 }
 
@@ -569,13 +772,16 @@ function onEnter(){
 
 function handleBack(){
   if(!$('#setupScreen').classList.contains('hidden')) return;
+  // Inside a series, Back returns to the series list rather than leaving the mode.
+  if(state.episodeContext){
+    closeSeries();
+    return;
+  }
   if(!$('#browseScreen').classList.contains('hidden') && !$('#homeScreen').classList.contains('hidden')) {
     resetToSetup();
     return;
   }
-  if(!$('#browserScreen').classList.contains('hidden')) {
-    backToHome();
-  }
+  backToHome();
 }
 
 function wireStatic(){
@@ -595,6 +801,7 @@ function wireStatic(){
   });
 
   $('#search').dataset.nav = 'search';
+  $('#vodSearch').dataset.nav = 'vodSearch';
   $('#goHome').dataset.nav = 'topAction';
   $('#backToSetup').dataset.nav = 'topAction';
   $('#cardLive').dataset.nav = 'homeCard';
@@ -619,6 +826,7 @@ function wireStatic(){
   $('#loadM3u').addEventListener('click', loadM3u);
   $('#loadXtream').addEventListener('click', loadXtream);
   $('#search').addEventListener('input', applyFilter);
+  $('#vodSearch').addEventListener('input', applyFilter);
   $('#cardLive').addEventListener('click', () => showMode('LIVE'));
   $('#cardVod').addEventListener('click', () => showMode('VOD'));
   $('#goHome').addEventListener('click', backToHome);
@@ -632,6 +840,20 @@ function wireStatic(){
     if(e.key === 'ArrowDown' || code === 40){ moveFocus('down'); e.preventDefault(); return; }
     if(e.key === 'Enter' || code === 13){ onEnter(); e.preventDefault(); return; }
     if(e.key === 'Backspace' || code === 10009){ handleBack(); e.preventDefault(); return; }
+    if(state.mode === 'LIVE' && (code === 427 || code === 33)){
+      moveLive(1);
+      const item = state.filtered[state.liveIndex];
+      if(item) activateItem(item);
+      e.preventDefault();
+      return;
+    }
+    if(state.mode === 'LIVE' && (code === 428 || code === 34)){
+      moveLive(-1);
+      const item = state.filtered[state.liveIndex];
+      if(item) activateItem(item);
+      e.preventDefault();
+      return;
+    }
     if(state.current && (code === 427 || code === 33)){
       const idx = state.filtered.findIndex(x => state.current && x.id === state.current.id);
       if(idx >= 0 && idx < state.filtered.length - 1) activateItem(state.filtered[idx + 1]);
@@ -654,8 +876,38 @@ function registerKeys(){
   } catch(e) {}
 }
 
+/**
+ * `?demo=19000` fills the app with generated items. It exists so the layout and
+ * the windowed rendering can be exercised at real playlist sizes in a desktop
+ * browser, without a subscription. It never runs unless the URL asks for it.
+ */
+function demoItems(count){
+  const groups = ['ישראל', 'ספורט', 'חדשות', 'ילדים', 'סרטים', 'סדרות', 'מוזיקה'];
+  const out = [];
+  for(let i = 0; i < count; i++){
+    const group = groups[i % groups.length];
+    const vod = group === 'סרטים' || group === 'סדרות';
+    out.push({
+      id: 'd' + i,
+      name: (vod ? 'כותר ' : 'ערוץ ') + (i + 1),
+      group: group,
+      kind: vod ? 'VOD' : 'LIVE',
+      contentType: group === 'סדרות' ? 'SERIES' : (vod ? 'MOVIE' : 'LIVE'),
+      url: 'http://example.invalid/' + i + '.m3u8',
+      logo: null
+    });
+  }
+  return out;
+}
+
 wireStatic();
 registerKeys();
+
+const demo = /[?&]demo=(\d+)/.exec(location.search);
+if(demo){
+  state.source = {type: 'demo'};
+  finishLoad(demoItems(Math.min(Number(demo[1]) || 0, 50000)));
+}
 loadSavedSource();
 setSourceTab(state.sourceTab);
 setTimeout(() => setFocus(visible('[data-nav="setupTab"]')[0] || $('#m3uUrl')), 150);
