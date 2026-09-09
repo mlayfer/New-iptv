@@ -28,7 +28,8 @@ const state = {
   vodRow: 0,
   vodCol: 0,
   vodRowStart: 0,
-  vodData: []
+  vodData: [],
+  overlayTimer: null
 };
 
 function text(el, value){ if(el) el.textContent = value; }
@@ -283,11 +284,14 @@ function applyFilter(){
     renderVodRows();
   } else {
     renderItems();
-    renderPreview(state.filtered[0]);
   }
 }
 
-// ---- Live TV ----------------------------------------------------------------
+// ---- Live TV: a guide of channel tiles, then full-screen playback ----------
+
+const LIVE_COLS = 5;
+const LIVE_ROW_WINDOW = 4;
+const OVERLAY_MS = 4500;
 
 function renderItems(){
   const box = $('#items');
@@ -299,90 +303,108 @@ function renderItems(){
 
   if(!state.filtered.length){
     const empty = document.createElement('div');
-    empty.className = 'channelRow';
-    empty.innerHTML = '<div class="channelText"><div class="channelName">לא נמצאו ערוצים</div><div class="channelMeta">נסה חיפוש אחר או קטגוריה אחרת</div></div>';
+    empty.className = 'tileMeta';
+    empty.textContent = 'לא נמצאו ערוצים';
     box.appendChild(empty);
     return;
   }
 
-  const start = state.liveStart;
-  state.filtered.slice(start, start + LIVE_WINDOW).forEach((item, offset) => {
+  const size = LIVE_COLS * LIVE_ROW_WINDOW;
+  const start = Math.floor(state.liveStart / LIVE_COLS) * LIVE_COLS;
+  state.filtered.slice(start, start + size).forEach((item, offset) => {
     const index = start + offset;
-    const btn = document.createElement('button');
-    btn.className = 'focusable channelRow' + (state.current && state.current.id === item.id ? ' playing' : '');
-    btn.dataset.nav = 'item';
-    btn.dataset.index = String(index);
-    btn.innerHTML = '<div class="channelNumber"></div>' +
-      '<div class="channelLogo"></div>' +
-      '<div class="channelText"><div class="channelName"></div><div class="channelMeta"></div></div>';
-    $('.channelNumber', btn).textContent = String(index + 1);
-    $('.channelName', btn).textContent = item.name;
-    $('.channelMeta', btn).textContent = itemMeta(item);
-    const logo = $('.channelLogo', btn);
-    if(item.logo){
-      const img = document.createElement('img');
-      img.src = item.logo;
-      img.alt = '';
-      img.onerror = () => { logo.textContent = placeholderText(item.name); img.remove(); };
-      logo.appendChild(img);
-    } else {
-      logo.textContent = placeholderText(item.name);
-    }
-    btn.addEventListener('click', () => {
+    const tile = document.createElement('button');
+    tile.className = 'focusable channelTile' + (state.current && state.current.id === item.id ? ' playing' : '');
+    tile.dataset.nav = 'item';
+    tile.dataset.index = String(index);
+    tile.innerHTML = '<div class="tileLogo"></div><div class="tileName"></div><div class="tileMeta"></div>';
+    $('.tileName', tile).textContent = item.name;
+    $('.tileMeta', tile).textContent = (index + 1) + ' · ' + item.group;
+    fillLogo($('.tileLogo', tile), item);
+    tile.addEventListener('click', () => {
       state.liveIndex = index;
       activateItem(item);
-      renderItems();
-      focusLive();
     });
-    box.appendChild(btn);
+    box.appendChild(tile);
   });
 }
 
-/** Keeps the focused channel inside the rendered window, scrolling it if needed. */
-/** Shows the highlighted channel on the stage while nothing is playing yet. */
-function renderPreview(item){
-  const box = $('#stagePreview');
+/** Shared by the tiles and the playback bar: artwork when there is any, initials when not. */
+function fillLogo(box, item){
   if(!box) return;
-  const message = $('#playerMessage');
-  if(!item || state.current){
-    box.style.display = 'none';
-    if(message) message.style.display = '';
-    return;
-  }
-  box.style.display = 'flex';
-  // The preview replaces the hint; both at once draw on top of each other.
-  if(message) message.style.display = 'none';
-  const logo = $('#previewLogo');
-  logo.innerHTML = '';
-  if(item.logo){
+  box.innerHTML = '';
+  if(item && item.logo){
     const img = document.createElement('img');
     img.src = item.logo;
     img.alt = '';
-    img.onerror = () => { logo.textContent = placeholderText(item.name); img.remove(); };
-    logo.appendChild(img);
-  } else {
-    logo.textContent = placeholderText(item.name);
+    img.onerror = () => { box.textContent = placeholderText(item.name); img.remove(); };
+    box.appendChild(img);
+  } else if(item){
+    box.textContent = placeholderText(item.name);
   }
-  text($('#previewName'), item.name);
-  text($('#previewMeta'), itemMeta(item));
 }
 
-function focusLive(){
+function focusChannel(){
+  if(!state.filtered.length) return;
   const index = Math.max(0, Math.min(state.liveIndex, state.filtered.length - 1));
   state.liveIndex = index;
-  if(index < state.liveStart || index >= state.liveStart + LIVE_WINDOW){
-    state.liveStart = Math.max(0, index - Math.floor(LIVE_WINDOW / 2));
+
+  const size = LIVE_COLS * LIVE_ROW_WINDOW;
+  const start = Math.floor(state.liveStart / LIVE_COLS) * LIVE_COLS;
+  if(index < start || index >= start + size){
+    // Keep the focused row one row into the window, so there is always context.
+    const row = Math.floor(index / LIVE_COLS);
+    state.liveStart = Math.max(0, (row - 1) * LIVE_COLS);
     renderItems();
   }
+
   const el = $('[data-nav="item"][data-index="' + index + '"]');
   if(el) setFocus(el);
-  renderPreview(state.filtered[index]);
 }
 
-function moveLive(delta){
+function moveChannel(dRow, dCol){
   if(!state.filtered.length) return;
-  state.liveIndex = Math.max(0, Math.min(state.liveIndex + delta, state.filtered.length - 1));
-  focusLive();
+  const last = state.filtered.length - 1;
+  let index = state.liveIndex;
+  if(dCol) index += dCol;
+  if(dRow) index += dRow * LIVE_COLS;
+  state.liveIndex = Math.max(0, Math.min(index, last));
+  focusChannel();
+}
+
+/** Channel Up/Down, and the D-pad while watching. */
+function zap(delta){
+  if(!state.filtered.length) return;
+  const index = state.filtered.findIndex(x => state.current && x.id === state.current.id);
+  const next = Math.max(0, Math.min((index === -1 ? 0 : index) + delta, state.filtered.length - 1));
+  state.liveIndex = next;
+  activateItem(state.filtered[next]);
+}
+
+function showOverlay(){
+  const bar = $('#liveOverlay');
+  if(!bar) return;
+  bar.classList.remove('faded');
+  if(state.overlayTimer) clearTimeout(state.overlayTimer);
+  state.overlayTimer = setTimeout(() => bar.classList.add('faded'), OVERLAY_MS);
+}
+
+function openLivePlayer(item){
+  $('#liveGuide').classList.add('hidden');
+  $('#livePlayer').classList.remove('hidden');
+  text($('#itemName'), item.name);
+  text($('#itemMeta'), itemMeta(item));
+  fillLogo($('#ovLogo'), item);
+  showOverlay();
+}
+
+function closeLivePlayer(){
+  stopPlayback();
+  state.current = null;
+  $('#livePlayer').classList.add('hidden');
+  $('#liveGuide').classList.remove('hidden');
+  renderItems();
+  focusChannel();
 }
 
 // ---- Movies and series ------------------------------------------------------
@@ -514,12 +536,14 @@ function showMode(mode){
     $('#vodScreen').classList.add('hidden');
     $('#liveScreen').classList.remove('hidden');
     text($('#modeHeader'), 'טלוויזיה בלייב');
+    $('#livePlayer').classList.add('hidden');
+    $('#liveGuide').classList.remove('hidden');
     $('#search').value = '';
     renderGroups();
     applyFilter();
     setTimeout(() => {
       const first = visible('[data-nav="item"]')[0];
-      if(first){ state.liveIndex = 0; focusLive(); } else { setFocus($('#search')); }
+      if(first){ state.liveIndex = 0; focusChannel(); } else { setFocus($('#search')); }
     }, 60);
     return;
   }
@@ -546,6 +570,8 @@ function backToHome(){
   state.mode = null;
   state.current = null;
   stopPlayback();
+  $('#livePlayer').classList.add('hidden');
+  $('#liveGuide').classList.remove('hidden');
   $('#liveScreen').classList.add('hidden');
   $('#vodScreen').classList.add('hidden');
   $('#homeScreen').classList.remove('hidden');
@@ -668,12 +694,9 @@ async function activateItem(item){
   if(!item.url){ playerMessage('אין כתובת ניגון לפריט זה'); return; }
 
   state.current = item;
-  text($('#itemName'), item.name);
-  text($('#itemMeta'), itemMeta(item));
+  if(state.mode === 'LIVE') openLivePlayer(item);
   state.candidates = streamVariants(item.url);
   state.candidateIndex = 0;
-  const preview = $('#stagePreview');
-  if(preview) preview.style.display = 'none';
   playCandidate();
 }
 
@@ -733,9 +756,13 @@ function navLive(active, dir){
   const actions = visible('[data-nav="topAction"]');
 
   if(type === 'item'){
-    if(dir === 'up' && state.liveIndex === 0) return $('#search');
-    if(dir === 'up'){ moveLive(-1); return null; }
-    if(dir === 'down'){ moveLive(1); return null; }
+    const col = state.liveIndex % LIVE_COLS;
+    if(dir === 'up' && state.liveIndex < LIVE_COLS) return groups[0] || $('#search');
+    if(dir === 'up'){ moveChannel(-1, 0); return null; }
+    if(dir === 'down'){ moveChannel(1, 0); return null; }
+    // Right moves back along an RTL row, left moves forward.
+    if(dir === 'right'){ if(col > 0) moveChannel(0, -1); return null; }
+    if(dir === 'left'){ if(col < LIVE_COLS - 1) moveChannel(0, 1); return null; }
     return active;
   }
   if(type === 'search'){
@@ -745,7 +772,7 @@ function navLive(active, dir){
   }
   if(type === 'group'){
     if(dir === 'left' || dir === 'right') return moveRtlRow(groups, active, dir) || active;
-    if(dir === 'down') return visible('[data-nav="item"]')[0] || active;
+    if(dir === 'down'){ if(state.filtered.length){ focusChannel(); return null; } return active; }
     if(dir === 'up') return $('#search');
     return active;
   }
@@ -755,6 +782,14 @@ function navLive(active, dir){
     return active;
   }
   return visible('[data-nav="item"]')[0] || $('#search');
+}
+
+/** While watching, the D-pad changes channel and any key wakes the bar. */
+function navPlayer(dir){
+  showOverlay();
+  if(dir === 'up') zap(-1);
+  if(dir === 'down') zap(1);
+  return null;
 }
 
 function navVod(active, dir){
@@ -786,6 +821,7 @@ function navVod(active, dir){
 function currentNavMode(){
   if(!$('#setupScreen').classList.contains('hidden')) return 'setup';
   if(!$('#homeScreen').classList.contains('hidden')) return 'home';
+  if(!$('#livePlayer').classList.contains('hidden')) return 'player';
   if(!$('#liveScreen').classList.contains('hidden')) return 'live';
   return 'vod';
 }
@@ -796,6 +832,7 @@ function moveFocus(dir){
   const mode = currentNavMode();
   if(mode === 'setup') next = navSetup(active, dir);
   else if(mode === 'home') next = navHome(active, dir);
+  else if(mode === 'player') next = navPlayer(dir);
   else if(mode === 'live') next = navLive(active, dir);
   else next = navVod(active, dir);
   // A null answer means the screen moved its own selection already.
@@ -813,6 +850,10 @@ function onEnter(){
 
 function handleBack(){
   if(!$('#setupScreen').classList.contains('hidden')) return;
+  if(!$('#livePlayer').classList.contains('hidden')){
+    closeLivePlayer();
+    return;
+  }
   // Inside a series, Back returns to the series list rather than leaving the mode.
   if(state.episodeContext){
     closeSeries();
@@ -882,16 +923,12 @@ function wireStatic(){
     if(e.key === 'Enter' || code === 13){ onEnter(); e.preventDefault(); return; }
     if(e.key === 'Backspace' || code === 10009){ handleBack(); e.preventDefault(); return; }
     if(state.mode === 'LIVE' && (code === 427 || code === 33)){
-      moveLive(1);
-      const item = state.filtered[state.liveIndex];
-      if(item) activateItem(item);
+      zap(1);
       e.preventDefault();
       return;
     }
     if(state.mode === 'LIVE' && (code === 428 || code === 34)){
-      moveLive(-1);
-      const item = state.filtered[state.liveIndex];
-      if(item) activateItem(item);
+      zap(-1);
       e.preventDefault();
       return;
     }

@@ -76,38 +76,34 @@
         </button>
       </div>
 
-      <!-- Live TV: a channel column beside the picture, the way Israeli TV apps lay it out. -->
+      <!-- Live TV: a guide of channel tiles, and playback that takes the screen. -->
       <div id="liveScreen" class="hidden liveLayout">
-        <aside class="channelPane">
-          <div class="paneHeader">
+        <div id="liveGuide" class="guide">
+          <div class="guideHead">
             <div class="paneTitle" id="modeHeader">טלוויזיה בלייב</div>
+            <div class="searchWrap"><input id="search" class="focusable" type="text" placeholder="חיפוש ערוץ"/></div>
             <div class="paneCount" id="liveCount"></div>
-          </div>
-          <div class="searchWrap">
-            <input id="search" class="focusable" type="text" placeholder="חיפוש ערוץ"/>
           </div>
           <div id="notes" class="statusLine"></div>
           <div id="groups" class="groupStrip"></div>
-          <div id="items" class="channelList"></div>
-        </aside>
+          <div id="items" class="channelGrid"></div>
+        </div>
 
-        <main class="stageArea">
+        <div id="livePlayer" class="hidden livePlayer">
           <div class="playerStage" id="playerStage">
             <object id="avPlayer" type="application/avplayer"></object>
-            <video id="htmlVideo" controls autoplay></video>
-            <div id="stagePreview" class="stagePreview">
-              <div id="previewLogo" class="previewLogo"></div>
-              <div id="previewName" class="previewName"></div>
-              <div id="previewMeta" class="previewMeta"></div>
-              <div class="previewHint">אישור להפעלה</div>
+            <video id="htmlVideo" autoplay></video>
+            <div id="playerMessage" class="playerMessage"></div>
+          </div>
+          <div id="liveOverlay" class="liveOverlay">
+            <div class="ovLogo" id="ovLogo"></div>
+            <div class="ovText">
+              <div class="ovName" id="itemName">בחר ערוץ</div>
+              <div class="ovMeta" id="itemMeta"></div>
             </div>
-            <div id="playerMessage" class="playerMessage">בחר ערוץ</div>
+            <div class="ovHint">מעלה/מטה — ערוץ · Back — למדריך</div>
           </div>
-          <div class="nowBar">
-            <div id="itemName" class="nowTitle">בחר ערוץ</div>
-            <div id="itemMeta" class="nowMeta">רשימת הערוצים מימין · אישור מפעיל</div>
-          </div>
-        </main>
+        </div>
       </div>
 
       <!-- Movies and series: poster rows, one per category. -->

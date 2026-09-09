@@ -1,28 +1,28 @@
 /*
- * Talohim — one visual system, taken from the app icon: deep navy, a gold halo,
- * a light screen. Gold is the accent and, more importantly, it is what focus
+ * Talohim — one visual system, taken from the app icon: near-black, a blue halo,
+ * a light screen. Blue is the accent and, more importantly, it is what focus
  * looks like: with a remote, the highlight is the only thing telling you where
  * you are, so it has to be unmistakable from across a room.
  */
 :root{
-  --bg:#080d18;
-  --bg-2:#0d1526;
-  --surface:#121b2e;
-  --line:#22314e;
-  --line-soft:#1a2740;
+  --bg:#0a0a0b;
+  --bg-2:#111113;
+  --surface:#18181b;
+  --line:#2e2e33;
+  --line-soft:#242428;
   --ink:#e9eefa;
   --ink-dim:#93a3bf;
   --ink-faint:#65748f;
-  --gold:#f5c446;
-  --gold-soft:rgba(245,196,70,.16);
+  --accent:#4d9bff;
+  --accent-soft:rgba(77,155,255,.18);
   --radius:18px;
 }
 
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
 body{direction:rtl;background:
-  radial-gradient(1100px 620px at 88% -8%, #1b2a4a 0%, rgba(13,21,38,0) 62%),
-  linear-gradient(180deg,#0b1220 0%, #070b14 100%)}
+  radial-gradient(1200px 700px at 85% -10%, #1c1c20 0%, rgba(10,10,11,0) 60%),
+  linear-gradient(180deg,#0d0d0f 0%, #070708 100%)}
 button,input{font-family:inherit;color:inherit}
 .hidden{display:none!important}
 #app{width:1920px;height:1080px;padding:26px 34px 28px}
@@ -38,97 +38,89 @@ button,input{font-family:inherit;color:inherit}
 .screen{height:922px}
 
 /* ---- focus: the single most important state on a TV ---- */
-.focused{outline:none;border-color:var(--gold)!important;
-  box-shadow:0 0 0 3px var(--gold), 0 0 34px rgba(245,196,70,.28);
-  background-color:var(--gold-soft)!important}
+.focused{outline:none;border-color:var(--accent)!important;
+  box-shadow:0 0 0 3px var(--accent), 0 0 38px rgba(77,155,255,.38);
+  background-color:var(--accent-soft)!important}
 
 /* ---- setup ---- */
-.setupPanel{width:1000px;max-width:100%;margin:0 auto;background:linear-gradient(180deg,rgba(20,29,48,.98),rgba(12,18,31,.98));
+.setupPanel{width:1000px;max-width:100%;margin:0 auto;background:linear-gradient(180deg,rgba(26,26,29,.98),rgba(14,14,16,.98));
   border:1px solid var(--line);border-radius:28px;padding:40px 48px;box-shadow:0 30px 70px rgba(0,0,0,.5)}
 .heroTitle{font-size:46px;font-weight:800;text-align:center}
 .heroSub{font-size:22px;color:var(--ink-dim);text-align:center;line-height:1.5;margin:14px 90px 26px}
 .toggleRow{display:flex;gap:12px;margin-bottom:22px}
 .sourceTab{flex:1;border:1px solid var(--line);background:var(--surface);padding:16px;border-radius:14px;font-size:25px}
-.sourceTab.active{background:var(--gold);color:#20180a;border-color:var(--gold);font-weight:700}
+.sourceTab.active{background:var(--accent);color:#04142e;border-color:var(--accent);font-weight:700}
 .formBlock{display:grid;gap:12px}
 .formBlock label{font-size:21px;color:var(--ink-dim)}
-input{width:100%;border-radius:14px;border:1px solid var(--line);background:#0c1424;padding:16px 18px;font-size:25px}
+input{width:100%;border-radius:14px;border:1px solid var(--line);background:#111113;padding:16px 18px;font-size:25px}
 input::placeholder{color:var(--ink-faint)}
 .bigBtn{margin-top:6px;padding:18px;border-radius:14px;border:0;font-size:26px;font-weight:700}
-.primary{background:var(--gold);color:#20180a}
+.primary{background:var(--accent);color:#04142e}
 .checkboxWrap{display:flex;align-items:center;gap:12px;font-size:21px;color:var(--ink-dim)}
 .checkboxWrap input{width:26px;height:26px;flex:0 0 auto}
 .statusLine{margin-top:10px;min-height:28px;font-size:20px;color:#ffb4a8}
 .serverSuggestWrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 6px}
 .serverSuggestTitle{grid-column:1/-1;font-size:18px;color:var(--ink-faint);margin:2px}
-.serverSuggestion{border:1px solid var(--line);background:#0c1424;border-radius:12px;padding:12px;font-size:19px;text-align:center;direction:ltr}
+.serverSuggestion{border:1px solid var(--line);background:#111113;border-radius:12px;padding:12px;font-size:19px;text-align:center;direction:ltr}
 
 /* ---- home ---- */
 .homeGrid{display:grid;grid-template-columns:1fr 1fr;gap:24px;height:100%;align-content:center}
 .homeCard{height:340px;border-radius:26px;border:1px solid var(--line);padding:32px;text-align:right;
   display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;
-  background:linear-gradient(160deg,#16233d 0%, #0d1526 70%)}
-.homeCard::before{content:"";position:absolute;inset:-40% 55% 40% -40%;border-radius:50%;background:rgba(245,196,70,.10)}
-.liveCard::before{background:rgba(110,168,255,.12)}
+  background:linear-gradient(160deg,#1f1f23 0%, #0d0d0f 72%)}
+.homeCard::before{content:"";position:absolute;inset:-40% 55% 40% -40%;border-radius:50%;background:rgba(77,155,255,.12)}
+.liveCard::before{background:rgba(77,155,255,.10)}
 .homeEmoji{font-size:66px;margin-bottom:22px}
 .homeTitle{font-size:40px;font-weight:800}
 .homeDesc{font-size:22px;line-height:1.5;color:var(--ink-dim);margin-top:12px;max-width:78%}
 
-/* ---- live ---- */
-.liveLayout{display:grid;grid-template-columns:620px 1fr;gap:20px;height:100%}
-.channelPane{background:linear-gradient(180deg,rgba(18,27,46,.96),rgba(10,16,28,.96));border:1px solid var(--line);
-  border-radius:24px;padding:18px 14px 10px;display:grid;grid-template-rows:auto auto auto auto 1fr;overflow:hidden}
-.paneHeader{display:flex;align-items:baseline;justify-content:space-between;margin:2px 8px 12px}
-.paneTitle{font-size:30px;font-weight:800}
-.paneCount{font-size:18px;color:var(--ink-faint)}
-.searchWrap{padding:0 6px 10px}
-.searchWrap input{font-size:22px;padding:13px 16px}
-.groupStrip{display:flex;gap:8px;overflow:hidden;padding:0 6px 12px}
-.groupChip{white-space:nowrap;border:1px solid var(--line);background:var(--surface);font-size:19px;border-radius:12px;padding:10px 15px;color:var(--ink-dim)}
-.groupChip.active{background:var(--gold);color:#20180a;border-color:var(--gold);font-weight:700}
-.channelList{overflow:hidden;padding:0 6px 6px}
-.channelRow{display:flex;gap:14px;align-items:center;border:1px solid var(--line-soft);background:var(--surface);
-  border-radius:16px;padding:8px 14px;margin:0 0 8px;height:92px;text-align:right;width:100%}
-.channelNumber{font-size:21px;color:var(--ink-faint);min-width:42px;font-weight:700;text-align:center}
-.channelLogo{width:78px;height:64px;border-radius:10px;background:#0b1322;border:1px solid var(--line-soft);
-  display:flex;align-items:center;justify-content:center;color:var(--gold);font-weight:800;font-size:22px;overflow:hidden;flex:0 0 auto}
-.channelLogo img{width:100%;height:100%;object-fit:contain}
-.channelText{min-width:0;flex:1}
-.channelName{font-size:25px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.channelMeta{font-size:18px;color:var(--ink-dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.channelRow.playing{border-color:var(--gold);background:linear-gradient(90deg,rgba(245,196,70,.14),rgba(18,27,46,.9))}
-.stageArea{background:linear-gradient(180deg,rgba(18,27,46,.96),rgba(10,16,28,.96));border:1px solid var(--line);
-  border-radius:24px;overflow:hidden;display:grid;grid-template-rows:1fr 122px}
-.playerStage{position:relative;background:#04070d}
-.playerStage object,.playerStage video{position:absolute;inset:0;width:100%;height:100%;background:#04070d}
+/* ---- live: a channel guide, the way a TV provider lays one out ---- */
+.liveLayout{height:100%}
+.guide{height:100%;display:grid;grid-template-rows:auto auto auto 1fr;gap:10px}
+.guideHead{display:flex;align-items:center;gap:20px}
+.paneTitle{font-size:32px;font-weight:800;white-space:nowrap}
+.searchWrap{flex:1}
+.searchWrap input{font-size:22px;padding:13px 18px}
+.paneCount{font-size:19px;color:var(--ink-faint);white-space:nowrap}
+.groupStrip{display:flex;gap:8px;overflow:hidden;padding:2px 0}
+.groupChip{white-space:nowrap;border:1px solid var(--line);background:var(--surface);font-size:19px;border-radius:999px;padding:10px 18px;color:var(--ink-dim)}
+.groupChip.active{background:var(--accent);color:#04142e;border-color:var(--accent);font-weight:700}
+
+.channelGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-content:start;overflow:hidden;min-height:0}
+.channelTile{height:196px;border:1px solid var(--line-soft);background:var(--surface);border-radius:16px;
+  padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.tileLogo{width:150px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  color:var(--accent);font-size:30px;font-weight:800}
+.tileLogo img{max-width:100%;max-height:100%;object-fit:contain}
+.tileName{font-size:22px;font-weight:700;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tileMeta{font-size:17px;color:var(--ink-faint);width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.channelTile.playing{border-color:var(--accent)}
+.channelTile .tileNumber{position:absolute}
+
+/* Playback takes the whole screen; the bar tells you what you are on and fades. */
+.livePlayer{position:fixed;inset:0;z-index:500;background:#000}
+.playerStage{position:absolute;inset:0;background:#000}
+.playerStage object,.playerStage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
 #htmlVideo{display:none}
 #avPlayer{display:none}
 .playerMessage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  color:var(--ink-dim);font-size:30px;text-align:center;padding:0 60px;pointer-events:none}
-.nowBar{padding:20px 28px;border-top:1px solid var(--line-soft);background:rgba(8,13,24,.9)}
-.nowTitle{font-size:32px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nowMeta{font-size:20px;color:var(--ink-dim);margin-top:6px}
-
-/* The stage is half the screen; before playback it shows what the highlight is
-   sitting on, instead of an empty black rectangle. */
-.stagePreview{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
-  background:radial-gradient(700px 420px at 50% 42%, rgba(27,41,71,.85), rgba(4,7,13,.96) 72%)}
-.previewLogo{width:210px;height:150px;border-radius:20px;background:#0b1322;border:1px solid var(--line);
-  display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--gold);font-size:60px;font-weight:800}
-.previewLogo img{width:100%;height:100%;object-fit:contain}
-.previewName{font-size:40px;font-weight:800;margin-top:6px;max-width:80%;text-align:center;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.previewMeta{font-size:22px;color:var(--ink-dim)}
-.previewHint{margin-top:10px;font-size:19px;color:#20180a;background:var(--gold);border-radius:999px;padding:9px 22px;font-weight:700}
-.channelList{position:relative}
-.channelList::after{content:"";position:absolute;inset:auto 0 0 0;height:40px;pointer-events:none;
-  background:linear-gradient(180deg,rgba(10,16,28,0),rgba(10,16,28,.95))}
+  color:var(--ink-dim);font-size:30px;text-align:center;padding:0 80px;pointer-events:none}
+.liveOverlay{position:absolute;inset:auto 0 0 0;display:flex;align-items:center;gap:24px;padding:34px 48px 40px;
+  background:linear-gradient(0deg,rgba(0,0,0,.92),rgba(0,0,0,.55) 60%,rgba(0,0,0,0));transition:opacity .3s ease}
+.liveOverlay.faded{opacity:0}
+.ovLogo{width:132px;height:80px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--accent);font-size:30px;font-weight:800;flex:0 0 auto}
+.ovLogo img{max-width:100%;max-height:100%;object-fit:contain}
+.ovText{flex:1;min-width:0}
+.ovName{font-size:40px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ovMeta{font-size:22px;color:var(--ink-dim);margin-top:6px}
+.ovHint{font-size:18px;color:var(--ink-faint);white-space:nowrap}
 
 /* ---- movies and series ---- */
 .vodLayout{height:100%;display:grid;grid-template-rows:200px auto 1fr;gap:14px;min-height:0}
 .vodHero{border-radius:24px;border:1px solid var(--line);padding:26px 34px;display:flex;align-items:flex-end;
-  position:relative;overflow:hidden;background:linear-gradient(100deg,#16233d 0%, #0b1220 68%);background-size:cover;background-position:center}
-.vodHero::after{content:"";position:absolute;inset:0;background:linear-gradient(270deg,rgba(8,13,24,.94) 30%,rgba(8,13,24,.55) 70%,rgba(8,13,24,.2) 100%)}
+  position:relative;overflow:hidden;background:linear-gradient(100deg,#1c1c20 0%, #0a0a0b 68%);background-size:cover;background-position:center}
+.vodHero::after{content:"";position:absolute;inset:0;background:linear-gradient(270deg,rgba(10,10,11,.96) 30%,rgba(10,10,11,.6) 70%,rgba(10,10,11,.2) 100%)}
 .vodHeroText{position:relative;z-index:1;max-width:1180px}
 .vodHeroTitle{font-size:44px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vodHeroMeta{font-size:22px;color:var(--ink-dim);margin-top:10px}
@@ -138,20 +130,20 @@ input::placeholder{color:var(--ink-faint)}
 .vodRows{overflow:hidden;display:flex;flex-direction:column;gap:10px;min-height:0}
 .vodRow{height:296px;overflow:hidden;flex:0 0 auto}
 .vodRowTitle{font-size:22px;font-weight:700;margin:0 6px 8px;color:var(--ink);display:flex;align-items:center;gap:10px}
-.vodRowTitle::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--gold);flex:0 0 auto}
+.vodRowTitle::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);flex:0 0 auto}
 .vodRowTrack{display:flex;gap:14px;overflow:hidden}
 .posterCard{flex:0 0 auto;width:158px;border:1px solid transparent;background:transparent;border-radius:14px;padding:6px;text-align:right}
 .vodPoster{width:100%;height:206px;border-radius:10px;overflow:hidden;
-  background:linear-gradient(160deg,#1b2947,#0d1524);display:flex;align-items:center;justify-content:center;
-  color:var(--gold);font-size:34px;font-weight:800;border:1px solid var(--line-soft)}
+  background:linear-gradient(160deg,#232327,#111113);display:flex;align-items:center;justify-content:center;
+  color:var(--accent);font-size:34px;font-weight:800;border:1px solid var(--line-soft)}
 .vodPoster img{width:100%;height:100%;object-fit:cover}
 .vodCardTitle{font-size:17px;margin-top:8px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.posterCard.playing .vodPoster{border-color:var(--gold)}
+.posterCard.playing .vodPoster{border-color:var(--accent)}
 .posterCard.focused .vodCardTitle{color:var(--ink)}
 
 /* ---- splash ---- */
 .splashScreen{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:radial-gradient(circle at center,#16233d 0%,#080d18 62%,#04070d 100%);transition:opacity .35s ease}
+  background:radial-gradient(circle at center,#1c1c20 0%,#0a0a0b 62%,#050506 100%);transition:opacity .35s ease}
 .splashScreen.hiddenSplash{opacity:0;pointer-events:none}
 .splashIcon{width:210px;height:210px;border-radius:48px;box-shadow:0 24px 80px rgba(0,0,0,.6)}
 .splashTitle{font-size:68px;font-weight:800;margin-top:24px}
