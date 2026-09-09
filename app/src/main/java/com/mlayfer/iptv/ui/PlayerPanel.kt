@@ -62,6 +62,7 @@ import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.Http
 import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.StreamProbe
+import com.mlayfer.iptv.data.StreamVariants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
@@ -117,11 +118,32 @@ fun PlayerPanel(
     var buffering by remember { mutableStateOf(false) }
     var retries by remember { mutableIntStateOf(0) }
     var reloadToken by remember { mutableIntStateOf(0) }
-    // Which container guess we are on. Not an effect key: the ladder is climbed
-    // from inside the error listener, without restarting playback setup.
-    val attempt = remember { mutableIntStateOf(0) }
-    val browserUaTried = remember { mutableStateOf(false) }
+    // Every way this channel might be reachable, in the order worth trying.
+    // Not an effect key: the ladder is climbed from inside the error listener,
+    // without tearing playback setup down and building it again.
+    val attempts = remember(channel?.id) { channel?.let(::attemptsFor) ?: emptyList() }
+    val attemptIndex = remember { mutableIntStateOf(0) }
+    val currentAttempts by rememberUpdatedState(attempts)
     val currentChannel by rememberUpdatedState(channel)
+
+    // Everything this reads is remembered or a State, so the copy captured by the
+    // error listener on first composition keeps seeing current values.
+    fun start(index: Int) {
+        val attempt = currentAttempts.getOrNull(index) ?: return
+        val channelNow = currentChannel
+
+        // Unlike a browser, the app can send the headers the playlist asks for.
+        httpFactory.setUserAgent(attempt.userAgent)
+        val headers = HashMap<String, String>()
+        channelNow?.referrer?.let { headers["Referer"] = it }
+        httpFactory.setDefaultRequestProperties(headers)
+
+        val builder = MediaItem.Builder().setUri(attempt.url)
+        attempt.mimeType?.let { builder.setMimeType(it) }
+        player.setMediaItem(builder.build())
+        player.prepare()
+        player.playWhenReady = true
+    }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -130,8 +152,23 @@ fun PlayerPanel(
             }
 
             override fun onPlayerError(e: PlaybackException) {
-                // Live streams drop connections routinely; a couple of silent
-                // retries beat showing an error for a hiccup.
+                // Providers lie about their streams constantly: extension-less
+                // HLS, .m3u8 URLs that answer with MPEG-TS, panels whose HLS
+                // endpoint is switched off and answer with an HTML page, CDNs
+                // that 403 anything that isn't a browser. Rather than trust the
+                // playlist, work down the ladder before calling a channel dead.
+                // This comes first: each rung fails in a single request, so it is
+                // far cheaper than retrying a wrong guess three times.
+                val channelNow = currentChannel
+                if (channelNow != null && attemptIndex.intValue + 1 < currentAttempts.size) {
+                    attemptIndex.intValue += 1
+                    retries = 0
+                    start(attemptIndex.intValue)
+                    return
+                }
+
+                // Nothing left to try: a live stream that dropped its connection
+                // deserves a couple of silent retries before showing an error.
                 if (isRecoverable(e) && retries < MAX_AUTO_RETRIES) {
                     retries += 1
                     scope.launch {
@@ -139,32 +176,6 @@ fun PlayerPanel(
                         player.prepare()
                         player.play()
                     }
-                    return
-                }
-
-                // Providers lie about containers constantly: extension-less HLS,
-                // .m3u8 URLs that answer with MPEG-TS, playlists served as
-                // text/html. Rather than trust the URL, work down the ladder of
-                // container guesses before calling the channel unplayable.
-                val channelNow = currentChannel
-                // A 403 on a stream that exists is usually the provider refusing
-                // anything that isn't a browser. Worth exactly one more try.
-                if (isForbidden(e) && channelNow != null && !browserUaTried.value) {
-                    browserUaTried.value = true
-                    retries = 0
-                    httpFactory.setUserAgent(BROWSER_USER_AGENT)
-                    player.setMediaItem(mediaItemFor(channelNow, attempt.intValue))
-                    player.prepare()
-                    player.play()
-                    return
-                }
-
-                if (isContainerError(e) && channelNow != null && attempt.intValue < LAST_ATTEMPT) {
-                    attempt.intValue += 1
-                    retries = 0
-                    player.setMediaItem(mediaItemFor(channelNow, attempt.intValue))
-                    player.prepare()
-                    player.play()
                     return
                 }
 
@@ -180,6 +191,7 @@ fun PlayerPanel(
                             url = failed.url,
                             userAgent = failed.userAgent ?: Http.DEFAULT_USER_AGENT,
                             referrer = failed.referrer,
+                            alternatives = StreamVariants.of(failed.url),
                         )
                     }
                     error = StreamProbe.summarize(probe)
@@ -210,24 +222,13 @@ fun PlayerPanel(
         report = null
         diagnosing = false
         retries = 0
-        attempt.intValue = 0
-        browserUaTried.value = false
-        val current = channel
-        if (current == null) {
+        attemptIndex.intValue = 0
+        if (channel == null) {
             player.stop()
             player.clearMediaItems()
             return@LaunchedEffect
         }
-
-        // Unlike a browser, the app can send the headers the playlist asks for.
-        httpFactory.setUserAgent(current.userAgent ?: Http.DEFAULT_USER_AGENT)
-        val headers = HashMap<String, String>()
-        current.referrer?.let { headers["Referer"] = it }
-        httpFactory.setDefaultRequestProperties(headers)
-
-        player.setMediaItem(mediaItemFor(current, 0))
-        player.prepare()
-        player.playWhenReady = true
+        start(0)
     }
 
     Column(modifier = modifier) {
@@ -385,23 +386,36 @@ fun PlayerPanel(
     }
 }
 
-/** Last rung of the container ladder in [mediaItemFor]. */
-private const val LAST_ATTEMPT = 2
+/** One thing to try: a URL, an optional container hint, and the headers to use. */
+private data class Attempt(val url: String, val mimeType: String?, val userAgent: String)
+
+private const val MAX_ATTEMPTS = 8
 
 /**
- * One rung of the container ladder:
- * 0 — believe the URL's extension (or let ExoPlayer infer when there is none)
- * 1 — force HLS, which covers the very common extension-less live playlist
- * 2 — no hint at all, so the bytes themselves decide (MPEG-TS, MP4, …)
+ * Ordered from "what the playlist says" to "what a browser hitting the panel's
+ * other endpoints would get". Cheap to walk: a wrong guess fails in one request.
  */
-private fun mediaItemFor(channel: Channel, attempt: Int): MediaItem {
-    val builder = MediaItem.Builder().setUri(channel.url)
-    when (attempt) {
-        0 -> mimeFor(channel.url)?.let { builder.setMimeType(it) }
-        1 -> builder.setMimeType(MimeTypes.APPLICATION_M3U8)
-        else -> Unit
+private fun attemptsFor(channel: Channel): List<Attempt> {
+    val listUserAgent = channel.userAgent ?: Http.DEFAULT_USER_AGENT
+    val urls = StreamVariants.of(channel.url)
+    val primary = urls.first()
+    val out = LinkedHashSet<Attempt>()
+
+    // The URL as given: extension first, then HLS for the extension-less case,
+    // then no hint at all so the bytes themselves decide.
+    out.add(Attempt(primary, mimeFor(primary), listUserAgent))
+    out.add(Attempt(primary, MimeTypes.APPLICATION_M3U8, listUserAgent))
+    out.add(Attempt(primary, null, listUserAgent))
+
+    // The same channel at the panel's other endpoints.
+    for (url in urls.drop(1)) out.add(Attempt(url, mimeFor(url), listUserAgent))
+
+    // Last resort: some CDNs serve only what looks like a browser.
+    if (listUserAgent != BROWSER_USER_AGENT) {
+        for (url in urls) out.add(Attempt(url, mimeFor(url), BROWSER_USER_AGENT))
     }
-    return builder.build()
+
+    return out.take(MAX_ATTEMPTS)
 }
 
 private fun mimeFor(url: String): String? {
@@ -411,21 +425,6 @@ private fun mimeFor(url: String): String? {
         lower.contains(".mpd") -> MimeTypes.APPLICATION_MPD
         else -> null
     }
-}
-
-private fun isForbidden(e: PlaybackException): Boolean =
-    e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS &&
-        (e.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403
-
-/** Errors that a different container guess could plausibly fix. */
-private fun isContainerError(e: PlaybackException): Boolean = when (e.errorCode) {
-    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
-    PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
-    PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
-    PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
-    PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
-    -> true
-    else -> false
 }
 
 /** The exact failure, so a report about a dead channel is actionable. */
@@ -445,6 +444,7 @@ private fun buildReport(
     channel.userAgent?.let { appendLine("User-Agent מהרשימה: $it") }
     channel.referrer?.let { appendLine("Referer מהרשימה: $it") }
     appendLine("שגיאת נגן: ${detailOf(error)}")
+    appendLine("נוסו ${attemptsFor(channel).size} וריאציות של הכתובת")
     appendLine("בדיקת שרת:")
     append(StreamProbe.technical(probe))
 }

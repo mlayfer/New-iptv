@@ -28,18 +28,30 @@ object StreamProbe {
         val failure: String? = null,
     )
 
-    data class Report(val steps: List<Step>)
+    data class Report(
+        /** The playlist's own URL, followed down to its first segment. */
+        val steps: List<Step>,
+        /** One hop against each alternative endpoint of the same channel. */
+        val variants: List<Step> = emptyList(),
+    )
 
     private const val SNIFF_BYTES = 8 * 1024
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 10_000
 
-    /** Blocking: call from a background dispatcher. */
+    /**
+     * Blocking: call from a background dispatcher.
+     *
+     * [alternatives] are other endpoints for the same channel; each is checked
+     * once so the report can show that, say, the HLS endpoint answers with an
+     * error page while the MPEG-TS one serves video.
+     */
     fun probe(
         url: String,
         userAgent: String = Http.DEFAULT_USER_AGENT,
         referrer: String? = null,
         maxHops: Int = 3,
+        alternatives: List<String> = emptyList(),
     ): Report {
         val steps = ArrayList<Step>()
         var target = url
@@ -57,7 +69,11 @@ object StreamProbe {
             target = firstUri(body ?: break, step.url) ?: break
         }
 
-        return Report(steps)
+        val variants = alternatives
+            .filter { it != url }
+            .map { fetch(it, userAgent, referrer).first }
+
+        return Report(steps, variants)
     }
 
     private fun fetch(
@@ -152,8 +168,17 @@ object StreamProbe {
         return null
     }
 
+    private fun Step.carriesVideo(): Boolean =
+        status in 200..299 && (kind == BodyKind.MPEG_TS || kind == BodyKind.MP4)
+
     /** A sentence a person can act on. */
     fun summarize(report: Report): String {
+        // If one of the other endpoints is serving video, the channel is alive and
+        // the failure is ours to fix — say so instead of blaming the provider.
+        report.variants.firstOrNull { it.carriesVideo() }?.let { working ->
+            return "הכתובת שברשימה לא עובדת, אבל כתובת אחרת של אותו ערוץ כן מחזירה וידאו (${working.url}). אם ההודעה הזו מופיעה, זה באג אצלנו — שלח לי את הדוח."
+        }
+
         val last = report.steps.lastOrNull()
             ?: return "לא הצלחתי לבדוק את הערוץ."
 
@@ -198,10 +223,19 @@ object StreamProbe {
     }
 
     /** The full chain, for pasting into a bug report. */
-    fun technical(report: Report): String = report.steps.mapIndexed { index, step ->
-        val head = "${index + 1}. ${step.url}"
+    fun technical(report: Report): String {
+        val lines = StringBuilder()
+        report.steps.forEachIndexed { index, step -> lines.append(render(index + 1, step)) }
+        if (report.variants.isNotEmpty()) {
+            lines.appendLine("כתובות חלופיות:")
+            report.variants.forEachIndexed { index, step -> lines.append(render(index + 1, step)) }
+        }
+        return lines.toString().trimEnd()
+    }
+
+    private fun render(number: Int, step: Step): String {
         val tail = step.failure?.let { "   ✗ $it" }
             ?: "   ${step.status} · ${step.contentType ?: "ללא content-type"} · ${step.kind}"
-        "$head\n$tail"
-    }.joinToString("\n")
+        return "$number. ${step.url}\n$tail\n"
+    }
 }

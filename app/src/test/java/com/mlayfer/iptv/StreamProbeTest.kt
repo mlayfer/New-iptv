@@ -65,4 +65,26 @@ class StreamProbeTest {
         )
         assertTrue(segmentBlocked.contains("המקטע עצמו"))
     }
+
+    @Test
+    fun `blames the app when another endpoint of the same channel works`() {
+        // The failure seen in the field: an Xtream panel answering the HLS
+        // endpoint with an HTML page while the MPEG-TS endpoint serves video.
+        val report = StreamProbe.Report(
+            steps = listOf(
+                StreamProbe.Step("http://h/live/u/p/26989.m3u8", 200, "text/html", BodyKind.HTML),
+            ),
+            variants = listOf(
+                StreamProbe.Step("http://h/live/u/p/26989.ts", 200, "video/mp2t", BodyKind.MPEG_TS),
+            ),
+        )
+
+        val summary = StreamProbe.summarize(report)
+        assertTrue(summary.contains("באג אצלנו"))
+        assertTrue(summary.contains("26989.ts"))
+
+        val technical = StreamProbe.technical(report)
+        assertTrue(technical.contains("כתובות חלופיות:"))
+        assertTrue(technical.contains("MPEG_TS"))
+    }
 }
