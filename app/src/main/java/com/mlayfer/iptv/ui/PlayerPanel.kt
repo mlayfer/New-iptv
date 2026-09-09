@@ -69,6 +69,11 @@ import java.util.Locale
 
 private const val MAX_AUTO_RETRIES = 3
 
+/** Some CDNs answer 403 to anything that doesn't look like a browser. */
+private const val BROWSER_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/120.0.0.0 Mobile Safari/537.36"
+
 @Composable
 fun PlayerPanel(
     channel: Channel?,
@@ -110,6 +115,7 @@ fun PlayerPanel(
     // Which container guess we are on. Not an effect key: the ladder is climbed
     // from inside the error listener, without restarting playback setup.
     val attempt = remember { mutableIntStateOf(0) }
+    val browserUaTried = remember { mutableStateOf(false) }
     val currentChannel by rememberUpdatedState(channel)
 
     DisposableEffect(player) {
@@ -136,6 +142,18 @@ fun PlayerPanel(
                 // text/html. Rather than trust the URL, work down the ladder of
                 // container guesses before calling the channel unplayable.
                 val channelNow = currentChannel
+                // A 403 on a stream that exists is usually the provider refusing
+                // anything that isn't a browser. Worth exactly one more try.
+                if (isForbidden(e) && channelNow != null && !browserUaTried.value) {
+                    browserUaTried.value = true
+                    retries = 0
+                    httpFactory.setUserAgent(BROWSER_USER_AGENT)
+                    player.setMediaItem(mediaItemFor(channelNow, attempt.intValue))
+                    player.prepare()
+                    player.play()
+                    return
+                }
+
                 if (isContainerError(e) && channelNow != null && attempt.intValue < LAST_ATTEMPT) {
                     attempt.intValue += 1
                     retries = 0
@@ -170,6 +188,7 @@ fun PlayerPanel(
         errorDetail = null
         retries = 0
         attempt.intValue = 0
+        browserUaTried.value = false
         val current = channel
         if (current == null) {
             player.stop()
@@ -361,6 +380,10 @@ private fun mimeFor(url: String): String? {
         else -> null
     }
 }
+
+private fun isForbidden(e: PlaybackException): Boolean =
+    e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS &&
+        (e.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403
 
 /** Errors that a different container guess could plausibly fix. */
 private fun isContainerError(e: PlaybackException): Boolean = when (e.errorCode) {
