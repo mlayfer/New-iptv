@@ -1,4 +1,4 @@
-name: Android
+name: Talohim
 
 on:
   push:
@@ -8,13 +8,20 @@ on:
 
 jobs:
   build:
-    name: Unit tests and debug APK
+    name: Tizen check, unit tests and debug APK
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@v4
+
+      # The Tizen app has no compiler to catch a typo, so at least keep it
+      # syntactically valid and its manifest well-formed.
+      - name: Check the Tizen app
+        run: |
+          node --check tizen/app.js
+          python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('tizen/config.xml')"
 
       - uses: actions/setup-java@v4
         with:

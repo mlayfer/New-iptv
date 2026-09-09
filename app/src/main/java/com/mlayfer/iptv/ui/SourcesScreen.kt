@@ -53,6 +53,12 @@ import kotlin.random.Random
 
 private enum class SourceKind { URL, FILE, XTREAM }
 
+/** Portals worth offering as one-press choices instead of typing them out. */
+private val KNOWN_SERVERS = listOf(
+    "http://ilvips.com:80",
+    "http://ilvip.net:80",
+)
+
 @Composable
 fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
     val context = LocalContext.current
@@ -245,6 +251,32 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                         placeholder = "http://portal.example.com:8080",
                         modifier = Modifier.fillMaxWidth(),
                     )
+
+                    // Typing a portal address on a remote is miserable; one press
+                    // beats forty. The list narrows as the field is typed into.
+                    val suggestions = KNOWN_SERVERS.filter { option ->
+                        server.isBlank() || option.contains(server.trim(), ignoreCase = true)
+                    }
+                    if (suggestions.isNotEmpty()) {
+                        Text(
+                            text = "שרתים מוצעים",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            suggestions.forEach { option ->
+                                OutlinedButton(
+                                    onClick = { server = option },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .focusHighlight(),
+                                ) {
+                                    Text(option)
+                                }
+                            }
+                        }
+                    }
+
                     FormTextField(
                         value = username,
                         onValueChange = { username = it },

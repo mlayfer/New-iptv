@@ -1,11 +1,18 @@
-# טלוהים — נגן IPTV לאנדרואיד
+# טלוהים — נגן IPTV לטלוויזיה
 
-אפליקציית אנדרואיד נייטיבית (Kotlin + Jetpack Compose + Media3/ExoPlayer) לצפייה
-ברשימות IPTV. רצה על טלפון, טאבלט ו-Android TV מאותו APK.
+שתי אפליקציות לאותו שימוש, בריפו אחד:
+
+| תיקייה | פלטפורמה | טכנולוגיה |
+| --- | --- | --- |
+| `app/` | אנדרואיד, טאבלט ו-Android TV | Kotlin + Jetpack Compose + Media3/ExoPlayer |
+| `tizen/` | טלוויזיות Samsung | אפליקציית ווב עם Tizen AVPlayer |
+
+הפיצול הזה אינו כפילות מיותרת: טלוויזיית Samsung מריצה Tizen ולא אנדרואיד, ולכן
+היא לא יכולה להתקין APK בכלל — היא צריכה חבילת `.wgt` משלה.
 
 האפליקציה היא **נגן בלבד**: אין בה תוכן, והערוצים מגיעים מרשימה או ממנוי שאתם מחברים.
 
-## התקנה
+## התקנה — אנדרואיד
 
 הורדה ישירה, תמיד הבנייה האחרונה:
 **https://github.com/mlayfer/New-iptv/releases/latest/download/telohim.apk**
@@ -13,6 +20,28 @@
 פותחים את הקישור בטלפון או בטלוויזיה, מאשרים "התקנה ממקור לא מוכר" (זו בנייה
 חתומה במפתח debug, לא דרך חנות), ומתקינים. בטלוויזיה הכי נוח דרך Downloader, או
 `adb install telohim.apk` מהמחשב.
+
+## התקנה — Samsung Tizen
+
+צריך [Tizen Studio](https://developer.tizen.org/development/tizen-studio/download)
+ותעודת מפתח (Certificate Manager ← Samsung ← TV).
+
+בטלוויזיה: Apps ← להקליד `12345` בשלט ← Developer mode ← On, ולהזין את כתובת ה-IP
+של המחשב. מאתחלים את הטלוויזיה.
+
+במחשב:
+
+```sh
+cd tizen
+tizen build-web -e ".*" -e gitignore
+tizen package -t wgt -s <שם-הפרופיל> -- .buildResult
+sdb connect <IP-של-הטלוויזיה>
+tizen install -n Talohim.wgt -t <שם-המכשיר>
+```
+
+`config.xml` מגדיר את מזהה החבילה, ההרשאות (אינטרנט, מקשי שלט) ומצב לרוחב.
+מזהה החבילה נשאר `MlayferTV1` בכוונה — שינוי שלו הופך את ההתקנה לאפליקציה אחרת
+בטלוויזיה, בדיוק כמו ששינוי `applicationId` היה עושה באנדרואיד.
 
 ## למה נייטיב ולא דפדפן
 

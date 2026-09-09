@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=1920,height=1080,initial-scale=1"/>
+  <title>טלוהים</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="$WEBAPIS/webapis/webapis.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brandBlock">
+        <div class="brandIdentity"><img src="brand-icon.png" class="brandIcon" alt=""/><div><div class="brandTitle">טלוהים</div><div class="brandSub">טלוויזיה בלייב • סרטים • סדרות</div></div></div>
+        <div class="brandSub">Samsung Tizen TV</div>
+      </div>
+      <div class="topActions">
+        <button id="goHome" class="focusable pill hidden">בית</button>
+        <button id="backToSetup" class="focusable pill hidden">החלף מקור</button>
+      </div>
+    </header>
+
+    <div id="splashScreen" class="splashScreen"><img src="brand-icon.png" class="splashIcon" alt=""/><div class="splashTitle">טלוהים</div><div class="splashSub">טלוויזיה בלייב • סרטים • סדרות</div></div>
+
+    <section id="setupScreen" class="screen">
+      <div class="setupPanel">
+        <div class="heroTitle">ברוכים הבאים לטלוהים</div>
+        <div class="heroSub">הזן מקור IPTV ולאחר מכן תוכל לבחור בין טלוויזיה בלייב לבין סרטים וסדרות.</div>
+
+        <div class="toggleRow" id="sourceTabs">
+          <button class="focusable sourceTab active" data-source="m3u">M3U</button>
+          <button class="focusable sourceTab" data-source="xtream">Xtream Codes</button>
+        </div>
+
+        <div id="m3uForm" class="formBlock">
+          <label>כתובת M3U</label>
+          <input id="m3uUrl" class="focusable" type="text" placeholder="http://.../playlist.m3u"/>
+          <button id="loadM3u" class="focusable primary bigBtn">טען רשימה</button>
+        </div>
+
+        <div id="xtreamForm" class="formBlock hidden">
+          <label>שרת</label>
+          <input id="xtServer" class="focusable" type="text" list="xtServerOptions" placeholder="בחר שרת או הקלד כתובת" autocomplete="off"/>
+          <datalist id="xtServerOptions">
+            <option value="http://ilvips.com:80"></option>
+            <option value="http://ilvip.net:80"></option>
+          </datalist>
+          <div class="serverSuggestWrap">
+            <div class="serverSuggestTitle">שרתים מוצעים</div>
+            <button class="focusable serverSuggestion" data-server="http://ilvips.com:80">http://ilvips.com:80</button>
+            <button class="focusable serverSuggestion" data-server="http://ilvip.net:80">http://ilvip.net:80</button>
+          </div>
+          <label>שם משתמש</label>
+          <input id="xtUser" class="focusable" type="text"/>
+          <label>סיסמה</label>
+          <input id="xtPass" class="focusable" type="password"/>
+          <label class="checkboxWrap"><input id="xtVod" type="checkbox" checked/> לכלול גם סרטים וסדרות</label>
+          <button id="loadXtream" class="focusable primary bigBtn">התחבר</button>
+        </div>
+
+        <div id="error" class="statusLine"></div>
+      </div>
+    </section>
+
+    <section id="browseScreen" class="screen hidden">
+      <div id="homeScreen" class="homeGrid">
+        <button id="cardLive" class="focusable homeCard liveCard">
+          <div class="homeEmoji">📺</div>
+          <div class="homeTitle">טלוויזיה בלייב</div>
+          <div class="homeDesc">ערוצים חיים, חדשות, ספורט ותוכן שידור</div>
+        </button>
+        <button id="cardVod" class="focusable homeCard vodCard">
+          <div class="homeEmoji">🎬</div>
+          <div class="homeTitle">סרטים וסדרות</div>
+          <div class="homeDesc">ספריית VOD, סרטים, סדרות ותוכן לפי קטגוריות</div>
+        </button>
+      </div>
+
+      <div id="browserScreen" class="hidden browserLayout">
+        <aside class="sidebar">
+          <div class="modeHeader" id="modeHeader">טלוויזיה בלייב</div>
+          <div class="searchWrap">
+            <input id="search" class="focusable" type="text" placeholder="חיפוש"/>
+          </div>
+          <div id="groups" class="groupStrip"></div>
+          <div id="items" class="itemList"></div>
+        </aside>
+
+        <main class="contentArea">
+          <div class="playerStage" id="playerStage">
+            <object id="avPlayer" type="application/avplayer"></object>
+            <video id="htmlVideo" controls autoplay></video>
+            <div id="playerMessage" class="playerMessage">בחר פריט</div>
+          </div>
+          <div class="contentInfo">
+            <div id="itemName" class="itemName">בחר פריט</div>
+            <div id="itemMeta" class="itemMeta">בחר ערוץ, סרט או סדרה כדי להתחיל</div>
+          </div>
+        </main>
+      </div>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
