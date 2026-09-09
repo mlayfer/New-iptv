@@ -61,6 +61,9 @@ import androidx.media3.ui.PlayerView
 import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.Http
 import com.mlayfer.iptv.data.Programme
+import com.mlayfer.iptv.data.StreamProbe
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -109,6 +112,8 @@ fun PlayerPanel(
 
     var error by remember { mutableStateOf<String?>(null) }
     var errorDetail by remember { mutableStateOf<String?>(null) }
+    var diagnosing by remember { mutableStateOf(false) }
+    var report by remember { mutableStateOf<String?>(null) }
     var buffering by remember { mutableStateOf(false) }
     var retries by remember { mutableIntStateOf(0) }
     var reloadToken by remember { mutableIntStateOf(0) }
@@ -163,8 +168,24 @@ fun PlayerPanel(
                     return
                 }
 
+                // The player's own error code can't tell a removed channel from a
+                // blocked device from a bug here — so go ask the server directly.
                 error = describe(e)
                 errorDetail = detailOf(e)
+                val failed = channelNow ?: return
+                diagnosing = true
+                scope.launch {
+                    val probe = withContext(Dispatchers.IO) {
+                        StreamProbe.probe(
+                            url = failed.url,
+                            userAgent = failed.userAgent ?: Http.DEFAULT_USER_AGENT,
+                            referrer = failed.referrer,
+                        )
+                    }
+                    error = StreamProbe.summarize(probe)
+                    report = buildReport(failed, e, probe)
+                    diagnosing = false
+                }
             }
         }
         player.addListener(listener)
@@ -186,6 +207,8 @@ fun PlayerPanel(
     LaunchedEffect(channel?.id, reloadToken) {
         error = null
         errorDetail = null
+        report = null
+        diagnosing = false
         retries = 0
         attempt.intValue = 0
         browserUaTried.value = false
@@ -260,6 +283,14 @@ fun PlayerPanel(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(text = message, color = Color.White)
+                    if (diagnosing) {
+                        Text(
+                            text = "בודק מה השרת מחזיר…",
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
                     val detail = errorDetail
                     if (detail != null) {
                         Text(
@@ -280,9 +311,10 @@ fun PlayerPanel(
                             Text("נגן חיצוני")
                         }
                         OutlinedButton(onClick = {
-                            channel?.let { clipboard.setText(AnnotatedString(it.url)) }
+                            val text = report ?: channel?.url
+                            text?.let { clipboard.setText(AnnotatedString(it)) }
                         }) {
-                            Text("העתק כתובת")
+                            Text(if (report != null) "העתק דוח" else "העתק כתובת")
                         }
                     }
                 }
@@ -400,6 +432,21 @@ private fun isContainerError(e: PlaybackException): Boolean = when (e.errorCode)
 private fun detailOf(e: PlaybackException): String {
     val status = (e.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
     return if (status != null) "${e.errorCodeName} · HTTP $status" else e.errorCodeName
+}
+
+/** Everything needed to understand the failure, in one pasteable block. */
+private fun buildReport(
+    channel: Channel,
+    error: PlaybackException,
+    probe: StreamProbe.Report,
+): String = buildString {
+    appendLine("ערוץ: ${channel.name}")
+    appendLine("כתובת: ${channel.url}")
+    channel.userAgent?.let { appendLine("User-Agent מהרשימה: $it") }
+    channel.referrer?.let { appendLine("Referer מהרשימה: $it") }
+    appendLine("שגיאת נגן: ${detailOf(error)}")
+    appendLine("בדיקת שרת:")
+    append(StreamProbe.technical(probe))
 }
 
 private fun openExternally(context: android.content.Context, url: String) {
