@@ -30,6 +30,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.VisualTransformation
@@ -63,8 +64,19 @@ fun isTelevision(context: Context): Boolean {
  * gets forgotten is the one that gets cropped.
  */
 @Composable
-fun Modifier.tvSafeArea(): Modifier =
-    if (LocalIsTv.current) this.padding(horizontal = 48.dp, vertical = 27.dp) else this
+fun Modifier.tvSafeArea(): Modifier {
+    // Asking the system whether this is a television is a guess that some boxes
+    // get wrong, and when it guesses wrong the screen is cropped with no way to
+    // tell from here. A wide screen therefore gets the gutter either way: on a
+    // television it is what keeps the edges on screen, and anywhere else it is
+    // margins, which never hurt anyone.
+    val wide = LocalConfiguration.current.screenWidthDp >= 600
+    return if (LocalIsTv.current || wide) {
+        this.padding(horizontal = 48.dp, vertical = 27.dp)
+    } else {
+        this
+    }
+}
 
 /**
  * On a touchscreen the finger says where you are; with a remote, only the

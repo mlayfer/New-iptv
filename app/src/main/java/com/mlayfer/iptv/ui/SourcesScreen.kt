@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import com.mlayfer.iptv.BuildConfig
 import com.mlayfer.iptv.data.Playlist
 import com.mlayfer.iptv.data.PlaylistSource
 import kotlinx.coroutines.Dispatchers
@@ -373,7 +374,9 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                         )
                     }
                     Text(
-                        text = "פרטי ההתחברות נשמרים במכשיר בלבד.",
+                        // Which build this is, said out loud. "Is this the new
+                        // one?" should be readable off the screen, not guessed.
+                        text = "פרטי ההתחברות נשמרים במכשיר בלבד · גרסה ${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

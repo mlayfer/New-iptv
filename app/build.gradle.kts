@@ -79,6 +79,9 @@ android {
 
     buildFeatures {
         compose = true
+        // So the app can say which build it is. Without that, "is this the new
+        // one?" is a question neither of us can answer from a photograph.
+        buildConfig = true
     }
 
     packaging {
