@@ -66,9 +66,14 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
     var query by remember { mutableStateOf("") }
     // One box over the whole catalogue: a title is not filed under the section
     // you happen to be standing in. Same rule as the Tizen build, from HomeRows.
-    val rows = remember(home, query, cards) {
-        if (query.trim().length < 2) home else HomeRows.search(cards, query)
-    }
+    // Twenty thousand cards are walked for every letter; not on the thread that
+    // draws the screen.
+    val searching = query.trim().length >= 2
+    val rows by filteredAsync(
+        home, query, cards,
+        initial = home,
+        immediate = !searching,
+    ) { if (searching) HomeRows.search(cards, query) else home }
     var highlighted by remember { mutableStateOf<HomeRows.Card?>(null) }
     val seen = remember(state.recent, state.watched) { state.seen }
 

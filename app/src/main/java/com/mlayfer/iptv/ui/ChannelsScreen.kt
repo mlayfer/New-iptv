@@ -85,9 +85,12 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
     }
     ImmersiveWhileFullscreen(fullscreen)
 
-    val visible = remember(
+    val visible by filteredAsync(
         state.channels, state.query, state.group, state.kind, state.view,
         state.favorites, state.recent,
+        initial = emptyList<Channel>(),
+        // Nothing typed is nothing to search: answer that one on the spot.
+        immediate = state.query.isBlank(),
     ) {
         Filtering.apply(
             channels = state.channels,
@@ -537,7 +540,11 @@ private fun SeriesContent(state: UiState, viewModel: AppViewModel) {
     val seen = remember(state.recent, state.watched) { state.seen }
 
     if (open == null) {
-        val filtered = remember(state.series, state.query, state.group) {
+        val filtered by filteredAsync(
+            state.series, state.query, state.group,
+            initial = emptyList<Series>(),
+            immediate = state.query.isBlank(),
+        ) {
             val needle = Filtering.normalize(state.query.trim())
             state.series.filter { series ->
                 val group = series.group?.trim().takeUnless { it.isNullOrEmpty() } ?: M3uParser.NO_GROUP

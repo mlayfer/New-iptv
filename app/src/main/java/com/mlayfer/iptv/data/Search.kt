@@ -22,6 +22,12 @@ object Search {
     private val HEBREW_LETTERS = Regex("[\\u0590-\\u05ff]")
     private val LATIN_LETTERS = Regex("[a-zA-Z]")
 
+    // Compiled once. These run per catalogue item per keystroke — on a real
+    // subscription that is nineteen thousand items — and building a Regex
+    // inside that loop costs more than the matching it does.
+    private val WHITESPACE = Regex("\\s+")
+    private val DOUBLED = Regex("(.)\\1+")
+
     /**
      * Which alphabet something is written in. The sound-alike path exists to
      * cross between alphabets; inside one alphabet it only removes information
@@ -62,7 +68,7 @@ object Search {
 
     fun skeleton(text: String): String {
         var s = text.lowercase()
-            .split(Regex("\\s+"))
+            .split(WHITESPACE)
             .filter { it !in STOP_WORDS }
             .joinToString(" ")
 
@@ -87,7 +93,7 @@ object Search {
 
         // A doubled letter in one spelling is a single one in the other, and s
         // between vowels is heard as z: neither difference should hide a match.
-        return out.toString().replace("Z", "S").replace(Regex("(.)\\1+"), "$1")
+        return out.toString().replace("Z", "S").replace(DOUBLED, "$1")
     }
 
     /** The text a search looks at: the name, its category, and any other title. */
@@ -111,7 +117,7 @@ object Search {
         // ...and only against text written in the other alphabet. Within one
         // alphabet the plain match above is the whole truth.
         val asked = scriptOf(q)
-        val parts = text.split(Regex("\\s+")).filter {
+        val parts = text.split(WHITESPACE).filter {
             val kind = scriptOf(it)
             kind != "none" && kind != asked
         }
