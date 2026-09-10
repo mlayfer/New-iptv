@@ -68,7 +68,29 @@
     </section>
 
     <section id="browseScreen" class="screen hidden">
-      <div id="homeScreen" class="homeLayout">
+      <div id="chooseScreen" class="chooseLayout">
+        <div class="chooseTitle">מה בא לך לראות?</div>
+        <div class="chooseGrid">
+          <button id="worldLive" class="focusable worldCard worldLive">
+            <div class="worldArt"></div>
+            <div class="worldText">
+              <div class="worldName">טלוויזיה בשידור חי</div>
+              <div class="worldCount" id="worldLiveCount"></div>
+              <div class="worldHint">ערוצים, ספורט, חדשות וילדים</div>
+            </div>
+          </button>
+          <button id="worldVod" class="focusable worldCard worldVod">
+            <div class="worldArt"></div>
+            <div class="worldText">
+              <div class="worldName">סרטים וסדרות</div>
+              <div class="worldCount" id="worldVodCount"></div>
+              <div class="worldHint">הספרייה, ומה שהתחלת לראות</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div id="homeScreen" class="hidden homeLayout">
         <div class="stageHero" id="homeHero">
           <div class="stageHeroBack" id="homeHeroBack"></div>
           <div class="stageHeroText">
@@ -91,6 +113,14 @@
           </div>
           <div id="notes" class="statusLine"></div>
           <div id="groups" class="groupStrip"></div>
+          <div id="nowNext" class="nowNext hidden">
+            <div class="nnLogo" id="nnLogo"></div>
+            <div class="nnText">
+              <div class="nnNow" id="nnNow"></div>
+              <div class="nnBar"><div class="nnFill" id="nnFill"></div></div>
+            </div>
+            <div class="nnNext" id="nnNext"></div>
+          </div>
           <div id="items" class="channelGrid"></div>
         </div>
 
@@ -106,6 +136,25 @@
       </div>
 
       <!-- Movies and series: poster rows, one per category. -->
+      <div id="detailScreen" class="hidden detailLayout">
+        <div class="detailBackdrop" id="detailBackdrop"></div>
+        <div class="detailShade"></div>
+        <div class="detailBody">
+          <div class="detailPoster" id="detailPoster"></div>
+          <div class="detailText">
+            <div class="detailTitle" id="detailTitle"></div>
+            <div class="detailFacts" id="detailFacts"></div>
+            <div class="detailPlot" id="detailPlot"></div>
+            <div class="detailActions" id="detailActions">
+              <button class="focusable ctrlBtn ctrlMain" id="detailPlay" data-nav="detailAction">צפה</button>
+              <button class="focusable ctrlBtn" id="detailFavorite" data-nav="detailAction">הוסף למועדפים</button>
+            </div>
+            <div class="seasonStrip hidden" id="seasonStrip"></div>
+          </div>
+        </div>
+        <div class="episodeStrip hidden" id="episodeStrip"></div>
+      </div>
+
       <div id="vodScreen" class="hidden vodLayout">
         <div class="vodHero" id="vodHero">
           <div class="vodHeroText">

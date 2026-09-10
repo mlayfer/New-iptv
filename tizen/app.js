@@ -233,7 +233,8 @@ async function loadXtream(){
         kind: 'LIVE',
         contentType: 'LIVE',
         url: `${server}/live/${enc(user)}/${enc(pass)}/${id}.m3u8`,
-        logo: x.stream_icon || null
+        logo: x.stream_icon || null,
+        streamId: id
       });
     });
 
@@ -250,6 +251,7 @@ async function loadXtream(){
             name: x.name || ('סרט ' + id),
             group: vodCats[String(x.category_id)] || 'סרטים',
             kind: 'VOD',
+            streamId: id,
             contentType: looksLikeSeries(x.name, vodCats[String(x.category_id)] || '') ? 'SERIES' : 'MOVIE',
             url: `${server}/movie/${enc(user)}/${enc(pass)}/${id}.${ext}`,
             logo: x.stream_icon || null,
@@ -307,7 +309,7 @@ function finishLoad(items){
   $('#navSearch').classList.remove('hidden');
   stopPlayback();
   renderCatalogSummary();
-  showHome();
+  showChooser();
   hideSplash();
 }
 
@@ -425,8 +427,10 @@ const HOME_ROW_WINDOW = 3;
 const HOME_COL_WINDOW = 12;
 
 function buildHome(){
+  // The library's home is the library's alone; channels have a guide of their own.
+  const pool = homePool().filter(x => x.kind !== 'LIVE');
   state.home.rows = Core.buildHomeRows({
-    items: homePool(),
+    items: pool,
     history: state.history,
     favorites: state.favorites
   });
@@ -563,14 +567,58 @@ function moveHome(dRow, dCol){
   focusHome();
 }
 
+/**
+ * Two worlds, and the app asks which one before it shows anything else. A
+ * provider's channel guide and a streaming library are different products with
+ * different manners; mixing them into one screen served neither.
+ */
+function showChooser(){
+  state.world = null;
+  state.mode = null;
+  state.episodeContext = null;
+  ['#homeScreen', '#liveScreen', '#vodScreen', '#searchScreen', '#detailScreen']
+    .forEach(sel => $(sel).classList.add('hidden'));
+  $('#chooseScreen').classList.remove('hidden');
+  $('#goHome').classList.add('hidden');
+  ['#navLive', '#navVod', '#navSeries', '#navSearch'].forEach(sel => $(sel).classList.add('hidden'));
+
+  const live = state.items.filter(x => x.kind === 'LIVE').length;
+  const series = state.items.filter(x => x.contentType === 'SERIES').length;
+  text($('#worldLiveCount'), live ? live.toLocaleString('he-IL') + ' ערוצים' : '');
+  text($('#worldVodCount'), (state.items.length - live - series).toLocaleString('he-IL') +
+    ' סרטים · ' + series.toLocaleString('he-IL') + ' סדרות');
+
+  renderNotes();
+  setTimeout(() => setFocus($('#worldLive')), 60);
+}
+
+/** Entering a world shows only what belongs to it. */
+function enterWorld(world){
+  state.world = world;
+  $('#chooseScreen').classList.add('hidden');
+  $('#goHome').classList.remove('hidden');
+  $('#navSearch').classList.remove('hidden');
+  if(world === 'LIVE'){
+    $('#navLive').classList.remove('hidden');
+    $('#navVod').classList.add('hidden');
+    $('#navSeries').classList.add('hidden');
+    showMode('LIVE');
+    return;
+  }
+  $('#navLive').classList.add('hidden');
+  $('#navVod').classList.remove('hidden');
+  $('#navSeries').classList.remove('hidden');
+  showHome();
+}
+
 function showHome(){
   state.mode = null;
   state.episodeContext = null;
   $('#liveScreen').classList.add('hidden');
   $('#vodScreen').classList.add('hidden');
   $('#searchScreen').classList.add('hidden');
+  $('#detailScreen').classList.add('hidden');
   $('#homeScreen').classList.remove('hidden');
-  $('#goHome').classList.add('hidden');
   renderNotes();
   buildHome();
   state.home.row = 0; state.home.col = 0; state.home.rowStart = 0;
@@ -583,7 +631,12 @@ function showHome(){
 /** A card knows what it is, so the home screen needs no separate menus. */
 function activateFromHome(item){
   if(!item) return;
-  if(item.isSeriesStub){ showMode('SERIES'); openSeries(item); return; }
+  // A poster opens the title first, the way a streaming app does. A channel or
+  // an episode is a thing to watch now, so it plays.
+  if(item.kind !== 'LIVE' && item.contentType !== 'EPISODE'){
+    openDetail(item, currentNavMode());
+    return;
+  }
   if(item.kind === 'LIVE'){
     // Line up the live pool so channel up/down works straight from the home row.
     state.mode = 'LIVE';
@@ -603,6 +656,197 @@ function resumeFor(item){
 }
 
 const formatClock = Core.formatClock;
+
+// ---- A title, before it plays ----------------------------------------------
+
+const detail = { item: null, info: null, seasons: [], season: null, episodes: [], focus: 'action', index: 0, returnTo: 'home' };
+
+function decodeMaybeBase64(value){
+  const text = String(value == null ? '' : value);
+  if(!/^[A-Za-z0-9+/=\s]+$/.test(text) || text.length < 8) return text;
+  try {
+    const bytes = atob(text.replace(/\s/g, ''));
+    // A portal that base64s its titles encodes UTF-8 inside; anything else is
+    // already the text it means.
+    return decodeURIComponent(bytes.split('').map(function(c){
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+  } catch(e) { return text; }
+}
+
+function detailApi(action, key, id){
+  const src = state.source || {};
+  if(src.type !== 'xtream') return null;
+  return `${src.server}/player_api.php?username=${enc(src.user)}&password=${enc(src.pass)}` +
+    `&action=${action}&${key}=${enc(id)}`;
+}
+
+function factsOf(info){
+  const facts = [];
+  const year = (info.releasedate || info.releaseDate || '').toString().slice(0, 4);
+  if(year) facts.push(year);
+  if(info.genre) facts.push(String(info.genre).split(',')[0].trim());
+  const minutes = String(info.duration || info.episode_run_time || '').trim();
+  if(minutes && /^\d+$/.test(minutes)) facts.push(minutes + ' דק׳');
+  else if(minutes && /:/.test(minutes)) facts.push(minutes);
+  if(info.rating && Number(info.rating) > 0) facts.push('★ ' + Number(info.rating).toFixed(1));
+  if(info.cast) facts.push(String(info.cast).split(',').slice(0, 3).join(', ').trim());
+  return facts.join(' · ');
+}
+
+async function openDetail(item, returnTo){
+  detail.item = item;
+  detail.info = null;
+  detail.seasons = [];
+  detail.episodes = [];
+  detail.season = null;
+  detail.focus = 'action';
+  detail.index = 0;
+  detail.returnTo = returnTo || currentNavMode();
+
+  ['#homeScreen', '#vodScreen', '#searchScreen'].forEach(sel => $(sel).classList.add('hidden'));
+  $('#detailScreen').classList.remove('hidden');
+
+  text($('#detailTitle'), item.name);
+  text($('#detailFacts'), itemMeta(item));
+  text($('#detailPlot'), '');
+  fillArt($('#detailPoster'), item);
+  $('#detailBackdrop').style.backgroundImage = item.logo ? `url("${item.logo}")` : '';
+  $('#seasonStrip').classList.add('hidden');
+  $('#episodeStrip').classList.add('hidden');
+  renderDetailActions();
+  setTimeout(() => setFocus($('#detailPlay')), 50);
+
+  const series = item.contentType === 'SERIES';
+  const url = detailApi(series ? 'get_series_info' : 'get_vod_info',
+    series ? 'series_id' : 'vod_id', item.streamId || item.seriesId || '');
+  if(!url) return;
+
+  try {
+    const data = JSON.parse(await getText(url));
+    if(detail.item !== item) return;   // the viewer moved on while this arrived
+    const info = data.info || (data.movie_data && data.movie_data.info) || {};
+    detail.info = info;
+
+    const plot = decodeMaybeBase64(info.plot || info.description || '');
+    if(plot) text($('#detailPlot'), plot);
+    const facts = factsOf(info);
+    if(facts) text($('#detailFacts'), itemMeta(item) + ' · ' + facts);
+
+    const backdrop = (Array.isArray(info.backdrop_path) ? info.backdrop_path[0] : info.backdrop_path) ||
+      info.movie_image || info.cover || item.logo;
+    if(backdrop) $('#detailBackdrop').style.backgroundImage = `url("${backdrop}")`;
+
+    if(series && data.episodes){
+      detail.seasons = Object.keys(data.episodes)
+        .sort(function(a, b){ return (Number(a) || 0) - (Number(b) || 0); });
+      detail.all = Core.episodesFromSeriesInfo(data, {
+        server: item.server, user: item.user, pass: item.pass, logo: item.logo, seriesName: item.name
+      });
+      selectSeason(detail.seasons[0]);
+    }
+  } catch(e) {
+    text($('#detailPlot'), 'לא הצלחתי לטעון את פרטי הכותר.');
+  }
+}
+
+function selectSeason(season){
+  detail.season = season;
+  detail.episodes = (detail.all || []).filter(function(ep){ return ep.group === 'עונה ' + season; });
+  state.episodeContext = { series: detail.item, episodes: detail.all || [] };
+  renderSeasons();
+  renderEpisodes();
+}
+
+function renderSeasons(){
+  const strip = $('#seasonStrip');
+  strip.innerHTML = '';
+  if(detail.seasons.length < 1){ strip.classList.add('hidden'); return; }
+  strip.classList.remove('hidden');
+  detail.seasons.forEach(function(season){
+    const chip = document.createElement('button');
+    chip.className = 'focusable seasonChip' + (season === detail.season ? ' active' : '');
+    chip.dataset.nav = 'season';
+    chip.textContent = 'עונה ' + season;
+    chip.addEventListener('click', () => selectSeason(season));
+    strip.appendChild(chip);
+  });
+}
+
+function renderEpisodes(){
+  const strip = $('#episodeStrip');
+  strip.innerHTML = '';
+  if(!detail.episodes.length){ strip.classList.add('hidden'); return; }
+  strip.classList.remove('hidden');
+  detail.episodes.slice(0, 14).forEach(function(episode, index){
+    const card = document.createElement('button');
+    card.className = 'focusable episodeCard';
+    card.dataset.nav = 'episode';
+    card.dataset.index = String(index);
+    card.innerHTML = '<div class="episodeName"></div><div class="episodeMeta"></div>';
+    $('.episodeName', card).textContent = episode.name;
+    const entry = state.history.find(x => x.id === episode.id);
+    $('.episodeMeta', card).textContent = entry && Core.isResumable(entry)
+      ? 'המשך מ-' + formatClock(entry.position) : episode.group;
+    card.addEventListener('click', () => activateItem(episode));
+    strip.appendChild(card);
+  });
+}
+
+function renderDetailActions(){
+  const item = detail.item;
+  if(!item) return;
+  const resume = resumeFor(item);
+  text($('#detailPlay'), item.contentType === 'SERIES'
+    ? 'צפה בפרק הראשון'
+    : (resume ? 'המשך מ-' + formatClock(resume) : 'צפה'));
+  text($('#detailFavorite'), isFavorite(item) ? 'הסר מהמועדפים' : 'הוסף למועדפים');
+}
+
+function playFromDetail(){
+  const item = detail.item;
+  if(!item) return;
+  if(item.contentType === 'SERIES'){
+    const first = (detail.episodes[0]) || (detail.all || [])[0];
+    if(first) activateItem(first);
+    return;
+  }
+  activateItem(item);
+}
+
+function closeDetail(){
+  $('#detailScreen').classList.add('hidden');
+  state.episodeContext = null;
+  if(detail.returnTo === 'vod'){ $('#vodScreen').classList.remove('hidden'); focusVod(); return; }
+  if(detail.returnTo === 'search'){ $('#searchScreen').classList.remove('hidden'); focusSearch(); return; }
+  $('#homeScreen').classList.remove('hidden');
+  focusHome();
+}
+
+function navDetail(active, dir){
+  const type = active && active.dataset ? active.dataset.nav : null;
+  const actions = visible('[data-nav="detailAction"]');
+  const seasons = visible('[data-nav="season"]');
+  const episodes = visible('[data-nav="episode"]');
+
+  if(type === 'detailAction'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(actions, active, dir) || active;
+    if(dir === 'down') return seasons[0] || episodes[0] || active;
+    return active;
+  }
+  if(type === 'season'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(seasons, active, dir) || active;
+    if(dir === 'up') return actions[0] || active;
+    if(dir === 'down') return episodes[0] || active;
+    return active;
+  }
+  if(type === 'episode'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(episodes, active, dir) || active;
+    if(dir === 'up') return seasons[0] || actions[0] || active;
+    return active;
+  }
+  return actions[0] || active;
+}
 
 // ---- Search: one box over everything --------------------------------------
 
@@ -678,6 +922,101 @@ function showSearch(){
   setTimeout(() => setFocus($('#globalSearch')), 60);
 }
 
+// ---- What is on right now --------------------------------------------------
+//
+// A provider's guide always answers two questions before you press anything:
+// what is playing, and what follows. The portal gives us a short EPG per
+// channel; we cache it, because moving across the grid asks for it constantly.
+
+const epgCache = {};
+
+function clockOfDay(stamp){
+  const when = new Date(stamp);
+  if(isNaN(when.getTime())) return '';
+  return ('0' + when.getHours()).slice(-2) + ':' + ('0' + when.getMinutes()).slice(-2);
+}
+
+/** Milliseconds for an Xtream EPG entry, which dates them two different ways. */
+function epgTime(value, fallback){
+  if(value == null || value === '') return fallback;
+  const asNumber = Number(value);
+  if(!isNaN(asNumber) && asNumber > 100000) return asNumber * 1000;
+  const parsed = Date.parse(String(value).replace(' ', 'T'));
+  return isNaN(parsed) ? fallback : parsed;
+}
+
+function epgFor(item){
+  const key = item && item.streamId;
+  if(!key) return Promise.resolve(null);
+  if(epgCache[key]) return Promise.resolve(epgCache[key]);
+  const url = detailApi('get_short_epg', 'stream_id', key);
+  if(!url) return Promise.resolve(null);
+  return getText(url + '&limit=4').then(function(raw){
+    const body = JSON.parse(raw) || {};
+    const list = (body.epg_listings || body.epg_listing || []).map(function(row){
+      return {
+        title: decodeMaybeBase64(row.title),
+        description: decodeMaybeBase64(row.description),
+        start: epgTime(row.start_timestamp || row.start, 0),
+        stop: epgTime(row.stop_timestamp || row.end, 0)
+      };
+    }).filter(function(row){ return row.title; });
+    epgCache[key] = list;
+    return list;
+  }).catch(function(){ epgCache[key] = []; return []; });
+}
+
+/** The entry covering `at`, plus the one after it. */
+function nowOn(list, at){
+  const when = at || Date.now();
+  let current = null, next = null;
+  (list || []).forEach(function(row){
+    if(row.start <= when && (!row.stop || row.stop > when)) current = row;
+    else if(row.start > when && (!next || row.start < next.start)) next = row;
+  });
+  return { current: current, next: next };
+}
+
+function epgLine(row){
+  if(!row) return '';
+  const at = row.start ? clockOfDay(row.start) : '';
+  return (at ? at + ' · ' : '') + row.title;
+}
+
+/** Fill the strip above the grid for whichever channel is focused. */
+function renderNowNext(){
+  const strip = $('#nowNext');
+  if(!strip) return;
+  const item = state.filtered[state.liveIndex];
+  if(!item || !item.streamId){ strip.classList.add('hidden'); return; }
+
+  const token = item.id;
+  strip.dataset.channel = token;
+  fillArt($('#nnLogo'), item);
+  text($('#nnNow'), 'טוען לוח שידורים…');
+  text($('#nnNext'), '');
+  const fill = $('#nnFill');
+  if(fill) fill.style.width = '0%';
+  strip.classList.remove('hidden');
+
+  epgFor(item).then(function(list){
+    // The focus may have moved on while the portal was answering.
+    if(strip.dataset.channel !== token) return;
+    // A portal with no EPG for this channel should not leave an empty shelf.
+    if(!list || !list.length){ strip.classList.add('hidden'); return; }
+    const at = Date.now();
+    const slot = nowOn(list, at);
+    text($('#nnNow'), slot.current ? slot.current.title : item.name);
+    text($('#nnNext'), slot.next ? 'אחר כך · ' + epgLine(slot.next) : '');
+    if(fill){
+      const row = slot.current;
+      const span = row && row.stop > row.start ? row.stop - row.start : 0;
+      const done = span ? Math.max(0, Math.min((at - row.start) / span, 1)) : 0;
+      fill.style.width = (done * 100).toFixed(1) + '%';
+    }
+  });
+}
+
 // ---- Live TV: a guide of channel tiles, then full-screen playback ----------
 
 const LIVE_COLS = 5;
@@ -697,6 +1036,8 @@ function renderItems(){
     empty.className = 'tileMeta';
     empty.textContent = 'לא נמצאו ערוצים';
     box.appendChild(empty);
+    const strip = $('#nowNext');
+    if(strip) strip.classList.add('hidden');
     return;
   }
 
@@ -736,6 +1077,7 @@ function focusChannel(){
 
   const el = $('[data-nav="item"][data-index="' + index + '"]');
   if(el) setFocus(el);
+  renderNowNext();
 }
 
 function moveChannel(dRow, dCol){
@@ -795,6 +1137,7 @@ function describePlayer(item){
   text($('#ovHint'), live
     ? 'מעלה/מטה — ערוץ · אישור — הפקדים · צהוב — מועדפים · Back — יציאה'
     : 'ימין/שמאל — דילוג · מטה — הפקדים · אישור — נגן/השהה · Back — יציאה');
+  if(live) describeLiveNow(item);
   renderProgress();
 }
 
@@ -802,6 +1145,19 @@ function describePlayer(item){
  * The scrubber is the whole point of a player: it has to say where you are,
  * where a pending jump would land, and how much is left.
  */
+/** While a channel plays, the meta line carries the programme, not the group. */
+function describeLiveNow(item){
+  const token = item.id;
+  epgFor(item).then(function(list){
+    if(!state.current || state.current.id !== token) return;
+    const slot = nowOn(list, Date.now());
+    if(!slot.current) return;
+    const parts = ['עכשיו · ' + slot.current.title];
+    if(slot.next) parts.push('אחר כך · ' + epgLine(slot.next));
+    text($('#itemMeta'), parts.join('   '));
+  });
+}
+
 function renderProgress(){
   if(!onDemand()) return;
   const duration = state.duration > 0 ? state.duration : 0;
@@ -1021,11 +1377,20 @@ function closePlayer(){
   state.duration = 0;
   $('#playerScreen').classList.add('hidden');
 
-  if(state.playerReturn === 'live'){
+  // Back from playback lands where it started: the title's page, the guide,
+  // the catalogue or the home of whichever world is open.
+  if(state.playerReturn === 'detail' && detail.item){
+    $('#detailScreen').classList.remove('hidden');
+    renderDetailActions();
+    renderEpisodes();
+    setTimeout(() => setFocus($('#detailPlay')), 40);
+  } else if(state.playerReturn === 'live'){
     renderItems();
     focusChannel();
   } else if(state.playerReturn === 'vod'){
     focusVod();
+  } else if(state.playerReturn === 'search'){
+    focusSearch();
   } else {
     buildHome();
     focusHome();
@@ -1095,7 +1460,9 @@ function renderVodRows(){
       card.addEventListener('click', () => {
         state.vodRow = rowIndex;
         state.vodCol = colIndex;
-        activateItem(item);
+        // Inside a series the cards are episodes, and an episode plays.
+        if(state.episodeContext){ activateItem(item); return; }
+        activateFromHome(item);
       });
       track.appendChild(card);
     });
@@ -1200,7 +1567,9 @@ function backToHome(){
     $('#playerScreen').classList.add('hidden');
     state.current = null;
   }
-  showHome();
+  if(state.world === 'LIVE'){ showMode('LIVE'); return; }
+  if(state.world === 'VOD'){ showHome(); return; }
+  showChooser();
 }
 
 function resetToSetup(){
@@ -1411,6 +1780,23 @@ function navSetup(active, dir){
   return tabs[0] || fields[0] || active;
 }
 
+function navChoose(active, dir){
+  const worlds = visible('[data-nav="world"]');
+  const actions = visible('[data-nav="topAction"]');
+  const type = active && active.dataset ? active.dataset.nav : null;
+  if(type === 'world'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(worlds, active, dir) || active;
+    if(dir === 'up') return actions[0] || active;
+    return active;
+  }
+  if(type === 'topAction'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(actions, active, dir) || active;
+    if(dir === 'down') return worlds[0] || active;
+    return active;
+  }
+  return worlds[0] || active;
+}
+
 function navHome(active, dir){
   const actions = visible('[data-nav="topAction"]');
   const type = active && active.dataset ? active.dataset.nav : null;
@@ -1546,6 +1932,8 @@ function navVod(active, dir){
 function currentNavMode(){
   if(!$('#playerScreen').classList.contains('hidden')) return 'player';
   if(!$('#setupScreen').classList.contains('hidden')) return 'setup';
+  if(!$('#chooseScreen').classList.contains('hidden')) return 'choose';
+  if(!$('#detailScreen').classList.contains('hidden')) return 'detail';
   if(!$('#homeScreen').classList.contains('hidden')) return 'home';
   if(!$('#searchScreen').classList.contains('hidden')) return 'search';
   if(!$('#liveScreen').classList.contains('hidden')) return 'live';
@@ -1582,6 +1970,8 @@ function moveFocus(dir){
   let next = null;
   const mode = currentNavMode();
   if(mode === 'setup') next = navSetup(active, dir);
+  else if(mode === 'choose') next = navChoose(active, dir);
+  else if(mode === 'detail') next = navDetail(active, dir);
   else if(mode === 'home') next = navHome(active, dir);
   else if(mode === 'player') next = navPlayer(active, dir);
   else if(mode === 'search') next = navSearch(active, dir);
@@ -1679,13 +2069,21 @@ function handleBack(){
     closePlayer();
     return;
   }
-  // Inside a series, Back returns to the series list rather than leaving the mode.
+  // The title's page is on top of whatever opened it, so it closes first — a
+  // series shown there also holds an episode list, and that is not a screen of
+  // its own to back out of.
+  if(!$('#detailScreen').classList.contains('hidden')){ closeDetail(); return; }
+  // Inside a series in the catalogue, Back returns to the list of series.
   if(state.episodeContext){
     closeSeries();
     return;
   }
-  if(!$('#browseScreen').classList.contains('hidden') && !$('#homeScreen').classList.contains('hidden')) {
-    resetToSetup();
+  // At the door, Back leaves for the source form; inside a world it returns
+  // to the world's own home, and from there to the door.
+  if(!$('#chooseScreen').classList.contains('hidden')){ resetToSetup(); return; }
+  if(!$('#homeScreen').classList.contains('hidden') ||
+     (state.world === 'LIVE' && !$('#liveScreen').classList.contains('hidden') && !state.episodeContext)){
+    showChooser();
     return;
   }
   backToHome();
@@ -1711,6 +2109,16 @@ function wireStatic(){
   $('#vodSearch').dataset.nav = 'vodSearch';
   ['#goHome', '#navLive', '#navVod', '#navSeries', '#navSearch', '#backToSetup']
     .forEach(sel => { $(sel).dataset.nav = 'topAction'; });
+  $('#worldLive').dataset.nav = 'world';
+  $('#worldVod').dataset.nav = 'world';
+  $('#worldLive').addEventListener('click', () => enterWorld('LIVE'));
+  $('#worldVod').addEventListener('click', () => enterWorld('VOD'));
+  $('#detailPlay').addEventListener('click', playFromDetail);
+  $('#detailFavorite').addEventListener('click', () => {
+    if(!detail.item) return;
+    toggleFavorite(detail.item);
+    renderDetailActions();
+  });
   $('#globalSearch').dataset.nav = 'globalSearch';
 
   $$('.serverSuggestion').forEach(btn => {

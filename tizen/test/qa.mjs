@@ -60,6 +60,17 @@ await page.route("**/player_api.php*", (route) => {
     category_id: (i % liveCats.length) + 1,
     stream_icon: `http://ilvips.com:80/art/wide/${i}/${encodeURIComponent("ערוץ")}`,
   }))));
+  if (action === "get_short_epg") {
+    // A real portal base64s its titles, and dates them in seconds.
+    const now = Math.floor(Date.now() / 1000), half = 1800;
+    const b64 = (t) => Buffer.from(t, "utf8").toString("base64");
+    return route.fulfill(json({ epg_listings: [
+      { title: b64("מהדורת החדשות"), description: b64("מה קרה היום"),
+        start_timestamp: now - half, stop_timestamp: now + half },
+      { title: b64("סרט הערב"), description: b64("סרט"),
+        start_timestamp: now + half, stop_timestamp: now + half * 4 },
+    ] }));
+  }
   if (action === "get_vod_categories") return route.fulfill(json(vodCats.map((c, i) => ({ category_id: 50 + i, category_name: c }))));
   if (action === "get_vod_streams") return route.fulfill(json(Array.from({ length: N_VOD }, (_, i) => ({
     stream_id: 5000 + i, name: `סרט ${i + 1}`, container_extension: "mkv", category_id: 50 + (i % vodCats.length),
@@ -72,7 +83,22 @@ await page.route("**/player_api.php*", (route) => {
     o_name: i === 0 ? "Severance" : undefined,
     cover: `http://ilvips.com:80/art/poster/${i + 3}/${encodeURIComponent("סדרה")}`,
   }))));
+  if (action === "get_vod_info") return route.fulfill(json({
+    info: {
+      plot: "סרט על אנשים שעושים דברים, ואז דברים אחרים קורים להם.",
+      genre: "דרמה, מתח", releasedate: "2024-03-01", duration: "112",
+      rating: "7.4", cast: "שחקן א, שחקנית ב, שחקן ג",
+      movie_image: "http://ilvips.com:80/art/poster/9/%D7%A1%D7%A8%D7%98",
+      backdrop_path: ["http://ilvips.com:80/art/wide/9/%D7%A1%D7%A8%D7%98"],
+    },
+  }));
   if (action === "get_series_info") return route.fulfill(json({
+    info: {
+      plot: "עובדים שעברו הליך שמפריד בין הזיכרונות שלהם בעבודה לחיים שבחוץ.",
+      genre: "מותחן", releaseDate: "2022-02-18", rating: "8.7",
+      cast: "אדם סקוט, בריט לואר",
+      backdrop_path: ["http://ilvips.com:80/art/wide/4/%D7%A1%D7%93%D7%A8%D7%94"],
+    },
     episodes: { 1: Array.from({ length: 10 }, (_, i) => ({
       id: 9000 + i, episode_num: i + 1, title: `ניתוק - S01E0${i + 1} - פרק`, container_extension: "mkv",
     })) },
@@ -131,37 +157,40 @@ await fill("#xtPass", "demo");
 const t0 = Date.now();
 await page.click("#loadXtream");
 await page.waitForTimeout(2600);
-check("the portal loads", await shown("#homeScreen"), `${Date.now() - t0} ms`);
+check("the portal loads", await shown("#chooseScreen"), `${Date.now() - t0} ms`);
 check("the catalogue is counted out loud",
   /\d+ ערוצים · \d+ סרטים · \d+ סדרות/.test(await page.textContent("#catalogSummary")),
   await page.textContent("#catalogSummary"));
 
-// ---- home -------------------------------------------------------------------
-const rows = await page.locator("#homeRows .cardRowTitle").allTextContents();
-check("the home screen opens on content", rows.length > 0, rows.join(" | "));
-check("only a window of rows is built", await page.locator("#homeRows .cardRow").count() <= 3,
-  `${await page.locator("#homeRows .cardRow").count()} rows in the DOM`);
-check("cards carry artwork", await page.locator("#homeRows .cardRowTrack img").count() > 0,
-  `${await page.locator("#homeRows .cardRowTrack img").count()} images`);
+// ---- the door ---------------------------------------------------------------
+check("the app opens on the choice between the two worlds", await shown("#chooseScreen"));
+check("each world says how much is in it",
+  /\d/.test(await page.textContent("#worldLiveCount")) && /\d/.test(await page.textContent("#worldVodCount")),
+  `${await page.textContent("#worldLiveCount")} / ${await page.textContent("#worldVodCount")}`);
+check("nothing of a world is on screen before one is chosen",
+  !(await shown("#homeScreen")) && !(await shown("#liveScreen")) && !(await shown("#navVod")));
 
-await page.keyboard.press("ArrowDown");
-await page.waitForTimeout(200);
-check("the hero follows the highlight", (await page.textContent("#homeTitle")).length > 0, await page.textContent("#homeTitle"));
-
-await page.keyboard.press("f");
-await page.waitForTimeout(300);
-check("the yellow key marks a favourite",
-  (await page.locator("#homeRows .cardRowTitle").allTextContents()).some((t) => t.includes("המועדפים")),
-  (await page.locator("#homeRows .cardRowTitle").allTextContents()).join(" | "));
-await page.keyboard.press("f");
-await page.waitForTimeout(300);
-
-// ---- live -------------------------------------------------------------------
-await page.click("#navLive");
-await page.waitForTimeout(900);
+// ---- the television world ---------------------------------------------------
+await page.click("#worldLive");
+await page.waitForTimeout(1000);
+check("choosing television opens the guide", await shown("#liveScreen"));
+check("the library's sections are not offered here",
+  !(await shown("#navVod")) && !(await shown("#navSeries")));
 check("the guide draws a window, not the catalogue",
   (await page.locator('[data-nav="item"]').count()) === 20,
   `${await page.locator('[data-nav="item"]').count()} tiles for ${N_LIVE} channels`);
+check("the guide says what is on now", await shown("#nowNext") &&
+  (await page.textContent("#nnNow")).includes("מהדורת החדשות"),
+  await page.textContent("#nnNow"));
+check("and what follows it", (await page.textContent("#nnNext")).includes("סרט הערב"),
+  await page.textContent("#nnNext"));
+check("how far into the programme is drawn",
+  parseFloat(await page.evaluate(() => document.querySelector("#nnFill").style.width)) > 10);
+await page.keyboard.press("ArrowLeft");
+await page.waitForTimeout(600);
+check("moving across the guide keeps the strip filled",
+  (await page.textContent("#nnNow")).includes("מהדורת החדשות"));
+
 await fill("#search", "ספורט");
 await page.waitForTimeout(500);
 const sportCount = await page.locator('[data-nav="item"]').count();
@@ -171,42 +200,74 @@ await page.waitForTimeout(400);
 
 await page.locator('[data-nav="item"]').first().click();
 await page.waitForTimeout(1200);
-check("a channel takes the whole screen", await shown("#playerScreen"));
+check("a channel plays at once, without a page in between", await shown("#playerScreen"));
 check("nothing of the app is left over the picture",
   !(await shown(".topbar")) && !(await shown("#browseScreen")));
 check("a channel says it is live", await shown("#ovBadge"));
 check("a channel has no timeline to scrub", !(await shown("#scrubRow")));
+check("the picture is captioned with the programme, not the group",
+  (await page.textContent("#itemMeta")).includes("עכשיו · מהדורת החדשות"),
+  await page.textContent("#itemMeta"));
 await page.keyboard.press("Backspace");
 await page.waitForTimeout(500);
 check("Back returns to the guide", await shown("#liveScreen") && !(await shown("#playerScreen")));
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(500);
+check("Back again returns to the door", await shown("#chooseScreen"));
 
-// ---- films and series -------------------------------------------------------
-await page.click("#navVod");
-await page.waitForTimeout(900);
-const movieRows = await page.locator("#vodRows .vodRowTitle").allTextContents();
-check("films are their own catalogue", movieRows.every((r) => !r.includes("דרמה") && !r.includes("Apple")),
-  movieRows.join(" | "));
+// ---- the library world ------------------------------------------------------
+await page.click("#worldVod");
+await page.waitForTimeout(1000);
+check("choosing the library opens its home", await shown("#homeScreen"));
+const rows = await page.locator("#homeRows .cardRowTitle").allTextContents();
+check("the home screen opens on content", rows.length > 0, rows.join(" | "));
+check("no channels are mixed into the library",
+  rows.every((r) => !liveCats.includes(r.split(" ")[0])), rows.join(" | "));
+check("only a window of rows is built", (await page.locator("#homeRows .cardRow").count()) <= 3);
+check("cards carry artwork", (await page.locator("#homeRows .cardRowTrack img").count()) > 0,
+  `${await page.locator("#homeRows .cardRowTrack img").count()} images`);
+check("the television's guide is not offered here", !(await shown("#navLive")));
+
+await page.keyboard.press("f");
+await page.waitForTimeout(300);
+check("the yellow key marks a favourite",
+  (await page.locator("#homeRows .cardRowTitle").allTextContents()).some((t) => t.includes("המועדפים")));
+await page.keyboard.press("f");
+await page.waitForTimeout(300);
+
+// ---- a title -----------------------------------------------------------------
 await page.click("#navSeries");
 await page.waitForTimeout(900);
 const seriesRows = await page.locator("#vodRows .vodRowTitle").allTextContents();
 check("series are their own catalogue", seriesRows.every((r) => vodCats.every((c) => !r.includes(c))),
   seriesRows.join(" | "));
-
 await page.locator('[data-nav="vodCard"]').first().click();
-await page.waitForTimeout(1300);
-const episodes = await page.locator('[data-nav="vodCard"]').allTextContents();
-check("a series opens on its episodes", episodes.length > 0, episodes.slice(0, 2).join(" / "));
-check("the portal's own numbering is not doubled",
-  episodes.every((e) => !/S\d+E\d+ · .*S\d+E\d+/i.test(e)), episodes[0]);
+await page.waitForTimeout(1400);
+check("a poster opens the title, it does not start playing", await shown("#detailScreen") && !(await shown("#playerScreen")));
+check("the title carries its story", (await page.textContent("#detailPlot")).length > 20,
+  (await page.textContent("#detailPlot")).slice(0, 40) + "…");
+check("the title carries its facts", /\d{4}/.test(await page.textContent("#detailFacts")),
+  await page.textContent("#detailFacts"));
+check("a series offers its seasons", await shown("#seasonStrip"));
+check("a series lists its episodes", (await page.locator('[data-nav="episode"]').count()) > 0,
+  `${await page.locator('[data-nav="episode"]').count()} episodes`);
+check("the first thing offered is watching it",
+  (await page.textContent("#detailPlay")).includes("צפה"), await page.textContent("#detailPlay"));
 
-await page.locator('[data-nav="vodCard"]').first().click();
+await page.click("#detailFavorite");
+await page.waitForTimeout(300);
+check("a title can be marked from its own page",
+  (await page.textContent("#detailFavorite")).includes("הסר"), await page.textContent("#detailFavorite"));
+await page.click("#detailFavorite");
+await page.waitForTimeout(200);
+
+await page.locator('[data-nav="episode"]').first().click();
 await page.waitForTimeout(1200);
-check("an episode opens the player", await shown("#playerScreen"));
+check("an episode plays from the title's page", await shown("#playerScreen"));
 check("the controls are there without hunting for them",
   (await page.locator("#controlRow .ctrlBtn:visible").count()) >= 6,
   `${await page.locator("#controlRow .ctrlBtn:visible").count()} buttons`);
-check("an episode offers the next one",
-  await page.locator('[data-act="nextEp"]:visible').count() === 1);
+check("an episode offers the next one", (await page.locator('[data-act="nextEp"]:visible').count()) === 1);
 
 await page.evaluate(() => { const a = window.__talohim; a.state.duration = 3600; a.state.position = 600; a.renderProgress(); });
 await page.keyboard.press("ArrowLeft");
@@ -218,15 +279,12 @@ await page.waitForTimeout(700);
 const forward = await page.evaluate(() => Math.round(window.__talohim.state.position));
 check("right goes forward ten seconds", forward === 600, `${forward}s`);
 
-await page.keyboard.press("ArrowDown");
-await page.waitForTimeout(300);
-check("down reaches the buttons", await page.evaluate(() => !!(window.__talohim.state.focusEl || {}).dataset?.act));
 await page.keyboard.press("Backspace");
-await page.waitForTimeout(200);
-check("Back leaves the buttons before the film", await shown("#playerScreen"));
+await page.waitForTimeout(500);
+check("Back from playback returns to the title", await shown("#detailScreen"));
 await page.keyboard.press("Backspace");
-await page.waitForTimeout(400);
-check("Back again leaves the film", !(await shown("#playerScreen")));
+await page.waitForTimeout(500);
+check("Back from the title returns to the catalogue", await shown("#vodScreen"));
 
 // ---- search -----------------------------------------------------------------
 await page.click("#navSearch");
@@ -238,13 +296,12 @@ check("a Hebrew name finds itself and nothing else",
   hebrew.length === 1 && hebrew[0].includes("ניתוק"), hebrew.join(" / "));
 await fill("#globalSearch", "severance");
 await page.waitForTimeout(600);
-const english = await page.locator('[data-nav="searchCard"]').allTextContents();
-check("the original name finds it too", english.some((t) => t.includes("ניתוק")), english.join(" / "));
+check("the original name finds it too",
+  (await page.locator('[data-nav="searchCard"]').allTextContents()).some((t) => t.includes("ניתוק")));
 await fill("#globalSearch", "breaking bad");
 await page.waitForTimeout(600);
-const translit = await page.locator('[data-nav="searchCard"]').allTextContents();
 check("a name spelled in Hebrew letters is found in English",
-  translit.some((t) => t.includes("ברייקינג")), translit.join(" / "));
+  (await page.locator('[data-nav="searchCard"]').allTextContents()).some((t) => t.includes("ברייקינג")));
 await fill("#globalSearch", "i24");
 await page.waitForTimeout(600);
 const noise = await page.locator('[data-nav="searchCard"]').count();
@@ -258,7 +315,9 @@ await page.evaluate(() => {
 });
 await page.reload({ waitUntil: "load" });
 await page.waitForTimeout(3000);
-check("a saved source signs itself in", await shown("#homeScreen"));
+check("a saved source signs itself in", await shown("#chooseScreen"));
+await page.click("#worldVod");
+await page.waitForTimeout(900);
 const afterRows = await page.locator("#homeRows .cardRowTitle").allTextContents();
 check("what was being watched comes back", afterRows.some((r) => r.includes("המשך לצפות")), afterRows.join(" | "));
 check("how far in is drawn on the card", (await page.locator(".cardProgress").count()) > 0);
