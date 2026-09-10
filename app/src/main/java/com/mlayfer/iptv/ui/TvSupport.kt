@@ -4,20 +4,22 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +31,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
@@ -41,6 +44,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
@@ -154,45 +158,65 @@ fun Modifier.opensOnOk(editing: Boolean, setEditing: (Boolean) -> Unit): Modifie
 }
 
 /**
- * The search box, at the height the Tizen build draws it.
+ * A text box at the measurements the Tizen build uses.
  *
  * Material's outlined field is 56dp tall whatever it is asked for — two and a
  * half times the Tizen box — which turned the top of every screen into a form.
- * This is the same field at the same measurements, under the same remote rule.
+ * One box, drawn from style.css, under the remote rule above; the two shapes
+ * built on it below are the only two this app needs.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SearchField(
+fun TzTextField(
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String,
     modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    password: Boolean = false,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
 ) {
     val isTv = LocalIsTv.current
     val keyboard = LocalSoftwareKeyboardController.current
     var editing by remember { mutableStateOf(false) }
+    val bring = remember { BringIntoViewRequester() }
 
     LaunchedEffect(editing) {
-        if (editing) keyboard?.show()
+        if (!editing) return@LaunchedEffect
+        keyboard?.show()
+        // A television keyboard is an overlay across the bottom half of the
+        // screen, and it does not always tell the app it is there — so a field
+        // in the middle of a form ends up behind it, and you type blind. Asking
+        // for a tall strip starting at the field forces the panel to scroll it
+        // to the top, which is the only place the keyboard never covers.
+        bring.bringIntoView(Rect(0f, 0f, 1f, KEYBOARD_ROOM))
     }
 
-    val shape = RoundedCornerShape(tz(12))
+    val shape = RoundedCornerShape(tz(14))
     Box(
         modifier = modifier
-            .height(tz(60))
+            .then(if (singleLine) Modifier.height(tz(60)) else Modifier)
+            .bringIntoViewRequester(bring)
             .clip(shape)
-            .background(Ink.Surface)
+            .background(Ink.SurfaceLow)
             .border(1.dp, Ink.Line, shape)
             .focusHighlight(shape, border = false)
-            .padding(horizontal = tz(20)),
+            .padding(horizontal = tz(16), vertical = tz(12)),
         contentAlignment = Alignment.CenterStart,
     ) {
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            singleLine = true,
+            singleLine = singleLine,
+            minLines = minLines,
             readOnly = isTv && !editing,
-            textStyle = TextStyle(color = Ink.Bright, fontSize = tzSp(21)),
+            textStyle = TextStyle(color = Ink.Bright, fontSize = tzSp(22)),
             cursorBrush = SolidColor(Ink.Accent),
+            visualTransformation = if (password) {
+                PasswordVisualTransformation()
+            } else {
+                VisualTransformation.None
+            },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(
                 onDone = {
@@ -202,8 +226,8 @@ fun SearchField(
             ),
             decorationBox = { field ->
                 Box(contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) {
-                        Text(placeholder, fontSize = tzSp(21), color = Ink.Faint, maxLines = 1)
+                    if (value.isEmpty() && placeholder != null) {
+                        Text(placeholder, fontSize = tzSp(22), color = Ink.Faint, maxLines = 1)
                     }
                     field()
                 }
@@ -215,59 +239,44 @@ fun SearchField(
     }
 }
 
-/** A labelled field for a form, where the height is not the point. */
+/** The box above a shelf. Nothing but a hint inside it. */
 @Composable
-fun FormTextField(
+fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) = TzTextField(value, onValueChange, modifier, placeholder = placeholder)
+
+/** The box in a form. The label stands above it, as it does on the Tizen panel. */
+@Composable
+fun LabeledField(
+    label: String,
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    label: String? = null,
     placeholder: String? = null,
-    leadingIcon: @Composable (() -> Unit)? = null,
-    trailingIcon: @Composable (() -> Unit)? = null,
-    visualTransformation: VisualTransformation = VisualTransformation.None,
+    password: Boolean = false,
     singleLine: Boolean = true,
     minLines: Int = 1,
-    maxLines: Int = if (singleLine) 1 else 8,
-    shape: Shape = RoundedCornerShape(14.dp),
 ) {
-    val isTv = LocalIsTv.current
-    val keyboard = LocalSoftwareKeyboardController.current
-    var editing by remember { mutableStateOf(false) }
-
-    LaunchedEffect(editing) {
-        if (editing) keyboard?.show()
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(tz(8))) {
+        Text(label, fontSize = tzSp(18), color = Ink.Dim, maxLines = 1)
+        TzTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = placeholder,
+            password = password,
+            singleLine = singleLine,
+            minLines = minLines,
+        )
     }
-
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = label?.let { { Text(it) } },
-        placeholder = placeholder?.let { { Text(it) } },
-        leadingIcon = leadingIcon,
-        trailingIcon = trailingIcon,
-        visualTransformation = visualTransformation,
-        singleLine = singleLine,
-        minLines = minLines,
-        maxLines = maxLines,
-        shape = shape,
-        textStyle = LocalTextStyle.current,
-        readOnly = isTv && !editing,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(
-            onDone = {
-                editing = false
-                keyboard?.hide()
-            },
-        ),
-        // A text field draws its own outline; the highlight only tints it, or the
-        // field ends up inside two rings.
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            focusedLabelColor = MaterialTheme.colorScheme.primary,
-        ),
-        modifier = modifier
-            .focusHighlight(shape, border = false)
-            .opensOnOk(editing) { editing = it },
-    )
 }
+
+/**
+ * How much room to clear below a field being typed into. Deliberately more than
+ * any keyboard needs: the request cannot be satisfied, so the scroll settles
+ * with the field at the top, which is exactly what is wanted.
+ */
+private const val KEYBOARD_ROOM = 3000f
