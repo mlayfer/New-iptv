@@ -384,7 +384,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val episodes = withContext(Dispatchers.IO) {
-                    repository.loadEpisodes(playlist, series.id)
+                    repository.loadEpisodes(playlist, series.id, series.name)
                 }
                 _state.value = _state.value.copy(
                     episodes = episodes,

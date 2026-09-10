@@ -1247,7 +1247,8 @@ async function openSeries(item){
     const api = `${item.server}/player_api.php?username=${enc(item.user)}&password=${enc(item.pass)}&action=get_series_info&series_id=${enc(item.seriesId)}`;
     const info = JSON.parse(await getText(api));
     const episodes = episodesFromSeriesInfo(info, {
-      server: item.server, user: item.user, pass: item.pass, logo: item.logo
+      server: item.server, user: item.user, pass: item.pass, logo: item.logo,
+      seriesName: item.name
     });
     if(!episodes.length) throw new Error('לא נמצאו פרקים לסדרה הזו');
 
@@ -1487,8 +1488,12 @@ function navPlayer(active, dir){
   }
 
   if(state.controlsOpen){
+    // The row reads left to right, so the arrows move through it that way.
     const buttons = visible('#controlRow .ctrlBtn');
-    if(dir === 'left' || dir === 'right') return moveRtlRow(buttons, active, dir) || active;
+    if(dir === 'left' || dir === 'right'){
+      const at = buttons.indexOf(active);
+      return buttons[at + (dir === 'right' ? 1 : -1)] || active;
+    }
     if(dir === 'down') return active;
     if(dir === 'up'){ closeControls(); return null; }
     return active;
@@ -1504,9 +1509,10 @@ function navPlayer(active, dir){
     return null;
   }
   if(dir === 'down'){ openControls(); return null; }
-  // Right is back and left is forward, the way the rest of the app reads.
-  if(dir === 'right') nudgeSeek(-Core.SEEK_STEP);
-  if(dir === 'left') nudgeSeek(Core.SEEK_STEP);
+  // The timeline is left to right even in a right-to-left interface, so the
+  // arrows follow it and not the text: left goes back, right goes forward.
+  if(dir === 'left') nudgeSeek(-Core.SEEK_STEP);
+  if(dir === 'right') nudgeSeek(Core.SEEK_STEP);
   if(dir === 'up') showOverlay();
   return null;
 }

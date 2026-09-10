@@ -154,6 +154,27 @@
   }
 
   /**
+   * What to call an episode. Portals already write the numbering into the title
+   * more often than not — "ניתוק - S01E04 - האתה שאתה" — and prefixing our own
+   * produced "S1E4 · ניתוק - S01E04 - האתה שאתה" on screen. So the series name
+   * is trimmed off the front when it is repeated there, and the numbering is
+   * added only when the title does not already carry it.
+   */
+  const EPISODE_MARK = /s\s?\d{1,2}\s?e\s?\d{1,3}/i;
+  const HEBREW_EPISODE_MARK = /פרק\s*\d/;
+
+  function episodeName(title, season, number, seriesName) {
+    let name = String(title || '').trim();
+    const series = String(seriesName || '').trim();
+    if (series && name.toLowerCase().indexOf(series.toLowerCase()) === 0) {
+      name = name.slice(series.length).replace(/^\s*[-–—·:|]\s*/, '').trim();
+    }
+    if (!name) name = 'פרק ' + number;
+    if (EPISODE_MARK.test(name) || HEBREW_EPISODE_MARK.test(name)) return name;
+    return 'S' + season + 'E' + number + ' · ' + name;
+  }
+
+  /**
    * Every episode of a series, in season order. Portals return the seasons as an
    * object whose keys are strings and whose order means nothing.
    */
@@ -171,10 +192,9 @@
           if (!id) return;
           const ext = episode.container_extension || 'mp4';
           const number = episode.episode_num != null ? String(episode.episode_num) : String(index + 1);
-          const title = (episode.title || '').trim() || ('פרק ' + number);
           out.push({
             id: 'e' + id,
-            name: 'S' + season + 'E' + number + ' · ' + title,
+            name: episodeName(episode.title, season, number, source.seriesName),
             group: 'עונה ' + season,
             kind: 'VOD',
             contentType: 'EPISODE',
@@ -484,6 +504,7 @@
     parseM3u: parseM3u,
     streamVariants: streamVariants,
     episodesFromSeriesInfo: episodesFromSeriesInfo,
+    episodeName: episodeName,
     isResumable: isResumable,
     progressRatio: progressRatio,
     buildHomeRows: buildHomeRows,

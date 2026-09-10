@@ -81,6 +81,7 @@ class ParityTest {
             info = spec.getJSONObject("info"),
             server = spec.getString("server"),
             credentials = "${spec.getString("user")}/${spec.getString("pass")}",
+            seriesName = spec.optString("seriesName").ifBlank { null },
         )
         val expected = spec.getJSONArray("expected")
 

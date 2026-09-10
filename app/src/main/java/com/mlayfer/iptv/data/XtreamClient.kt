@@ -147,7 +147,11 @@ object XtreamClient {
      * Episodes are fetched per series, on demand: a portal with thousands of
      * series would need thousands of requests to expand them all up front.
      */
-    fun loadEpisodes(source: PlaylistSource.Xtream, seriesId: String): List<Channel> {
+    fun loadEpisodes(
+        source: PlaylistSource.Xtream,
+        seriesId: String,
+        seriesName: String? = null,
+    ): List<Channel> {
         val server = normalizeServer(source.server)
         val url = api(server, source.username, source.password, "get_series_info") +
             "&series_id=${encode(seriesId)}"
@@ -158,11 +162,40 @@ object XtreamClient {
             throw Http.HttpException("לא הצלחתי לטעון את פרקי הסדרה")
         }
 
-        return parseEpisodes(info, server, credentials(source.username, source.password))
+        return parseEpisodes(info, server, credentials(source.username, source.password), seriesName)
+    }
+
+    /**
+     * What to call an episode. Portals already write the numbering into the
+     * title more often than not — "ניתוק - S01E04 - האתה שאתה" — and prefixing
+     * our own produced "S1E4 · ניתוק - S01E04 - האתה שאתה" on screen. So the
+     * series name is trimmed off the front when it is repeated there, and the
+     * numbering is added only when the title does not already carry it.
+     */
+    private val EPISODE_MARK = Regex("s\\s?\\d{1,2}\\s?e\\s?\\d{1,3}", RegexOption.IGNORE_CASE)
+    private val HEBREW_EPISODE_MARK = Regex("פרק\\s*\\d")
+    private val LEADING_SEPARATOR = Regex("^\\s*[-–—·:|]\\s*")
+
+    fun episodeName(title: String, season: String, number: String, seriesName: String?): String {
+        var name = title.trim()
+        val series = seriesName?.trim().orEmpty()
+        if (series.isNotEmpty() && name.startsWith(series, ignoreCase = true)) {
+            name = LEADING_SEPARATOR.replace(name.substring(series.length), "").trim()
+        }
+        if (name.isEmpty()) name = "פרק $number"
+        if (EPISODE_MARK.containsMatchIn(name) || HEBREW_EPISODE_MARK.containsMatchIn(name)) {
+            return name
+        }
+        return "S${season}E$number · $name"
     }
 
     /** Split out from the request so the shape of a portal's reply can be tested. */
-    fun parseEpisodes(info: JSONObject, server: String, credentials: String): List<Channel> {
+    fun parseEpisodes(
+        info: JSONObject,
+        server: String,
+        credentials: String,
+        seriesName: String? = null,
+    ): List<Channel> {
         val seasons = info.optJSONObject("episodes") ?: return emptyList()
         val episodes = ArrayList<Channel>()
 
@@ -178,12 +211,13 @@ object XtreamClient {
                 val ext = episode.optString("container_extension").ifBlank { "mp4" }
                 val number = episode.opt("episode_num")?.toString()?.takeIf { it.isNotBlank() }
                     ?: "${i + 1}"
-                val title = episode.optString("title").trim().ifEmpty { "פרק $number" }
+                val title = episode.optString("title").trim()
                 val streamUrl = "$server/series/$credentials/$id.$ext"
+                val name = episodeName(title, season, number, seriesName)
                 episodes.add(
                     Channel(
-                        id = M3uParser.channelId(streamUrl, title),
-                        name = "S${season}E$number · $title",
+                        id = M3uParser.channelId(streamUrl, name),
+                        name = name,
                         url = streamUrl,
                         kind = ChannelKind.VOD,
                         group = "עונה $season",

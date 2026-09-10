@@ -40,7 +40,7 @@ test('offers the same endpoint variants', () => {
 test('builds the same episode list', () => {
   const f = fixtures.episodes;
   const episodes = core.episodesFromSeriesInfo(f.info, {
-    server: f.server, user: f.user, pass: f.pass, logo: null,
+    server: f.server, user: f.user, pass: f.pass, logo: null, seriesName: f.seriesName,
   });
 
   assert.strictEqual(episodes.length, f.expected.length);

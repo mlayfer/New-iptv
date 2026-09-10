@@ -76,8 +76,8 @@ input::placeholder{color:var(--ink-faint)}
    and a dimmed, blurred copy of the same art behind it for depth. */
 .stageHero{border-radius:22px;border:1px solid var(--line);padding:22px 32px;display:flex;align-items:center;gap:28px;
   position:relative;overflow:hidden;background-color:#141417}
-.stageHeroBack{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(30px);opacity:.35}
-.stageHero::after{content:"";position:absolute;inset:0;
+.stageHeroBack{position:absolute;top:-40px;right:-40px;bottom:-40px;left:-40px;background-size:cover;background-position:center;filter:blur(30px);opacity:.35}
+.stageHero::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;
   background:linear-gradient(270deg,rgba(10,10,11,.97) 34%,rgba(10,10,11,.72) 72%,rgba(10,10,11,.45) 100%)}
 .stageArt{position:relative;z-index:1;width:210px;height:118px;border-radius:14px;border:1px solid var(--line);
   background:linear-gradient(160deg,#232327,#111113);display:flex;align-items:center;justify-content:center;
@@ -138,7 +138,13 @@ input::placeholder{color:var(--ink-faint)}
 .channelTile .tileNumber{position:absolute}
 
 /* Playback takes the whole screen; the bar tells you what you are on and fades. */
-.playerScreen{position:fixed;inset:0;z-index:500;background:#000}
+/*
+ * Everything below is written for the browser a television actually has. The
+ * 2022 sets run Chromium 85, which does not know the `inset` shorthand — an
+ * unknown property is dropped in silence, so `position:absolute` was left with
+ * no offsets and the whole playback UI collapsed into a corner. Longhand only.
+ */
+.playerScreen{position:fixed;top:0;right:0;bottom:0;left:0;z-index:500;background:#000}
 
 /*
  * On a Samsung TV the AVPlay video is not drawn by the browser: it is a plane
@@ -158,19 +164,19 @@ html.avplayOn .playerStage{background:transparent!important;background-image:non
 body.playerOpen .topbar{display:none}
 body.playerOpen #browseScreen{visibility:hidden}
 body.playerOpen #app{padding:0}
-.playerStage{position:absolute;inset:0;background:#000}
-.playerStage object,.playerStage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
+.playerStage{position:absolute;top:0;right:0;bottom:0;left:0;background:#000}
+.playerStage object,.playerStage video{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;background:#000}
 #htmlVideo{display:none}
 #avPlayer{display:none}
-.playerMessage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+.playerMessage{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;
   color:var(--ink-dim);font-size:30px;text-align:center;padding:0 80px;pointer-events:none}
 /* The playback UI: a title block that fades, a scrubber that says where you
    are, and a row of controls that only appears when you ask for it. */
-.playerUi{position:absolute;inset:0;pointer-events:none;transition:opacity .3s ease}
+.playerUi{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;transition:opacity .3s ease}
 .playerUi.faded{opacity:0}
-.ovTop{position:absolute;inset:0 0 auto 0;display:flex;align-items:center;gap:24px;padding:40px 48px 60px;
+.ovTop{position:absolute;top:0;right:0;bottom:auto;left:0;display:flex;align-items:center;gap:24px;padding:40px 48px 60px;
   background:linear-gradient(180deg,rgba(0,0,0,.92),rgba(0,0,0,.45) 55%,rgba(0,0,0,0))}
-.ovBottom{position:absolute;inset:auto 0 0 0;padding:60px 48px 40px;
+.ovBottom{position:absolute;top:auto;right:0;bottom:0;left:0;padding:60px 48px 40px;
   background:linear-gradient(0deg,rgba(0,0,0,.94),rgba(0,0,0,.6) 55%,rgba(0,0,0,0))}
 .ovLogo{width:120px;height:74px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);
   display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--accent);font-size:28px;font-weight:800;flex:0 0 auto}
@@ -189,15 +195,17 @@ body.playerOpen #app{padding:0}
 .scrubRow.hidden{display:none}
 .ovTime{font-size:22px;color:var(--ink-dim);font-variant-numeric:tabular-nums;min-width:96px;text-align:center;direction:ltr}
 .scrubTrack{position:relative;flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.22);overflow:visible}
-.scrubBuffered{position:absolute;inset:0 auto 0 0;width:0;background:rgba(255,255,255,.34);border-radius:6px}
-.scrubPlayed{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);border-radius:6px}
+.scrubBuffered{position:absolute;top:0;right:auto;bottom:0;left:0;width:0;background:rgba(255,255,255,.34);border-radius:6px}
+.scrubPlayed{position:absolute;top:0;right:auto;bottom:0;left:0;width:0;background:var(--accent);border-radius:6px}
 .scrubThumb{position:absolute;top:50%;left:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
   background:var(--accent);box-shadow:0 0 0 5px rgba(77,155,255,.28)}
 .scrubTrack.seeking .scrubPlayed{background:#ffffff}
 .scrubTrack.seeking .scrubThumb{background:#ffffff;box-shadow:0 0 0 6px rgba(255,255,255,.3)}
 
 /* Controls, shown on demand the way a streaming app does it */
-.controlRow{display:flex;justify-content:center;gap:12px;margin-top:22px;pointer-events:auto}
+/* The buttons follow the timeline too: rewind on its left, forward on its
+   right, the order every player uses. The labels stay Hebrew inside them. */
+.controlRow{display:flex;justify-content:center;gap:12px;margin-top:22px;pointer-events:auto;direction:ltr}
 .controlRow.hidden{display:none}
 .ctrlBtn{border:1px solid var(--line);background:rgba(24,24,27,.9);color:var(--ink);border-radius:14px;
   padding:14px 22px;font-size:22px;white-space:nowrap}
@@ -205,7 +213,7 @@ body.playerOpen #app{padding:0}
 .ctrlBtn.hidden{display:none}
 
 /* Audio and subtitle tracks */
-.trackPanel{position:absolute;inset:auto 48px 210px auto;width:420px;max-height:520px;overflow:hidden;
+.trackPanel{position:absolute;top:auto;right:48px;bottom:210px;left:auto;width:420px;max-height:520px;overflow:hidden;
   background:rgba(16,16,18,.97);border:1px solid var(--line);border-radius:18px;padding:20px;pointer-events:auto}
 .trackTitle{font-size:24px;font-weight:700;margin-bottom:12px}
 .trackList{display:flex;flex-direction:column;gap:8px}
@@ -221,7 +229,7 @@ body.playerOpen #app{padding:0}
 .vodLayout{height:100%;display:grid;grid-template-rows:200px auto 1fr;gap:14px;min-height:0}
 .vodHero{border-radius:24px;border:1px solid var(--line);padding:26px 34px;display:flex;align-items:flex-end;
   position:relative;overflow:hidden;background:linear-gradient(100deg,#1c1c20 0%, #0a0a0b 68%);background-size:cover;background-position:center}
-.vodHero::after{content:"";position:absolute;inset:0;background:linear-gradient(270deg,rgba(10,10,11,.96) 30%,rgba(10,10,11,.6) 70%,rgba(10,10,11,.2) 100%)}
+.vodHero::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(270deg,rgba(10,10,11,.96) 30%,rgba(10,10,11,.6) 70%,rgba(10,10,11,.2) 100%)}
 .vodHeroText{position:relative;z-index:1;max-width:1180px}
 .vodHeroTitle{font-size:44px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vodHeroMeta{font-size:22px;color:var(--ink-dim);margin-top:10px}
@@ -243,7 +251,7 @@ body.playerOpen #app{padding:0}
 .posterCard.focused .vodCardTitle{color:var(--ink)}
 
 /* ---- splash ---- */
-.splashScreen{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;
+.splashScreen{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(circle at center,#1c1c20 0%,#0a0a0b 62%,#050506 100%);transition:opacity .35s ease}
 .splashScreen.hiddenSplash{opacity:0;pointer-events:none}
 .splashIcon{width:210px;height:210px;border-radius:48px;box-shadow:0 24px 80px rgba(0,0,0,.6)}

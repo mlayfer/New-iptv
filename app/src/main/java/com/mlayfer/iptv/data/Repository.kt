@@ -44,14 +44,14 @@ class Repository {
      * Blocking: call from a background dispatcher. Episodes are fetched per
      * series because a portal with thousands of series can't be expanded up front.
      */
-    fun loadEpisodes(playlist: Playlist, seriesId: String): List<Channel> {
+    fun loadEpisodes(playlist: Playlist, seriesId: String, seriesName: String? = null): List<Channel> {
         val source = playlist.source
         if (source !is PlaylistSource.Xtream) return emptyList()
 
         val key = "${'$'}{playlist.id}#${'$'}seriesId"
         episodeCache[key]?.let { return it }
 
-        val episodes = XtreamClient.loadEpisodes(source, seriesId)
+        val episodes = XtreamClient.loadEpisodes(source, seriesId, seriesName)
         episodeCache[key] = episodes
         return episodes
     }

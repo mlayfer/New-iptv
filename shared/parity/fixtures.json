@@ -93,6 +93,12 @@
             "episode_num": 2,
             "title": "",
             "container_extension": ""
+          },
+          {
+            "id": 9042,
+            "episode_num": 4,
+            "title": "ניתוק - S01E04 - האתה שאתה",
+            "container_extension": "mkv"
           }
         ],
         "2": [
@@ -115,16 +121,22 @@
         "url": "http://panel:8080/series/user/pass/12.mp4"
       },
       {
-        "name": "S1E2 · פרק 2",
+        "name": "פרק 2",
         "group": "עונה 1",
         "url": "http://panel:8080/series/user/pass/13.mp4"
+      },
+      {
+        "name": "S01E04 - האתה שאתה",
+        "group": "עונה 1",
+        "url": "http://panel:8080/series/user/pass/9042.mkv"
       },
       {
         "name": "S2E1 · Return",
         "group": "עונה 2",
         "url": "http://panel:8080/series/user/pass/991.mkv"
       }
-    ]
+    ],
+    "seriesName": "ניתוק"
   },
   "home": {
     "_comment": "buildHomeRows in tizen/core.js and HomeRows.build in Kotlin must return this.",
