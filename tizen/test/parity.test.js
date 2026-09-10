@@ -87,3 +87,18 @@ test('searches the whole catalogue the same way', () => {
     });
   }
 });
+
+test('does the same playback arithmetic', () => {
+  const f = fixtures.playback;
+  for (const c of f.seeks) {
+    assert.strictEqual(core.seekTarget(c.position, c.delta, c.duration), c.expected,
+      `${c.position}${c.delta >= 0 ? '+' : ''}${c.delta} of ${c.duration}`);
+  }
+  for (const c of f.clocks) {
+    assert.strictEqual(core.formatClock(c.seconds), c.expected, String(c.seconds));
+  }
+  for (const c of f.steps) {
+    const got = core.stepInList(c.ids.map((id) => ({ id })), c.id, c.step);
+    assert.strictEqual(got ? got.id : null, c.expected, `${c.id} ${c.step}`);
+  }
+});

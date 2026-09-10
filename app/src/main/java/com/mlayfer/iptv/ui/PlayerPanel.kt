@@ -62,6 +62,7 @@ import androidx.media3.ui.PlayerView
 import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Http
+import com.mlayfer.iptv.data.Playback
 import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.StreamProbe
 import com.mlayfer.iptv.data.StreamVariants
@@ -74,6 +75,9 @@ import java.util.Date
 import java.util.Locale
 
 private const val MAX_AUTO_RETRIES = 3
+
+/** Ten seconds a press, the same step the Tizen player moves by. */
+private val SEEK_STEP_MS = Playback.SEEK_STEP * 1000
 
 /** Some CDNs answer 403 to anything that doesn't look like a browser. */
 private const val BROWSER_USER_AGENT =
@@ -95,6 +99,9 @@ fun PlayerPanel(
     /** Seconds to start from, for something you were already part way through. */
     resumeAt: Long = 0,
     onProgress: (position: Long, duration: Long) -> Unit = { _, _ -> },
+    /** What is playing after this — the episodes of an open series, in order. */
+    queue: List<Channel> = emptyList(),
+    onPlayItem: (Channel) -> Unit = {},
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -113,6 +120,10 @@ fun PlayerPanel(
             .setMediaSourceFactory(
                 DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory))
             )
+            // The rewind and fast-forward buttons, and the D-pad on a TV, move by
+            // these — the same ten seconds the Tizen player uses.
+            .setSeekBackIncrementMs(SEEK_STEP_MS)
+            .setSeekForwardIncrementMs(SEEK_STEP_MS)
             .build()
     }
 
@@ -130,6 +141,8 @@ fun PlayerPanel(
     val attemptIndex = remember { mutableIntStateOf(0) }
     val currentAttempts by rememberUpdatedState(attempts)
     val currentChannel by rememberUpdatedState(channel)
+    val currentQueue by rememberUpdatedState(queue)
+    val currentPlayItem by rememberUpdatedState(onPlayItem)
 
     // Everything this reads is remembered or a State, so the copy captured by the
     // error listener on first composition keeps seeing current values.
@@ -171,6 +184,15 @@ fun PlayerPanel(
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 buffering = playbackState == Player.STATE_BUFFERING
+                // A finished episode rolls into the next one, the way a season
+                // is watched. Nothing follows a film, or the last episode.
+                if (playbackState == Player.STATE_ENDED) {
+                    val watching = currentChannel ?: return
+                    val next = currentQueue.indexOfFirst { it.id == watching.id }
+                        .takeIf { it >= 0 }
+                        ?.let { currentQueue.getOrNull(it + 1) }
+                    if (next != null) currentPlayItem(next)
+                }
             }
 
             override fun onPlayerError(e: PlaybackException) {
@@ -269,6 +291,11 @@ fun PlayerPanel(
                         keepScreenOn = true
                         setShowNextButton(false)
                         setShowPreviousButton(false)
+                        // A film needs to be moved through, not only started.
+                        setShowRewindButton(true)
+                        setShowFastForwardButton(true)
+                        setShowShuffleButton(false)
+                        controllerShowTimeoutMs = 4_500
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         isFocusable = true
                         setFullscreenButtonClickListener { onToggleFullscreen() }

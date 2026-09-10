@@ -292,6 +292,42 @@
   }
 
   /**
+   * Playback arithmetic, shared so the two players behave identically: where a
+   * seek lands, what the clock reads, and which item comes next in a series.
+   */
+  const SEEK_STEP = 10;
+  const SEEK_STEP_LONG = 60;
+
+  function seekTarget(position, delta, duration) {
+    let target = (position || 0) + delta;
+    if (target < 0) target = 0;
+    // Landing exactly on the end restarts or stalls depending on the player, so
+    // stop just short of it.
+    if (duration > 0 && target > duration - 1) target = Math.max(0, duration - 1);
+    return target;
+  }
+
+  function formatClock(seconds) {
+    let s = Math.round(seconds || 0);
+    if (!isFinite(s) || s < 0) s = 0;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    const pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return h ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
+  }
+
+  /** The neighbour of what is playing, or null at either end of the season. */
+  function stepInList(items, currentId, step) {
+    const list = items || [];
+    let at = -1;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === currentId) { at = i; break; }
+    }
+    if (at === -1) return null;
+    const next = at + step;
+    return next >= 0 && next < list.length ? list[next] : null;
+  }
+
+  /**
    * One box over the whole catalogue. A title someone remembers is not filed
    * under the section they happen to be standing in, so the search never asks
    * which one that is; results come back grouped by what they are.
@@ -345,6 +381,11 @@
     progressRatio: progressRatio,
     buildHomeRows: buildHomeRows,
     searchRows: searchRows,
+    seekTarget: seekTarget,
+    formatClock: formatClock,
+    stepInList: stepInList,
+    SEEK_STEP: SEEK_STEP,
+    SEEK_STEP_LONG: SEEK_STEP_LONG,
     mergeHistory: mergeHistory
   };
 });

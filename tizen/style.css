@@ -154,19 +154,55 @@ html.avplayOn #browseScreen{visibility:hidden}
 #avPlayer{display:none}
 .playerMessage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   color:var(--ink-dim);font-size:30px;text-align:center;padding:0 80px;pointer-events:none}
-.liveOverlay{position:absolute;inset:auto 0 0 0;display:flex;align-items:center;gap:24px;padding:34px 48px 40px;
-  background:linear-gradient(0deg,rgba(0,0,0,.92),rgba(0,0,0,.55) 60%,rgba(0,0,0,0));transition:opacity .3s ease}
-.liveOverlay.faded{opacity:0}
-.ovLogo{width:132px;height:80px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);
-  display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--accent);font-size:30px;font-weight:800;flex:0 0 auto}
+/* The playback UI: a title block that fades, a scrubber that says where you
+   are, and a row of controls that only appears when you ask for it. */
+.playerUi{position:absolute;inset:0;pointer-events:none;transition:opacity .3s ease}
+.playerUi.faded{opacity:0}
+.ovTop{position:absolute;inset:0 0 auto 0;display:flex;align-items:center;gap:24px;padding:40px 48px 60px;
+  background:linear-gradient(180deg,rgba(0,0,0,.92),rgba(0,0,0,.45) 55%,rgba(0,0,0,0))}
+.ovBottom{position:absolute;inset:auto 0 0 0;padding:60px 48px 40px;
+  background:linear-gradient(0deg,rgba(0,0,0,.94),rgba(0,0,0,.6) 55%,rgba(0,0,0,0))}
+.ovLogo{width:120px;height:74px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--accent);font-size:28px;font-weight:800;flex:0 0 auto}
 .ovLogo img{max-width:100%;max-height:100%;object-fit:contain}
 .ovText{flex:1;min-width:0}
 .ovName{font-size:40px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ovMeta{font-size:22px;color:var(--ink-dim);margin-top:6px}
-.ovHint{font-size:18px;color:var(--ink-faint);white-space:nowrap}
-.ovProgress{height:6px;border-radius:4px;background:rgba(255,255,255,.18);margin-top:12px;overflow:hidden;display:none}
-.ovProgress.on{display:block}
-.ovProgressFill{height:100%;width:0;background:var(--accent)}
+.ovMeta{font-size:22px;color:var(--ink-dim);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ovBadge{flex:0 0 auto;background:#c8322b;color:#fff;font-size:20px;font-weight:700;border-radius:8px;padding:8px 16px;letter-spacing:1px}
+.ovHint{font-size:19px;color:var(--ink-faint);margin-top:14px;text-align:center}
+
+/* Scrubber */
+/* The timeline stays left-to-right even in a right-to-left interface, the way
+   every streaming app renders one: elapsed on the left, what is left on the
+   right, and the bar filling in the direction time runs. */
+.scrubRow{display:flex;align-items:center;gap:20px;direction:ltr}
+.scrubRow.hidden{display:none}
+.ovTime{font-size:22px;color:var(--ink-dim);font-variant-numeric:tabular-nums;min-width:96px;text-align:center;direction:ltr}
+.scrubTrack{position:relative;flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.22);overflow:visible}
+.scrubBuffered{position:absolute;inset:0 auto 0 0;width:0;background:rgba(255,255,255,.34);border-radius:6px}
+.scrubPlayed{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);border-radius:6px}
+.scrubThumb{position:absolute;top:50%;left:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 0 5px rgba(77,155,255,.28)}
+.scrubTrack.seeking .scrubPlayed{background:#ffffff}
+.scrubTrack.seeking .scrubThumb{background:#ffffff;box-shadow:0 0 0 6px rgba(255,255,255,.3)}
+
+/* Controls, shown on demand the way a streaming app does it */
+.controlRow{display:flex;justify-content:center;gap:12px;margin-top:22px;pointer-events:auto}
+.controlRow.hidden{display:none}
+.ctrlBtn{border:1px solid var(--line);background:rgba(24,24,27,.9);color:var(--ink);border-radius:14px;
+  padding:14px 22px;font-size:22px;white-space:nowrap}
+.ctrlBtn.ctrlMain{background:var(--accent);color:#04142e;font-weight:700;border-color:var(--accent);min-width:150px}
+.ctrlBtn.hidden{display:none}
+
+/* Audio and subtitle tracks */
+.trackPanel{position:absolute;inset:auto 48px 210px auto;width:420px;max-height:520px;overflow:hidden;
+  background:rgba(16,16,18,.97);border:1px solid var(--line);border-radius:18px;padding:20px;pointer-events:auto}
+.trackTitle{font-size:24px;font-weight:700;margin-bottom:12px}
+.trackList{display:flex;flex-direction:column;gap:8px}
+.trackBtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;
+  padding:12px 16px;font-size:21px;text-align:right}
+.trackBtn.active{border-color:var(--accent);color:var(--accent)}
+.trackEmpty{font-size:20px;color:var(--ink-faint);padding:8px 4px}
 
 /* ---- search across everything ---- */
 .searchLayout{height:100%;display:grid;grid-template-rows:auto 1fr;gap:14px;min-height:0}

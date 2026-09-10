@@ -252,6 +252,8 @@ private fun PlayerFor(
         onProgress = { position, duration ->
             selected?.let { viewModel.noteProgress(it, position, duration) }
         },
+        queue = state.episodes,
+        onPlayItem = viewModel::select,
     )
 }
 
