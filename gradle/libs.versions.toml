@@ -10,7 +10,12 @@ junit = "4.13.2"
 coil = "2.7.0"
 json = "20240303"
 # Screenshot tests that render Compose on the JVM — no emulator, no device.
-roborazzi = "1.74.0"
+# The last release built with a Kotlin 2.0 compiler: anything newer carries
+# metadata this project's compiler cannot read, and the build stops at
+# "binary version of its metadata is 2.3.0, expected 2.0.0". The version to
+# raise this to is whichever one follows a Kotlin upgrade here, not whichever
+# one is newest.
+roborazzi = "1.60.0"
 robolectric = "4.16.1"
 
 [libraries]
