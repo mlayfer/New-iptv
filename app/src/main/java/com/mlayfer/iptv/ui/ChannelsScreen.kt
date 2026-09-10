@@ -33,9 +33,11 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -332,6 +334,8 @@ private fun ChannelListPane(
     channels: List<Channel>,
     modifier: Modifier = Modifier,
 ) {
+    val seen = remember(state.recent, state.watched) { state.seen }
+
     Column(modifier = modifier.background(MaterialTheme.colorScheme.background)) {
         // Search sits with the list it filters, not in the app bar, so the video
         // keeps the top of the screen.
@@ -466,6 +470,9 @@ private fun ChannelListPane(
 
             else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(channels, key = { it.id }) { channel ->
+                    // A film is a thing you finish; a channel is not, so only
+                    // one of them is offered a tick.
+                    val film = channel.kind == ChannelKind.VOD
                     ChannelRow(
                         channel = channel,
                         selected = channel.id == state.selectedId,
@@ -475,6 +482,12 @@ private fun ChannelListPane(
                         },
                         onClick = { viewModel.select(channel) },
                         onToggleFavorite = { viewModel.toggleFavorite(channel) },
+                        seen = if (film) channel.id in seen else null,
+                        onToggleWatched = if (film) {
+                            { viewModel.toggleWatched(channel.id) }
+                        } else {
+                            null
+                        },
                     )
                 }
             }
@@ -485,6 +498,9 @@ private fun ChannelListPane(
 @Composable
 private fun SeriesContent(state: UiState, viewModel: AppViewModel) {
     val open = state.openSeries
+    // Walking the marks is cheap but not free, and this runs on every frame
+    // otherwise; it only changes when the memory does.
+    val seen = remember(state.recent, state.watched) { state.seen }
 
     if (open == null) {
         val filtered = remember(state.series, state.query, state.group) {
@@ -543,7 +559,16 @@ private fun SeriesContent(state: UiState, viewModel: AppViewModel) {
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
+            // A season is ticked off as one gesture: all of it, or none of it.
+            if (state.episodes.isNotEmpty()) {
+                val done = state.episodes.all { it.id in seen }
+                TextButton(
+                    onClick = { viewModel.toggleWatchedAll(state.episodes.map { it.id }) },
+                    modifier = Modifier.focusHighlight(),
+                ) { Text(if (done) "סמן כלא נצפתה" else "סמן הכל כנצפה") }
+            }
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
@@ -575,6 +600,8 @@ private fun SeriesContent(state: UiState, viewModel: AppViewModel) {
                         nowTitle = null,
                         onClick = { viewModel.select(episode) },
                         onToggleFavorite = { viewModel.toggleFavorite(episode) },
+                        seen = episode.id in seen,
+                        onToggleWatched = { viewModel.toggleWatched(episode.id) },
                     )
                 }
             }
@@ -708,6 +735,9 @@ private fun ChannelRow(
     nowTitle: String?,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
+    /** Null for a channel: live television is not a thing you finish. */
+    seen: Boolean? = null,
+    onToggleWatched: (() -> Unit)? = null,
 ) {
     val isTv = LocalIsTv.current
 
@@ -758,11 +788,16 @@ private fun ChannelRow(
                 } else {
                     MaterialTheme.typography.bodyLarge
                 },
+                color = if (seen == true) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    Color.Unspecified
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = nowTitle ?: channel.group
+                text = if (seen == true) "נצפה" else nowTitle ?: channel.group
                     ?: if (channel.kind == ChannelKind.VOD) "ספריית תוכן" else "שידור חי",
                 style = if (isTv) {
                     MaterialTheme.typography.bodyMedium
@@ -773,6 +808,20 @@ private fun ChannelRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+
+        if (onToggleWatched != null) {
+            IconButton(onClick = onToggleWatched) {
+                Icon(
+                    imageVector = if (seen == true) Icons.Default.Check else Icons.Default.Remove,
+                    contentDescription = if (seen == true) "סמן כלא נצפה" else "סמן כנצפה",
+                    tint = if (seen == true) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
         }
 
         IconButton(onClick = onToggleFavorite) {

@@ -21,8 +21,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +70,7 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
         if (query.trim().length < 2) home else HomeRows.search(cards, query)
     }
     var highlighted by remember { mutableStateOf<HomeRows.Card?>(null) }
+    val seen = remember(state.recent, state.watched) { state.seen }
 
     Column(
         modifier = Modifier
@@ -119,6 +123,7 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
                     CardRow(
                         row = row,
                         favorites = state.favorites,
+                        seen = seen,
                         onHighlight = { highlighted = it },
                         onOpen = viewModel::openCard,
                         onFavorite = { viewModel.toggleFavoriteId(it.id) },
@@ -257,6 +262,7 @@ private fun clock(seconds: Long): String {
 private fun CardRow(
     row: HomeRows.Row,
     favorites: Set<String>,
+    seen: Set<String>,
     onHighlight: (HomeRows.Card) -> Unit,
     onOpen: (HomeRows.Card) -> Unit,
     onFavorite: (HomeRows.Card) -> Unit,
@@ -276,6 +282,7 @@ private fun CardRow(
                 ContentCard(
                     card = card,
                     isFavorite = card.id in favorites,
+                    isSeen = card.id in seen,
                     onHighlight = onHighlight,
                     onOpen = onOpen,
                     onFavorite = onFavorite,
@@ -290,6 +297,7 @@ private fun CardRow(
 private fun ContentCard(
     card: HomeRows.Card,
     isFavorite: Boolean,
+    isSeen: Boolean,
     onHighlight: (HomeRows.Card) -> Unit,
     onOpen: (HomeRows.Card) -> Unit,
     onFavorite: (HomeRows.Card) -> Unit,
@@ -308,9 +316,29 @@ private fun ContentCard(
                 name = card.name,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (live) 90.dp else 150.dp),
+                    .height(if (live) 90.dp else 150.dp)
+                    // Already seen: dimmed, so a shelf reads as what is left.
+                    .alpha(if (isSeen) 0.45f else 1f),
                 crop = !live,
             )
+            if (isSeen) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "נצפה",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
             if (isFavorite) {
                 Icon(
                     imageVector = Icons.Filled.Favorite,

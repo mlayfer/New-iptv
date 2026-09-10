@@ -28,6 +28,26 @@ class Store(context: Context) {
         get() = readRecent()
         set(value) = prefs.edit().putString(KEY_RECENT, writeRecent(value)).apply()
 
+    /**
+     * Titles and episodes ticked off by hand. A list rather than a set, because
+     * the order says which was ticked last — that is what names the
+     * "because you watched" row when nothing has been played to the end yet.
+     */
+    var watched: List<String>
+        get() = prefs.getString(KEY_WATCHED, null)?.let { raw ->
+            try {
+                val array = JSONArray(raw)
+                (0 until array.length()).mapNotNull { array.optString(it).ifBlank { null } }
+            } catch (e: Exception) {
+                emptyList()
+            }
+        } ?: emptyList()
+        set(value) {
+            val array = JSONArray()
+            value.take(MAX_WATCHED).forEach { array.put(it) }
+            prefs.edit().putString(KEY_WATCHED, array.toString()).apply()
+        }
+
     private fun readPlaylists(): List<Playlist> {
         val raw = prefs.getString(KEY_PLAYLISTS, null) ?: return emptyList()
         return try {
@@ -149,5 +169,7 @@ class Store(context: Context) {
         const val KEY_ACTIVE = "active"
         const val KEY_FAVORITES = "favorites"
         const val KEY_RECENT = "recent"
+        const val KEY_WATCHED = "watched"
+        const val MAX_WATCHED = 4000
     }
 }

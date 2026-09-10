@@ -40,6 +40,8 @@ data class UiState(
     val epg: Map<String, List<Programme>> = emptyMap(),
     val favorites: Set<String> = emptySet(),
     val recent: List<RecentEntry> = emptyList(),
+    /** Ticked off by hand; newest last, so the order says which was last. */
+    val watched: List<String> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
     val query: String = "",
@@ -78,12 +80,12 @@ data class UiState(
         get() = HomeRows.build(
             // Channels have a guide of their own; the library's home is its own.
             items = homeCards.filter { it.kind != "LIVE" },
-            history = recent.map {
-                HomeRows.Entry(it.channelId, it.at, it.position, it.duration)
-            },
+            history = historyEntries,
             // Most recently watched favourites first; a Set has no order of its own.
             favorites = (recent.map { it.channelId } + favorites).distinct()
                 .filter { it in favorites },
+            marks = watched,
+            now = System.currentTimeMillis(),
         )
 
     /** The catalogue plus anything remembered that is no longer in it. */
@@ -115,6 +117,16 @@ data class UiState(
             }
             return cards.values.toList()
         }
+
+    /**
+     * One answer to "have I seen this" — a hand-tick, or something played to
+     * the end. Derived rather than stored, so the two can never disagree.
+     */
+    val seen: Set<String>
+        get() = HomeRows.watchedSet(historyEntries, watched)
+
+    private val historyEntries: List<HomeRows.Entry>
+        get() = recent.map { HomeRows.Entry(it.channelId, it.at, it.position, it.duration) }
 
     fun resumeFor(id: String): Long {
         val entry = recent.firstOrNull { it.channelId == id } ?: return 0
@@ -155,6 +167,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             activeId = active,
             favorites = store.favorites,
             recent = store.recent,
+            watched = store.watched,
             screen = if (playlists.isEmpty()) Screen.SOURCES else Screen.CHOOSE,
         )
         active?.let { selectPlaylist(it) }
@@ -358,6 +371,45 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!favorites.add(channel.id)) favorites.remove(channel.id)
         store.favorites = favorites
         _state.value = _state.value.copy(favorites = favorites)
+    }
+
+    /**
+     * Ticking something off by hand. Unticking also clears a finished position,
+     * because playing to the end counts as seen too — otherwise the tick comes
+     * straight back.
+     */
+    fun toggleWatched(id: String) {
+        val marks = _state.value.watched.toMutableList()
+        val had = marks.remove(id)
+        if (!had) marks.add(id)
+        store.watched = marks
+
+        var recent = _state.value.recent
+        if (had) {
+            recent = recent.map { if (it.channelId == id) it.copy(position = 0) else it }
+            store.recent = recent
+        }
+        _state.value = _state.value.copy(watched = marks, recent = recent)
+    }
+
+    /** A season is ticked off as one gesture: all of it, or none of it. */
+    fun toggleWatchedAll(ids: List<String>) {
+        if (ids.isEmpty()) return
+        val seen = _state.value.seen
+        val done = ids.all { it in seen }
+        val marks = _state.value.watched.toMutableList()
+        ids.forEach { id ->
+            marks.remove(id)
+            if (!done) marks.add(id)
+        }
+        store.watched = marks
+
+        var recent = _state.value.recent
+        if (done) {
+            recent = recent.map { if (it.channelId in ids) it.copy(position = 0) else it }
+            store.recent = recent
+        }
+        _state.value = _state.value.copy(watched = marks, recent = recent)
     }
 
     fun setQuery(query: String) {
