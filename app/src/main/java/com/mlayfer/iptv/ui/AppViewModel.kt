@@ -82,7 +82,7 @@ data class UiState(
         )
 
     /** The catalogue plus anything remembered that is no longer in it. */
-    private val homeCards: List<HomeRows.Card>
+    val homeCards: List<HomeRows.Card>
         get() {
             val cards = LinkedHashMap<String, HomeRows.Card>()
             for (channel in channels) cards[channel.id] = channel.toCard()

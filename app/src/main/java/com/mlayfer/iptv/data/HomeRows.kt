@@ -17,6 +17,8 @@ object HomeRows {
     private const val RECENT_LIMIT = 12
     private const val FAVORITE_LIMIT = 20
     private const val CATEGORY_ROWS = 3
+    private const val SEARCH_ROW_LIMIT = 40
+    private const val SEARCH_MIN_QUERY = 2
 
     /** A card on the home screen: any item, live or on demand, in one shape. */
     data class Card(
@@ -85,6 +87,34 @@ object HomeRows {
         if (series.isNotEmpty()) rows.add(Row("series", "סדרות", series.take(ROW_LIMIT)))
 
         return rows.filter { it.items.isNotEmpty() }
+    }
+
+    /**
+     * One box over the whole catalogue. A title someone remembers is not filed
+     * under the section they happen to be standing in, so the search never asks
+     * which one that is; results come back grouped by what they are.
+     */
+    fun search(items: List<Card>, query: String, limit: Int = SEARCH_ROW_LIMIT): List<Row> {
+        val q = query.trim().lowercase()
+        if (q.length < SEARCH_MIN_QUERY) return emptyList()
+
+        val live = ArrayList<Card>()
+        val movies = ArrayList<Card>()
+        val series = ArrayList<Card>()
+        for (item in items) {
+            if (!item.name.lowercase().contains(q) && !item.group.lowercase().contains(q)) continue
+            when {
+                item.kind == "LIVE" -> if (live.size < limit) live.add(item)
+                item.contentType == "SERIES" -> if (series.size < limit) series.add(item)
+                else -> if (movies.size < limit) movies.add(item)
+            }
+        }
+
+        val rows = ArrayList<Row>()
+        if (series.isNotEmpty()) rows.add(Row("series", "סדרות", series))
+        if (movies.isNotEmpty()) rows.add(Row("movies", "סרטים", movies))
+        if (live.isNotEmpty()) rows.add(Row("live", "ערוצים", live))
+        return rows
     }
 
     /** Newest first, one entry per item, capped — the same list both apps store. */

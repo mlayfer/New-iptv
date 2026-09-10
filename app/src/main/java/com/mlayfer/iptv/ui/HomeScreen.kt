@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,8 +51,14 @@ import com.mlayfer.iptv.data.HomeRows
  */
 @Composable
 fun HomeScreen(state: UiState, viewModel: AppViewModel) {
-    val rows = remember(state.channels, state.series, state.recent, state.favorites) {
+    val home = remember(state.channels, state.series, state.recent, state.favorites) {
         state.homeRows
+    }
+    var query by remember { mutableStateOf("") }
+    // One box over the whole catalogue: a title is not filed under the section
+    // you happen to be standing in. Same rule as the Tizen build, from HomeRows.
+    val rows = remember(home, query, state.channels, state.series) {
+        if (query.trim().length < 2) home else HomeRows.search(state.homeCards, query)
     }
     var highlighted by remember { mutableStateOf<HomeRows.Card?>(null) }
 
@@ -62,6 +69,18 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         HomeTopBar(state, viewModel)
+        CatalogSummary(state)
+
+        FormTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = "חיפוש ערוץ, סרט או סדרה",
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .focusHighlight(),
+        )
 
         val focus = highlighted ?: rows.firstOrNull()?.items?.firstOrNull()
         if (focus != null) HomeHero(focus, viewModel.resumeFor(focus.id))
@@ -77,7 +96,11 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = state.error ?: "אין תוכן להצגה",
+                    text = when {
+                        query.trim().length >= 2 -> "לא נמצא כלום בשם הזה"
+                        state.error != null -> state.error
+                        else -> "אין תוכן להצגה"
+                    },
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -142,6 +165,35 @@ private fun HomeTopBar(state: UiState, viewModel: AppViewModel) {
             modifier = Modifier.focusHighlight(),
         ) { Text("מקורות") }
     }
+}
+
+/**
+ * How much of each catalogue arrived, and what did not. A title someone expects
+ * and cannot find is either missing from the portal or lost on the way in, and
+ * a count is the difference between the two.
+ */
+@Composable
+private fun CatalogSummary(state: UiState) {
+    val cards = state.homeCards
+    if (cards.isEmpty()) return
+    val live = cards.count { it.kind == "LIVE" }
+    val series = cards.count { it.contentType == "SERIES" }
+    val movies = cards.size - live - series
+    val counts = "$live ערוצים · $movies סרטים · $series סדרות"
+    val notes = state.notes.joinToString(" · ")
+
+    Text(
+        text = if (notes.isBlank()) counts else "$counts · $notes",
+        style = MaterialTheme.typography.bodySmall,
+        color = if (state.notes.isEmpty()) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.error
+        },
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+    )
 }
 
 /** What sits under the cursor, said out loud so the row titles can stay short. */

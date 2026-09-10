@@ -405,5 +405,180 @@
         ]
       }
     ]
+  },
+  "search": {
+    "_comment": "searchRows in tizen/core.js and HomeRows.search in Kotlin must return this.",
+    "items": [
+      {
+        "id": "l1",
+        "name": "כאן 11",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l2",
+        "name": "קשת 12",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l3",
+        "name": "רשת 13",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l4",
+        "name": "ספורט 1",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l5",
+        "name": "ספורט 2",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l6",
+        "name": "ספורט 3",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l7",
+        "name": "i24",
+        "group": "חדשות",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l8",
+        "name": "כאן חדשות",
+        "group": "חדשות",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "l9",
+        "name": "לוגי",
+        "group": "ילדים",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      },
+      {
+        "id": "v1",
+        "name": "המסע הארוך",
+        "group": "חדש בקולנוע",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "v2",
+        "name": "אור אחרון",
+        "group": "חדש בקולנוע",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "v3",
+        "name": "שדות של זהב",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "v4",
+        "name": "מעבר לים",
+        "group": "קומדיה",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "v5",
+        "name": "יום שישי",
+        "group": "קומדיה",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "s1",
+        "name": "פאודה",
+        "group": "דרמה",
+        "kind": "VOD",
+        "contentType": "SERIES"
+      },
+      {
+        "id": "s2",
+        "name": "שטיסל",
+        "group": "דרמה",
+        "kind": "VOD",
+        "contentType": "SERIES"
+      }
+    ],
+    "cases": [
+      {
+        "query": "ספורט",
+        "expected": [
+          {
+            "key": "live",
+            "title": "ערוצים",
+            "items": [
+              "l4",
+              "l5",
+              "l6"
+            ]
+          }
+        ]
+      },
+      {
+        "query": "א",
+        "expected": []
+      },
+      {
+        "query": "קומדיה",
+        "expected": [
+          {
+            "key": "movies",
+            "title": "סרטים",
+            "items": [
+              "v4",
+              "v5"
+            ]
+          }
+        ]
+      },
+      {
+        "query": "פאודה",
+        "expected": [
+          {
+            "key": "series",
+            "title": "סדרות",
+            "items": [
+              "s1"
+            ]
+          }
+        ]
+      },
+      {
+        "query": "כאן",
+        "expected": [
+          {
+            "key": "live",
+            "title": "ערוצים",
+            "items": [
+              "l1",
+              "l8"
+            ]
+          }
+        ]
+      }
+    ]
   }
 }
