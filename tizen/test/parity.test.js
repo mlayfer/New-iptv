@@ -74,3 +74,16 @@ test('keeps one history entry per item, newest first', () => {
   assert.deepStrictEqual(merged.map((x) => x.id), ['b', 'a']);
   assert.strictEqual(merged[0].position, 90);
 });
+
+test('searches the whole catalogue the same way', () => {
+  const f = fixtures.search;
+  for (const c of f.cases) {
+    const rows = core.searchRows(f.items, c.query);
+    assert.strictEqual(rows.length, c.expected.length, c.query);
+    c.expected.forEach((want, i) => {
+      assert.strictEqual(rows[i].key, want.key, c.query);
+      assert.strictEqual(rows[i].title, want.title, c.query);
+      assert.deepStrictEqual(rows[i].items.map((x) => x.id), want.items, c.query);
+    });
+  }
+});

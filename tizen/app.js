@@ -36,6 +36,7 @@ const state = {
   history: [],
   favorites: [],
   home: {rows: [], row: 0, col: 0, rowStart: 0},
+  search: {rows: [], row: 0, col: 0, rowStart: 0},
   playerReturn: 'home',
   resumeAt: 0,
   position: 0,
@@ -278,7 +279,9 @@ function finishLoad(items){
   $('#navLive').classList.remove('hidden');
   $('#navVod').classList.remove('hidden');
   $('#navSeries').classList.remove('hidden');
+  $('#navSearch').classList.remove('hidden');
   stopPlayback();
+  renderCatalogSummary();
   showHome();
   hideSplash();
 }
@@ -307,6 +310,24 @@ function groupList(){
   const counts = {};
   pool.forEach(x => counts[x.group] = (counts[x.group] || 0) + 1);
   return ['הכל', ...Object.keys(counts).sort((a,b) => counts[b] - counts[a])];
+}
+
+/**
+ * How much of each catalogue actually arrived. A title someone expects and
+ * cannot find is either missing from the portal or lost on the way in, and a
+ * count is the difference between the two.
+ */
+function renderCatalogSummary(){
+  const el = $('#catalogSummary');
+  if(!el) return;
+  if(!state.items.length){ el.textContent = 'Samsung Tizen TV'; el.classList.remove('warn'); return; }
+  const live = state.items.filter(x => x.kind === 'LIVE').length;
+  const series = state.items.filter(x => x.contentType === 'SERIES').length;
+  const movies = state.items.length - live - series;
+  const parts = [live + ' ערוצים', movies + ' סרטים', series + ' סדרות'];
+  const notes = state.notes || [];
+  el.textContent = parts.join(' · ') + (notes.length ? ' · ' + notes.join(' · ') : '');
+  el.classList.toggle('warn', notes.length > 0);
 }
 
 function renderNotes(){
@@ -421,7 +442,8 @@ function makeCard(item, navName, row, col){
     card.appendChild(bar);
   }
   card.addEventListener('click', () => {
-    state.home.row = row; state.home.col = col;
+    const cursor = navName === 'searchCard' ? state.search : state.home;
+    cursor.row = row; cursor.col = col;
     activateFromHome(item);
   });
   return card;
@@ -518,6 +540,7 @@ function showHome(){
   state.episodeContext = null;
   $('#liveScreen').classList.add('hidden');
   $('#vodScreen').classList.add('hidden');
+  $('#searchScreen').classList.add('hidden');
   $('#homeScreen').classList.remove('hidden');
   $('#goHome').classList.add('hidden');
   renderNotes();
@@ -556,6 +579,80 @@ function formatClock(seconds){
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   const pad = n => (n < 10 ? '0' : '') + n;
   return h ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
+}
+
+// ---- Search: one box over everything --------------------------------------
+
+function renderSearch(){
+  const box = $('#searchRows');
+  if(!box) return;
+  const query = ($('#globalSearch') && $('#globalSearch').value) || '';
+  state.search.rows = Core.searchRows(state.items, query);
+  box.innerHTML = '';
+
+  const count = $('#searchCount');
+  const total = state.search.rows.reduce((n, r) => n + r.items.length, 0);
+  if(count){
+    count.textContent = query.trim().length < 2 ? 'הקלד שתי אותיות לפחות'
+      : (total ? total + ' תוצאות' : 'לא נמצא כלום בשם הזה');
+  }
+
+  state.search.rows.slice(state.search.rowStart, state.search.rowStart + HOME_ROW_WINDOW)
+    .forEach((row, offset) => {
+      const rowIndex = state.search.rowStart + offset;
+      const wrap = document.createElement('div');
+      wrap.className = 'cardRow ' + (row.items.every(x => x.kind === 'LIVE') ? 'liveRow' : 'posterRow');
+      const title = document.createElement('div');
+      title.className = 'cardRowTitle';
+      title.textContent = row.title + ' · ' + row.items.length;
+      const track = document.createElement('div');
+      track.className = 'cardRowTrack';
+      const colStart = rowIndex === state.search.row ? Math.max(0, state.search.col - 2) : 0;
+      row.items.slice(colStart, colStart + HOME_COL_WINDOW).forEach((item, colOffset) => {
+        track.appendChild(makeCard(item, 'searchCard', rowIndex, colStart + colOffset));
+      });
+      wrap.appendChild(title);
+      wrap.appendChild(track);
+      box.appendChild(wrap);
+    });
+}
+
+function searchItemAt(row, col){
+  const r = state.search.rows[row];
+  return r ? r.items[col] : null;
+}
+
+function focusSearch(){
+  const data = state.search.rows;
+  if(!data.length){ renderSearch(); return; }
+  state.search.row = Math.max(0, Math.min(state.search.row, data.length - 1));
+  const row = data[state.search.row];
+  state.search.col = Math.max(0, Math.min(state.search.col, row.items.length - 1));
+  state.search.rowStart = Math.max(0, Math.min(state.search.row - 1, Math.max(0, data.length - HOME_ROW_WINDOW)));
+  renderSearch();
+  const el = $('[data-nav="searchCard"][data-row="' + state.search.row + '"][data-col="' + state.search.col + '"]');
+  if(el) setFocus(el);
+}
+
+function moveSearch(dRow, dCol){
+  const data = state.search.rows;
+  if(!data.length) return;
+  if(dRow){ state.search.row = Math.max(0, Math.min(state.search.row + dRow, data.length - 1)); state.search.col = 0; }
+  if(dCol) state.search.col = Math.max(0, state.search.col + dCol);
+  focusSearch();
+}
+
+function showSearch(){
+  state.mode = null;
+  state.episodeContext = null;
+  $('#homeScreen').classList.add('hidden');
+  $('#liveScreen').classList.add('hidden');
+  $('#vodScreen').classList.add('hidden');
+  $('#searchScreen').classList.remove('hidden');
+  $('#goHome').classList.remove('hidden');
+  state.search.row = 0; state.search.col = 0; state.search.rowStart = 0;
+  renderSearch();
+  setTimeout(() => setFocus($('#globalSearch')), 60);
 }
 
 // ---- Live TV: a guide of channel tiles, then full-screen playback ----------
@@ -833,6 +930,7 @@ function showMode(mode){
   state.lastGroupFocus = 0;
   state.episodeContext = null;
   $('#homeScreen').classList.add('hidden');
+  $('#searchScreen').classList.add('hidden');
   $('#goHome').classList.remove('hidden');
   renderNotes();
 
@@ -885,6 +983,7 @@ function resetToSetup(){
   $('#navLive').classList.add('hidden');
   $('#navVod').classList.add('hidden');
   $('#navSeries').classList.add('hidden');
+  $('#navSearch').classList.add('hidden');
   $('#browseScreen').classList.add('hidden');
   $('#setupScreen').classList.remove('hidden');
   $('#goHome').classList.add('hidden');
@@ -1193,8 +1292,34 @@ function currentNavMode(){
   if(!$('#playerScreen').classList.contains('hidden')) return 'player';
   if(!$('#setupScreen').classList.contains('hidden')) return 'setup';
   if(!$('#homeScreen').classList.contains('hidden')) return 'home';
+  if(!$('#searchScreen').classList.contains('hidden')) return 'search';
   if(!$('#liveScreen').classList.contains('hidden')) return 'live';
   return 'vod';
+}
+
+function navSearch(active, dir){
+  const type = active && active.dataset ? active.dataset.nav : null;
+  const actions = visible('[data-nav="topAction"]');
+
+  if(type === 'searchCard'){
+    if(dir === 'up' && state.search.row === 0) return $('#globalSearch');
+    if(dir === 'up'){ moveSearch(-1, 0); return null; }
+    if(dir === 'down'){ moveSearch(1, 0); return null; }
+    if(dir === 'right'){ moveSearch(0, -1); return null; }
+    if(dir === 'left'){ moveSearch(0, 1); return null; }
+    return active;
+  }
+  if(type === 'globalSearch'){
+    if(dir === 'down'){ if(state.search.rows.length){ focusSearch(); return null; } return active; }
+    if(dir === 'up') return actions[0] || active;
+    return active;
+  }
+  if(type === 'topAction'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(actions, active, dir) || active;
+    if(dir === 'down') return $('#globalSearch');
+    return active;
+  }
+  return $('#globalSearch');
 }
 
 function moveFocus(dir){
@@ -1204,6 +1329,7 @@ function moveFocus(dir){
   if(mode === 'setup') next = navSetup(active, dir);
   else if(mode === 'home') next = navHome(active, dir);
   else if(mode === 'player') next = navPlayer(dir);
+  else if(mode === 'search') next = navSearch(active, dir);
   else if(mode === 'live') next = navLive(active, dir);
   else next = navVod(active, dir);
   // A null answer means the screen moved its own selection already.
@@ -1288,7 +1414,9 @@ function wireStatic(){
 
   $('#search').dataset.nav = 'search';
   $('#vodSearch').dataset.nav = 'vodSearch';
-  ['#goHome', '#navLive', '#navVod', '#navSeries', '#backToSetup'].forEach(sel => { $(sel).dataset.nav = 'topAction'; });
+  ['#goHome', '#navLive', '#navVod', '#navSeries', '#navSearch', '#backToSetup']
+    .forEach(sel => { $(sel).dataset.nav = 'topAction'; });
+  $('#globalSearch').dataset.nav = 'globalSearch';
 
   $$('.serverSuggestion').forEach(btn => {
     btn.dataset.nav = 'setupField';
@@ -1313,6 +1441,11 @@ function wireStatic(){
   $('#navLive').addEventListener('click', () => showMode('LIVE'));
   $('#navVod').addEventListener('click', () => showMode('MOVIES'));
   $('#navSeries').addEventListener('click', () => showMode('SERIES'));
+  $('#navSearch').addEventListener('click', showSearch);
+  $('#globalSearch').addEventListener('input', () => {
+    state.search.row = 0; state.search.col = 0; state.search.rowStart = 0;
+    renderSearch();
+  });
   $('#goHome').addEventListener('click', backToHome);
   $('#backToSetup').addEventListener('click', resetToSetup);
 
@@ -1383,6 +1516,7 @@ function favoriteFocused(){
   let item = null;
   if(mode === 'player') item = state.current;
   else if(mode === 'home') item = homeItemAt(state.home.row, state.home.col);
+  else if(mode === 'search') item = searchItemAt(state.search.row, state.search.col);
   else if(mode === 'live') item = state.filtered[state.liveIndex];
   else if(mode === 'vod') item = vodItemAt(state.vodRow, state.vodCol);
   if(!item) return;
@@ -1394,6 +1528,8 @@ function favoriteFocused(){
   } else if(mode === 'live'){
     renderItems();
     focusChannel();
+  } else if(mode === 'search'){
+    focusSearch();
   } else if(mode === 'vod'){
     focusVod();
   } else {

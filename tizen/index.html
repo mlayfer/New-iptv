@@ -12,13 +12,14 @@
     <header class="topbar">
       <div class="brandBlock">
         <div class="brandIdentity"><img src="brand-icon.png" class="brandIcon" alt=""/><div><div class="brandTitle">טלוהים</div><div class="brandSub">טלוויזיה בלייב • סרטים • סדרות</div></div></div>
-        <div class="brandSub">Samsung Tizen TV</div>
+        <div class="brandSub" id="catalogSummary">Samsung Tizen TV</div>
       </div>
       <div class="topActions" id="topNav">
         <button id="goHome" class="focusable pill hidden">בית</button>
         <button id="navLive" class="focusable pill hidden">ערוצים</button>
         <button id="navVod" class="focusable pill hidden">סרטים</button>
         <button id="navSeries" class="focusable pill hidden">סדרות</button>
+        <button id="navSearch" class="focusable pill hidden">חיפוש</button>
         <button id="backToSetup" class="focusable pill hidden">החלף מקור</button>
       </div>
     </header>
@@ -93,6 +94,15 @@
           <div id="items" class="channelGrid"></div>
         </div>
 
+      </div>
+
+      <div id="searchScreen" class="hidden searchLayout">
+        <div class="guideHead">
+          <div class="paneTitle">חיפוש בכל התוכן</div>
+          <div class="searchWrap"><input id="globalSearch" class="focusable" type="text" placeholder="שם ערוץ, סרט או סדרה · אישור פותח מקלדת"/></div>
+          <div class="paneCount" id="searchCount"></div>
+        </div>
+        <div id="searchRows" class="cardRows"></div>
       </div>
 
       <!-- Movies and series: poster rows, one per category. -->

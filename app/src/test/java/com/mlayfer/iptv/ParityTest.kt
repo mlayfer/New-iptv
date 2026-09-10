@@ -140,6 +140,41 @@ class ParityTest {
     }
 
     @Test
+    fun `searches the whole catalogue the same way`() {
+        val spec = fixtures.getJSONObject("search")
+        val items = spec.getJSONArray("items").let { array ->
+            (0 until array.length()).map { i ->
+                val o = array.getJSONObject(i)
+                HomeRows.Card(
+                    id = o.getString("id"),
+                    name = o.getString("name"),
+                    group = o.getString("group"),
+                    kind = o.getString("kind"),
+                    contentType = o.getString("contentType"),
+                )
+            }
+        }
+        val cases = spec.getJSONArray("cases")
+        for (i in 0 until cases.length()) {
+            val case = cases.getJSONObject(i)
+            val query = case.getString("query")
+            val rows = HomeRows.search(items, query)
+            val expected = case.getJSONArray("expected")
+            assertEquals(query, expected.length(), rows.size)
+            for (j in 0 until expected.length()) {
+                val want = expected.getJSONObject(j)
+                assertEquals(query, want.getString("key"), rows[j].key)
+                assertEquals(query, want.getString("title"), rows[j].title)
+                val wantItems = want.getJSONArray("items")
+                assertEquals(query, wantItems.length(), rows[j].items.size)
+                for (k in 0 until wantItems.length()) {
+                    assertEquals(query, wantItems.getString(k), rows[j].items[k].id)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `keeps one history entry per item, newest first`() {
         val merged = HomeRows.mergeHistory(
             listOf(HomeRows.Entry("a", at = 2, position = 10), HomeRows.Entry("b", at = 1)),

@@ -33,6 +33,7 @@ button,input{font-family:inherit;color:inherit}
 .brandIcon{width:60px;height:60px;border-radius:16px;object-fit:cover;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 .brandTitle{font-size:38px;font-weight:800;letter-spacing:.5px}
 .brandSub{font-size:18px;color:var(--ink-faint);margin-top:4px}
+.brandSub.warn{color:#ffb4a8}
 .topActions{display:flex;gap:12px}
 .pill{border:1px solid var(--line);border-radius:14px;padding:14px 24px;background:var(--surface);font-size:22px}
 .screen{height:922px}
@@ -166,6 +167,9 @@ html.avplayOn #browseScreen{visibility:hidden}
 .ovProgress{height:6px;border-radius:4px;background:rgba(255,255,255,.18);margin-top:12px;overflow:hidden;display:none}
 .ovProgress.on{display:block}
 .ovProgressFill{height:100%;width:0;background:var(--accent)}
+
+/* ---- search across everything ---- */
+.searchLayout{height:100%;display:grid;grid-template-rows:auto 1fr;gap:14px;min-height:0}
 
 /* ---- movies and series ---- */
 .vodLayout{height:100%;display:grid;grid-template-rows:200px auto 1fr;gap:14px;min-height:0}

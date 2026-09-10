@@ -291,6 +291,36 @@
     return rows.filter(function (row) { return row.items.length > 0; });
   }
 
+  /**
+   * One box over the whole catalogue. A title someone remembers is not filed
+   * under the section they happen to be standing in, so the search never asks
+   * which one that is; results come back grouped by what they are.
+   */
+  const SEARCH_ROW_LIMIT = 40;
+  const SEARCH_MIN_QUERY = 2;
+
+  function searchRows(items, query, limit) {
+    const q = (query || '').trim().toLowerCase();
+    if (q.length < SEARCH_MIN_QUERY) return [];
+    const cap = limit || SEARCH_ROW_LIMIT;
+
+    const live = [], movies = [], series = [];
+    (items || []).forEach(function (item) {
+      const name = (item.name || '').toLowerCase();
+      const group = (item.group || '').toLowerCase();
+      if (name.indexOf(q) === -1 && group.indexOf(q) === -1) return;
+      if (item.kind === 'LIVE') { if (live.length < cap) live.push(item); }
+      else if (item.contentType === 'SERIES') { if (series.length < cap) series.push(item); }
+      else if (movies.length < cap) movies.push(item);
+    });
+
+    const rows = [];
+    if (series.length) rows.push({ key: 'series', title: 'סדרות', items: series });
+    if (movies.length) rows.push({ key: 'movies', title: 'סרטים', items: movies });
+    if (live.length) rows.push({ key: 'live', title: 'ערוצים', items: live });
+    return rows;
+  }
+
   /** Newest first, one entry per item, capped — the same list both apps store. */
   function mergeHistory(history, entry, limit) {
     const cap = limit || 60;
@@ -314,6 +344,7 @@
     isResumable: isResumable,
     progressRatio: progressRatio,
     buildHomeRows: buildHomeRows,
+    searchRows: searchRows,
     mergeHistory: mergeHistory
   };
 });
