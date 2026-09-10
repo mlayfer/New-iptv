@@ -129,14 +129,45 @@
         <video id="htmlVideo" autoplay></video>
         <div id="playerMessage" class="playerMessage"></div>
       </div>
-      <div id="liveOverlay" class="liveOverlay">
-        <div class="ovLogo" id="ovLogo"></div>
-        <div class="ovText">
-          <div class="ovName" id="itemName">בחר ערוץ</div>
-          <div class="ovMeta" id="itemMeta"></div>
-          <div class="ovProgress" id="ovProgress"><div class="ovProgressFill" id="ovProgressFill"></div></div>
+      <div id="liveOverlay" class="playerUi">
+        <div class="ovTop">
+          <div class="ovLogo" id="ovLogo"></div>
+          <div class="ovText">
+            <div class="ovName" id="itemName">בחר ערוץ</div>
+            <div class="ovMeta" id="itemMeta"></div>
+          </div>
+          <div class="ovBadge hidden" id="ovBadge">שידור חי</div>
         </div>
-        <div class="ovHint" id="ovHint">מעלה/מטה — ערוץ · צהוב — מועדפים · Back — יציאה</div>
+
+        <div class="ovBottom">
+          <div class="scrubRow" id="scrubRow">
+            <div class="ovTime" id="ovElapsed">0:00</div>
+            <div class="scrubTrack">
+              <div class="scrubBuffered" id="scrubBuffered"></div>
+              <div class="scrubPlayed" id="scrubPlayed"></div>
+              <div class="scrubThumb" id="scrubThumb"></div>
+            </div>
+            <div class="ovTime" id="ovRemaining">0:00</div>
+          </div>
+
+          <div class="controlRow" id="controlRow">
+            <button class="focusable ctrlBtn" data-act="restart">מהתחלה</button>
+            <button class="focusable ctrlBtn" data-act="back10">אחורה 10</button>
+            <button class="focusable ctrlBtn ctrlMain" id="btnToggle" data-act="toggle">השהה</button>
+            <button class="focusable ctrlBtn" data-act="fwd10">קדימה 10</button>
+            <button class="focusable ctrlBtn" data-act="prevEp">הפרק הקודם</button>
+            <button class="focusable ctrlBtn" data-act="nextEp">הפרק הבא</button>
+            <button class="focusable ctrlBtn" data-act="audio">שמע</button>
+            <button class="focusable ctrlBtn" data-act="subs">כתוביות</button>
+          </div>
+
+          <div class="ovHint" id="ovHint"></div>
+        </div>
+
+        <div class="trackPanel hidden" id="trackPanel">
+          <div class="trackTitle" id="trackTitle">שמע</div>
+          <div class="trackList" id="trackList"></div>
+        </div>
       </div>
     </div>
   </div>

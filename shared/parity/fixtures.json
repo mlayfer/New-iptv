@@ -580,5 +580,114 @@
         ]
       }
     ]
+  },
+  "playback": {
+    "_comment": "seekTarget, formatClock and stepInList must agree in both apps.",
+    "seeks": [
+      {
+        "position": 600,
+        "delta": -10,
+        "duration": 5400,
+        "expected": 590
+      },
+      {
+        "position": 5,
+        "delta": -10,
+        "duration": 5400,
+        "expected": 0
+      },
+      {
+        "position": 5395,
+        "delta": 10,
+        "duration": 5400,
+        "expected": 5399
+      },
+      {
+        "position": 100,
+        "delta": 10,
+        "duration": 0,
+        "expected": 110
+      },
+      {
+        "position": 0,
+        "delta": -10,
+        "duration": 300,
+        "expected": 0
+      },
+      {
+        "position": 299,
+        "delta": 60,
+        "duration": 300,
+        "expected": 299
+      }
+    ],
+    "clocks": [
+      {
+        "seconds": 0,
+        "expected": "0:00"
+      },
+      {
+        "seconds": 7,
+        "expected": "0:07"
+      },
+      {
+        "seconds": 75,
+        "expected": "1:15"
+      },
+      {
+        "seconds": 600,
+        "expected": "10:00"
+      },
+      {
+        "seconds": 3671,
+        "expected": "1:01:11"
+      },
+      {
+        "seconds": 86399,
+        "expected": "23:59:59"
+      }
+    ],
+    "steps": [
+      {
+        "ids": [
+          "a",
+          "b",
+          "c"
+        ],
+        "id": "b",
+        "step": 1,
+        "expected": "c"
+      },
+      {
+        "ids": [
+          "a",
+          "b",
+          "c"
+        ],
+        "id": "c",
+        "step": 1,
+        "expected": null
+      },
+      {
+        "ids": [
+          "a",
+          "b",
+          "c"
+        ],
+        "id": "a",
+        "step": -1,
+        "expected": null
+      },
+      {
+        "ids": [
+          "a",
+          "b",
+          "c"
+        ],
+        "id": "x",
+        "step": 1,
+        "expected": null
+      }
+    ]
   }
 }

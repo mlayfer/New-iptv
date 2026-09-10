@@ -32,6 +32,13 @@ const state = {
   overlayTimer: null,
   // The field the on-screen keyboard is open on, if any.
   editingEl: null,
+  // Playback: whether the controls are showing, and a jump not yet committed.
+  controlsOpen: false,
+  paused: false,
+  pendingSeek: null,
+  seekTimer: null,
+  trackType: null,
+  selectedTrack: {},
   // What you watched and what you marked — the home screen is built from these.
   history: [],
   favorites: [],
@@ -574,12 +581,7 @@ function resumeFor(item){
   return entry && Core.isResumable(entry) ? entry.position : 0;
 }
 
-function formatClock(seconds){
-  const s = Math.max(0, Math.round(seconds || 0));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  const pad = n => (n < 10 ? '0' : '') + n;
-  return h ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
-}
+const formatClock = Core.formatClock;
 
 // ---- Search: one box over everything --------------------------------------
 
@@ -739,6 +741,8 @@ function showOverlay(){
   if(!bar) return;
   bar.classList.remove('faded');
   if(state.overlayTimer) clearTimeout(state.overlayTimer);
+  // Nothing fades while it is being used, or while playback is stopped.
+  if(state.controlsOpen || state.trackType || state.paused) return;
   state.overlayTimer = setTimeout(() => bar.classList.add('faded'), OVERLAY_MS);
 }
 
@@ -748,33 +752,218 @@ function showOverlay(){
  */
 function openPlayer(item, returnTo){
   state.playerReturn = returnTo;
+  state.controlsOpen = false;
+  state.pendingSeek = null;
+  closeTrackPanel();
   $('#playerScreen').classList.remove('hidden');
   describePlayer(item);
+  renderControls();
   showOverlay();
 }
+
+function onDemand(){ return !!state.current && state.current.kind !== 'LIVE'; }
 
 function describePlayer(item){
   text($('#itemName'), item.name);
   text($('#itemMeta'), itemMeta(item));
   fillArt($('#ovLogo'), item);
-  const onDemand = item.kind !== 'LIVE';
-  text($('#ovHint'), onDemand
-    ? 'ימין/שמאל — דילוג · צהוב — מועדפים · Back — יציאה'
-    : 'מעלה/מטה — ערוץ · צהוב — מועדפים · Back — יציאה');
-  const bar = $('#ovProgress');
-  if(bar) bar.classList.toggle('on', onDemand);
+  const live = item.kind === 'LIVE';
+  $('#ovBadge').classList.toggle('hidden', !live);
+  $('#scrubRow').classList.toggle('hidden', live);
+  text($('#ovHint'), live
+    ? 'מעלה/מטה — ערוץ · אישור — פקדים · צהוב — מועדפים · Back — יציאה'
+    : 'ימין/שמאל — דילוג 10 שניות · מטה — פקדים · אישור — נגן/השהה · Back — יציאה');
   renderProgress();
 }
 
+/**
+ * The scrubber is the whole point of a player: it has to say where you are,
+ * where a pending jump would land, and how much is left.
+ */
 function renderProgress(){
-  const fill = $('#ovProgressFill');
-  if(!fill) return;
-  const ratio = state.duration > 0 ? Math.max(0, Math.min(state.position / state.duration, 1)) : 0;
-  fill.style.width = Math.round(ratio * 100) + '%';
-  const item = state.current;
-  if(item && item.kind !== 'LIVE' && state.duration > 0){
-    text($('#itemMeta'), itemMeta(item) + ' · ' + formatClock(state.position) + ' / ' + formatClock(state.duration));
+  if(!onDemand()) return;
+  const duration = state.duration > 0 ? state.duration : 0;
+  const shown = state.pendingSeek !== null ? state.pendingSeek : state.position;
+  const ratio = duration > 0 ? Math.max(0, Math.min(shown / duration, 1)) : 0;
+  const percent = (ratio * 100).toFixed(2) + '%';
+
+  $('#scrubPlayed').style.width = percent;
+  $('#scrubThumb').style.left = percent;
+  $('#scrubBuffered').style.width = duration > 0
+    ? Math.min(100, ratio * 100 + 6).toFixed(2) + '%' : '0%';
+  $('.scrubTrack').classList.toggle('seeking', state.pendingSeek !== null);
+
+  text($('#ovElapsed'), formatClock(shown));
+  text($('#ovRemaining'), duration > 0 ? '-' + formatClock(Math.max(0, duration - shown)) : '');
+}
+
+// ---- controls ---------------------------------------------------------------
+
+function episodeNeighbour(step){
+  if(!state.episodeContext || !state.current) return null;
+  return Core.stepInList(state.episodeContext.episodes, state.current.id, step);
+}
+
+function renderControls(){
+  const row = $('#controlRow');
+  if(!row) return;
+  row.classList.toggle('hidden', !state.controlsOpen);
+
+  const live = !onDemand();
+  const show = (act, visible) => {
+    const btn = $('[data-act="' + act + '"]', row);
+    if(btn) btn.classList.toggle('hidden', !visible);
+  };
+  show('restart', !live);
+  show('back10', !live);
+  show('fwd10', !live);
+  show('prevEp', !!episodeNeighbour(-1));
+  show('nextEp', !!episodeNeighbour(1));
+  text($('#btnToggle'), state.paused ? 'נגן' : 'השהה');
+}
+
+function openControls(){
+  state.controlsOpen = true;
+  renderControls();
+  showOverlay();
+  const first = $('#btnToggle');
+  if(first && !first.classList.contains('hidden')) setFocus(first);
+}
+
+function closeControls(){
+  state.controlsOpen = false;
+  closeTrackPanel();
+  renderControls();
+  if(state.focusEl) state.focusEl.classList.remove('focused');
+  state.focusEl = null;
+  showOverlay();
+}
+
+function setPaused(paused){
+  state.paused = paused;
+  try {
+    if(window.webapis && webapis.avplay && webapis.avplay.getState() !== 'NONE'){
+      if(paused) webapis.avplay.pause(); else webapis.avplay.play();
+    } else {
+      const v = $('#htmlVideo');
+      if(paused) v.pause(); else v.play().catch(() => {});
+    }
+  } catch(e) {}
+  renderControls();
+  showOverlay();
+}
+
+function togglePlay(){ setPaused(!state.paused); }
+
+/**
+ * Presses on the remote arrive faster than a stream can seek, so they are
+ * gathered into one jump: the bar follows every press, the player moves once.
+ */
+function nudgeSeek(delta){
+  if(!onDemand()) return;
+  const from = state.pendingSeek !== null ? state.pendingSeek : state.position;
+  state.pendingSeek = Core.seekTarget(from, delta, state.duration);
+  renderProgress();
+  showOverlay();
+  if(state.seekTimer) clearTimeout(state.seekTimer);
+  state.seekTimer = setTimeout(commitSeek, 450);
+}
+
+function commitSeek(){
+  if(state.pendingSeek === null) return;
+  const target = state.pendingSeek;
+  state.pendingSeek = null;
+  seekTo(target);
+}
+
+function seekTo(seconds){
+  const target = Core.seekTarget(seconds, 0, state.duration);
+  try {
+    if(window.webapis && webapis.avplay && webapis.avplay.getState() !== 'NONE'){
+      webapis.avplay.seekTo(Math.round(target * 1000));
+    } else {
+      $('#htmlVideo').currentTime = target;
+    }
+  } catch(e) {}
+  state.position = target;
+  renderProgress();
+  rememberPosition();
+}
+
+function playNeighbourEpisode(step){
+  const next = episodeNeighbour(step);
+  if(!next) return false;
+  state.vodCol = Math.max(0, state.vodCol + step);
+  activateItem(next, 0);
+  return true;
+}
+
+function runControl(act){
+  showOverlay();
+  if(act === 'toggle'){ togglePlay(); return; }
+  if(act === 'restart'){ seekTo(0); setPaused(false); return; }
+  if(act === 'back10'){ nudgeSeek(-Core.SEEK_STEP); return; }
+  if(act === 'fwd10'){ nudgeSeek(Core.SEEK_STEP); return; }
+  if(act === 'prevEp'){ playNeighbourEpisode(-1); return; }
+  if(act === 'nextEp'){ playNeighbourEpisode(1); return; }
+  if(act === 'audio'){ openTrackPanel('AUDIO'); return; }
+  if(act === 'subs'){ openTrackPanel('TEXT'); return; }
+}
+
+// ---- audio and subtitle tracks ---------------------------------------------
+
+function availableTracks(type){
+  try {
+    if(window.webapis && webapis.avplay && webapis.avplay.getState() !== 'NONE'){
+      const all = webapis.avplay.getTotalTrackInfo() || [];
+      return all.filter(t => t.type === type).map(t => {
+        let label = '';
+        try { label = JSON.parse(t.extra_info || '{}').track_lang || ''; } catch(e) {}
+        return { index: t.index, label: (label || '').trim() || ('רצועה ' + t.index) };
+      });
+    }
+  } catch(e) {}
+  return [];
+}
+
+function openTrackPanel(type){
+  const panel = $('#trackPanel');
+  const list = $('#trackList');
+  if(!panel || !list) return;
+  state.trackType = type;
+  text($('#trackTitle'), type === 'AUDIO' ? 'שפת שמע' : 'כתוביות');
+  list.innerHTML = '';
+
+  const tracks = availableTracks(type);
+  if(!tracks.length){
+    const empty = document.createElement('div');
+    empty.className = 'trackEmpty';
+    empty.textContent = 'הפריט הזה לא מציע רצועות לבחירה';
+    list.appendChild(empty);
+  } else {
+    tracks.forEach(track => {
+      const btn = document.createElement('button');
+      btn.className = 'focusable trackBtn' + (state.selectedTrack[type] === track.index ? ' active' : '');
+      btn.dataset.nav = 'track';
+      btn.textContent = track.label;
+      btn.addEventListener('click', () => {
+        try { webapis.avplay.setSelectTrack(type, track.index); } catch(e) {}
+        state.selectedTrack[type] = track.index;
+        openTrackPanel(type);
+      });
+      list.appendChild(btn);
+    });
   }
+
+  panel.classList.remove('hidden');
+  const first = $('.trackBtn', list);
+  if(first) setFocus(first);
+}
+
+function closeTrackPanel(){
+  const panel = $('#trackPanel');
+  if(panel) panel.classList.add('hidden');
+  state.trackType = null;
 }
 
 function rememberPosition(){
@@ -787,6 +976,11 @@ function rememberPosition(){
 }
 
 function closePlayer(){
+  if(state.seekTimer){ clearTimeout(state.seekTimer); state.seekTimer = null; }
+  state.pendingSeek = null;
+  state.controlsOpen = false;
+  state.paused = false;
+  closeTrackPanel();
   rememberPosition();
   stopPlayback();
   if(state.progressTimer){ clearInterval(state.progressTimer); state.progressTimer = null; }
@@ -1044,6 +1238,9 @@ function playHtml(url){
     if(state.resumeAt > 0){ try { v.currentTime = state.resumeAt; } catch(e) {} state.resumeAt = 0; }
   };
   v.ontimeupdate = () => { state.position = v.currentTime || 0; state.duration = v.duration || state.duration; renderProgress(); };
+  v.onended = () => { rememberPosition(); if(!playNeighbourEpisode(1)) playerMessage('ההפעלה הסתיימה'); };
+  v.onpause = () => { state.paused = true; renderControls(); };
+  v.onplay = () => { state.paused = false; renderControls(); };
   v.src = url;
   v.play().catch(() => nextCandidate('הנגן המובנה לא הצליח לנגן את התוכן'));
 }
@@ -1055,21 +1252,6 @@ function startProgressTicker(){
     if(!state.current) return;
     if(state.current.kind !== 'LIVE' && state.position > 0) rememberPosition();
   }, 15000);
-}
-
-function seekBy(seconds){
-  const item = state.current;
-  if(!item || item.kind === 'LIVE') return;
-  const target = Math.max(0, state.position + seconds);
-  try {
-    if(window.webapis && webapis.avplay && webapis.avplay.getState() !== 'NONE'){
-      webapis.avplay.seekTo(Math.round(target * 1000));
-    } else {
-      $('#htmlVideo').currentTime = target;
-    }
-    state.position = target;
-    renderProgress();
-  } catch(e) {}
 }
 
 /**
@@ -1109,7 +1291,11 @@ function playCandidate(){
       webapis.avplay.setListener({
         onbufferingstart: () => playerMessage('טוען...'),
         onbufferingcomplete: () => playerMessage(''),
-        onstreamcompleted: () => { rememberPosition(); playerMessage('ההפעלה הסתיימה'); },
+        onstreamcompleted: () => {
+          rememberPosition();
+          // A finished episode rolls into the next one, the way a season is watched.
+          if(!playNeighbourEpisode(1)) playerMessage('ההפעלה הסתיימה');
+        },
         onerror: err => nextCandidate('שגיאת ניגון: ' + err),
         onevent: () => {},
         oncurrentplaytime: ms => { state.position = (ms || 0) / 1000; renderProgress(); },
@@ -1143,6 +1329,9 @@ async function activateItem(item, resumeAt){
 
   const returnTo = state.current ? state.playerReturn : currentNavMode();
   state.current = item;
+  state.paused = false;
+  state.pendingSeek = null;
+  state.selectedTrack = {};
   // Anything picked anywhere resumes, not only what the home row offers.
   state.resumeAt = resumeAt === undefined ? resumeFor(item) : (resumeAt || 0);
   state.position = state.resumeAt;
@@ -1245,20 +1434,45 @@ function navLive(active, dir){
 }
 
 /**
- * While watching, the D-pad belongs to the content: channels zap up and down,
- * a film seeks. Any key wakes the bar first, so you can see what you are on.
+ * While watching, the D-pad belongs to the content: channels zap up and down, a
+ * film seeks, and Down brings up the controls the way a streaming app does.
+ * Once the controls are open the same D-pad moves between them.
  */
-function navPlayer(dir){
+function navPlayer(active, dir){
   showOverlay();
-  const live = state.current && state.current.kind === 'LIVE';
+  const live = !onDemand();
+
+  if(state.trackType){
+    const tracks = visible('[data-nav="track"]');
+    if(dir === 'up' || dir === 'down'){
+      const at = tracks.indexOf(active);
+      const next = tracks[at + (dir === 'down' ? 1 : -1)];
+      return next || active;
+    }
+    if(dir === 'left' || dir === 'right'){ closeTrackPanel(); openControls(); return null; }
+    return active;
+  }
+
+  if(state.controlsOpen){
+    const buttons = visible('#controlRow .ctrlBtn');
+    if(dir === 'left' || dir === 'right') return moveRtlRow(buttons, active, dir) || active;
+    if(dir === 'down') return active;
+    if(dir === 'up'){ closeControls(); return null; }
+    return active;
+  }
+
+  // On a channel the D-pad stays what it is on a television: up and down are
+  // the channel. On a film there is nothing to zap, so down opens the controls.
   if(live){
     if(dir === 'up') zap(-1);
     if(dir === 'down') zap(1);
-  } else {
-    // Right is back and left is forward, the way the rest of the app reads.
-    if(dir === 'right') seekBy(-30);
-    if(dir === 'left') seekBy(30);
+    return null;
   }
+  if(dir === 'down'){ openControls(); return null; }
+  // Right is back and left is forward, the way the rest of the app reads.
+  if(dir === 'right') nudgeSeek(-Core.SEEK_STEP);
+  if(dir === 'left') nudgeSeek(Core.SEEK_STEP);
+  if(dir === 'up') showOverlay();
   return null;
 }
 
@@ -1328,7 +1542,7 @@ function moveFocus(dir){
   const mode = currentNavMode();
   if(mode === 'setup') next = navSetup(active, dir);
   else if(mode === 'home') next = navHome(active, dir);
-  else if(mode === 'player') next = navPlayer(dir);
+  else if(mode === 'player') next = navPlayer(active, dir);
   else if(mode === 'search') next = navSearch(active, dir);
   else if(mode === 'live') next = navLive(active, dir);
   else next = navVod(active, dir);
@@ -1372,6 +1586,11 @@ function endEdit(){
 }
 
 function onEnter(){
+  // In the player, OK is play/pause until the controls are open.
+  if(currentNavMode() === 'player' && !state.controlsOpen && !state.trackType){
+    if(onDemand()) togglePlay(); else openControls();
+    return;
+  }
   const a = state.focusEl || document.activeElement;
   if(!a) return;
   if(a.tagName === 'BUTTON') { a.click(); return; }
@@ -1381,6 +1600,9 @@ function onEnter(){
 function handleBack(){
   if(!$('#setupScreen').classList.contains('hidden')) return;
   if(!$('#playerScreen').classList.contains('hidden')){
+    // Back closes what is open on top of the picture before leaving it.
+    if(state.trackType){ closeTrackPanel(); openControls(); return; }
+    if(state.controlsOpen){ closeControls(); return; }
     closePlayer();
     return;
   }
@@ -1442,6 +1664,10 @@ function wireStatic(){
   $('#navVod').addEventListener('click', () => showMode('MOVIES'));
   $('#navSeries').addEventListener('click', () => showMode('SERIES'));
   $('#navSearch').addEventListener('click', showSearch);
+  $$('#controlRow .ctrlBtn').forEach(btn => {
+    btn.dataset.nav = 'control';
+    btn.addEventListener('click', () => runControl(btn.dataset.act));
+  });
   $('#globalSearch').addEventListener('input', () => {
     state.search.row = 0; state.search.col = 0; state.search.rowStart = 0;
     renderSearch();
@@ -1477,6 +1703,14 @@ function wireStatic(){
     if(e.key === 'Backspace' || code === 10009){ handleBack(); e.preventDefault(); return; }
     // The yellow key on a Samsung remote, and F on a desktop keyboard.
     if(code === 405 || e.key === 'f' || e.key === 'F'){ favoriteFocused(); e.preventDefault(); return; }
+    // The transport keys, which a Samsung remote sends whatever is focused.
+    if(currentNavMode() === 'player'){
+      if(code === 415 || code === 10252){ togglePlay(); e.preventDefault(); return; }   // Play / PlayPause
+      if(code === 19){ setPaused(true); e.preventDefault(); return; }                    // Pause
+      if(code === 413){ closePlayer(); e.preventDefault(); return; }                     // Stop
+      if(code === 417){ nudgeSeek(Core.SEEK_STEP_LONG); e.preventDefault(); return; }    // FastForward
+      if(code === 412){ nudgeSeek(-Core.SEEK_STEP_LONG); e.preventDefault(); return; }   // Rewind
+    }
     if(state.mode === 'LIVE' && (code === 427 || code === 33)){
       zap(1);
       e.preventDefault();
@@ -1504,7 +1738,8 @@ function wireStatic(){
 function registerKeys(){
   try {
     if(window.tizen && tizen.tvinputdevice){
-      ['MediaPlayPause','MediaStop','ChannelUp','ChannelDown','ColorF2Yellow']
+      ['MediaPlayPause','MediaPlay','MediaPause','MediaStop','MediaRewind','MediaFastForward',
+       'ChannelUp','ChannelDown','ColorF2Yellow']
         .forEach(k => { try { tizen.tvinputdevice.registerKey(k); } catch(e) {} });
     }
   } catch(e) {}
@@ -1564,6 +1799,25 @@ function demoItems(count){
 loadPrefs();
 wireStatic();
 registerKeys();
+
+/**
+ * ?test=1 exposes the player's internals so a browser test can drive them
+ * without a real stream — a TV app cannot be checked any other way from here.
+ * Nothing reads this in a normal launch.
+ */
+if(/[?&]test=1/.test(location.search)){
+  window.__talohim = {
+    state: state,
+    nudgeSeek: nudgeSeek,
+    seekTo: seekTo,
+    runControl: runControl,
+    openControls: openControls,
+    closeControls: closeControls,
+    renderProgress: renderProgress,
+    renderControls: renderControls,
+    playNeighbourEpisode: playNeighbourEpisode
+  };
+}
 
 const demo = /[?&]demo=(\d+)/.exec(location.search);
 if(demo){

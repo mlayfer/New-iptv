@@ -2,6 +2,7 @@ package com.mlayfer.iptv
 
 import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.M3uParser
+import com.mlayfer.iptv.data.Playback
 import com.mlayfer.iptv.data.StreamVariants
 import com.mlayfer.iptv.data.XtreamClient
 import org.json.JSONObject
@@ -171,6 +172,35 @@ class ParityTest {
                     assertEquals(query, wantItems.getString(k), rows[j].items[k].id)
                 }
             }
+        }
+    }
+
+    @Test
+    fun `does the same playback arithmetic`() {
+        val spec = fixtures.getJSONObject("playback")
+
+        val seeks = spec.getJSONArray("seeks")
+        for (i in 0 until seeks.length()) {
+            val c = seeks.getJSONObject(i)
+            assertEquals(
+                "${c.getLong("position")} ${c.getLong("delta")} of ${c.getLong("duration")}",
+                c.getLong("expected"),
+                Playback.seekTarget(c.getLong("position"), c.getLong("delta"), c.getLong("duration")),
+            )
+        }
+
+        val clocks = spec.getJSONArray("clocks")
+        for (i in 0 until clocks.length()) {
+            val c = clocks.getJSONObject(i)
+            assertEquals(c.getString("expected"), Playback.formatClock(c.getLong("seconds")))
+        }
+
+        val steps = spec.getJSONArray("steps")
+        for (i in 0 until steps.length()) {
+            val c = steps.getJSONObject(i)
+            val ids = c.getJSONArray("ids").let { a -> (0 until a.length()).map { a.getString(it) } }
+            val want = if (c.isNull("expected")) null else c.getString("expected")
+            assertEquals(want, Playback.stepInList(ids, c.getString("id"), c.getInt("step")))
         }
     }
 
