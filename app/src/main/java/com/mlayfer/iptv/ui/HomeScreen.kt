@@ -78,8 +78,7 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .focusHighlight(),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
         )
 
         val focus = highlighted ?: rows.firstOrNull()?.items?.firstOrNull()

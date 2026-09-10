@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,7 +40,13 @@ val LocalIsTv = staticCompositionLocalOf { false }
 fun isTelevision(context: Context): Boolean {
     val uiMode = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
     if (uiMode?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION) return true
-    return context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    val packages = context.packageManager
+    if (packages.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) return true
+    // Some boxes report neither of the above. Nothing with no touchscreen is
+    // held in a hand, so it is driven by a remote whatever it calls itself —
+    // and a keyboard that opens on focus is unusable with one.
+    if (!packages.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) return true
+    return context.resources.configuration.touchscreen == Configuration.TOUCHSCREEN_NOTOUCH
 }
 
 /**
@@ -48,7 +55,11 @@ fun isTelevision(context: Context): Boolean {
  * visible from across a room.
  */
 @Composable
-fun Modifier.focusHighlight(shape: Shape = RoundedCornerShape(10.dp)): Modifier {
+fun Modifier.focusHighlight(
+    shape: Shape = RoundedCornerShape(10.dp),
+    /** Off for anything that draws its own outline, so it is not ringed twice. */
+    border: Boolean = true,
+): Modifier {
     var focused by remember { mutableStateOf(false) }
     val accent = MaterialTheme.colorScheme.primary
 
@@ -57,8 +68,8 @@ fun Modifier.focusHighlight(shape: Shape = RoundedCornerShape(10.dp)): Modifier 
         .then(
             if (focused) {
                 Modifier
-                    .background(accent.copy(alpha = 0.22f), shape)
-                    .border(3.dp, accent, shape)
+                    .background(accent.copy(alpha = if (border) 0.22f else 0.14f), shape)
+                    .then(if (border) Modifier.border(3.dp, accent, shape) else Modifier)
             } else {
                 Modifier
             }
@@ -117,9 +128,23 @@ fun FormTextField(
                 keyboard?.hide()
             },
         ),
+        // A text field draws its own outline; the highlight only tints it, or the
+        // field ends up inside two rings.
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+        ),
         modifier = modifier
-            .focusHighlight(shape)
-            .onFocusChanged { if (!it.isFocused) editing = false }
+            .focusHighlight(shape, border = false)
+            .onFocusChanged { focus ->
+                if (!focus.isFocused) {
+                    editing = false
+                } else if (isTv && !editing) {
+                    // Landing on a field is not a request to type: with a remote
+                    // the keyboard covers the screen, so it waits for OK.
+                    keyboard?.hide()
+                }
+            }
             .onKeyEvent { event ->
                 if (!isTv || editing) return@onKeyEvent false
                 val opens = event.key == Key.Enter ||

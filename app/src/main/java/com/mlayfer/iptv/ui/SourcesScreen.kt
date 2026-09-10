@@ -192,6 +192,16 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 )
             }
 
+            // With a remote, a field is a place you stand before it is a place
+            // you type: say so, since the keyboard no longer opens by itself.
+            if (LocalIsTv.current) {
+                Text(
+                    text = "עמוד על שדה ולחץ אישור כדי לפתוח את המקלדת · Back סוגר אותה",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             FormTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -269,7 +279,8 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                                     onClick = { server = option },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .focusHighlight(),
+                                        // The button has an outline of its own.
+                                        .focusHighlight(border = false),
                                 ) {
                                     Text(option)
                                 }
