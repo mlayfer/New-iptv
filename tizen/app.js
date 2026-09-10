@@ -30,8 +30,9 @@ const state = {
   vodRowStart: 0,
   vodData: [],
   overlayTimer: null,
-  // The field the on-screen keyboard is open on, if any.
+  // The field the on-screen keyboard is open on, if any, and how it was left.
   editingEl: null,
+  editExit: null,
   // Playback: whether the controls are showing, and a jump not yet committed.
   controlsOpen: false,
   paused: false,
@@ -1600,9 +1601,34 @@ function endEdit(){
   const el = state.editingEl;
   state.editingEl = null;
   if(!el) return;
+  // Back means "leave this field alone", so the highlight stays on it.
+  state.editExit = 'back';
   el.setAttribute('readonly', 'readonly');
   try { el.blur(); } catch(e) {}
   setFocus(el);
+  state.editExit = null;
+}
+
+/**
+ * The on-screen keyboard closes itself when its "done" key is pressed, and all
+ * the app sees is a blur. That is the moment to move on: nobody types a server
+ * address in order to stand on it afterwards.
+ */
+function afterKeyboardClosed(el){
+  if(state.editExit === 'back') return;
+  setTimeout(() => {
+    if(state.editingEl) return;
+    // The next thing to fill in, not the next thing in the tab order: after
+    // typing an address nobody wants to land on the list of suggested ones.
+    const fields = editableFields().filter(isVisible);
+    const next = fields[fields.indexOf(el) + 1];
+    if(next){ setFocus(next); return; }
+    // The last field hands over the button that uses it.
+    const submit = visible('.bigBtn')[0];
+    if(submit){ setFocus(submit); return; }
+    setFocus(el);
+    moveFocus('down');
+  }, 60);
 }
 
 function onEnter(){
@@ -1700,8 +1726,10 @@ function wireStatic(){
     el.addEventListener('blur', () => {
       // Only the field being edited ends editing; a neighbour losing focus
       // because this one gained it is not the end of anything.
-      if(state.editingEl === el) state.editingEl = null;
+      const wasEditing = state.editingEl === el;
+      if(wasEditing) state.editingEl = null;
       el.setAttribute('readonly', 'readonly');
+      if(wasEditing) afterKeyboardClosed(el);
     });
     // A pointer (or a remote's cursor mode) should open the keyboard too.
     el.addEventListener('click', () => { if(!isEditing()) beginEdit(el); });

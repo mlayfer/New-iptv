@@ -42,28 +42,33 @@ button,input{font-family:inherit;color:inherit}
 .focused{outline:none;border-color:var(--accent)!important;
   box-shadow:0 0 0 3px var(--accent), 0 0 38px rgba(77,155,255,.38);
   background-color:var(--accent-soft)!important}
+/* Anything already carrying the accent as a fill keeps it, and says "focused"
+   with a white ring instead — a tint over a fill only ruins the contrast. */
+.primary.focused,.sourceTab.active.focused,.groupChip.active.focused{
+  background-color:var(--accent)!important;color:#04142e;border-color:#fff!important;
+  box-shadow:0 0 0 4px #ffffff, 0 0 40px rgba(77,155,255,.55)}
 
 /* ---- setup ---- */
 .setupPanel{width:1000px;max-width:100%;margin:0 auto;background:linear-gradient(180deg,rgba(26,26,29,.98),rgba(14,14,16,.98));
-  border:1px solid var(--line);border-radius:28px;padding:40px 48px;box-shadow:0 30px 70px rgba(0,0,0,.5)}
-.heroTitle{font-size:46px;font-weight:800;text-align:center}
-.heroSub{font-size:22px;color:var(--ink-dim);text-align:center;line-height:1.5;margin:14px 90px 26px}
-.toggleRow{display:flex;gap:12px;margin-bottom:22px}
-.sourceTab{flex:1;border:1px solid var(--line);background:var(--surface);padding:16px;border-radius:14px;font-size:25px}
+  border:1px solid var(--line);border-radius:26px;padding:24px 40px 26px;box-shadow:0 30px 70px rgba(0,0,0,.5)}
+.heroTitle{font-size:38px;font-weight:800;text-align:center}
+.heroSub{font-size:19px;color:var(--ink-dim);text-align:center;line-height:1.4;margin:8px 70px 4px}
+.toggleRow{display:flex;gap:12px;margin-bottom:14px}
+.sourceTab{flex:1;border:1px solid var(--line);background:var(--surface);padding:12px;border-radius:14px;font-size:22px}
 .sourceTab.active{background:var(--accent);color:#04142e;border-color:var(--accent);font-weight:700}
-.formBlock{display:grid;gap:12px}
-.formBlock label{font-size:21px;color:var(--ink-dim)}
-input{width:100%;border-radius:14px;border:1px solid var(--line);background:#111113;padding:16px 18px;font-size:25px}
+.formBlock{display:grid;gap:8px}
+.formBlock label{font-size:18px;color:var(--ink-dim)}
+input{width:100%;border-radius:14px;border:1px solid var(--line);background:#111113;padding:12px 16px;font-size:22px}
 input::placeholder{color:var(--ink-faint)}
-.bigBtn{margin-top:6px;padding:18px;border-radius:14px;border:0;font-size:26px;font-weight:700}
+.bigBtn{margin-top:4px;padding:14px;border-radius:14px;border:0;font-size:23px;font-weight:700}
 .primary{background:var(--accent);color:#04142e}
-.checkboxWrap{display:flex;align-items:center;gap:12px;font-size:21px;color:var(--ink-dim)}
+.checkboxWrap{display:flex;align-items:center;gap:10px;font-size:19px;color:var(--ink-dim)}
 .checkboxWrap input{width:26px;height:26px;flex:0 0 auto}
-.statusLine{margin-top:10px;min-height:28px;font-size:20px;color:#ffb4a8}
-.formHint{text-align:center;font-size:19px;color:var(--ink-faint);margin:-14px 0 20px}
-.serverSuggestWrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 6px}
-.serverSuggestTitle{grid-column:1/-1;font-size:18px;color:var(--ink-faint);margin:2px}
-.serverSuggestion{border:1px solid var(--line);background:#111113;border-radius:12px;padding:12px;font-size:19px;text-align:center;direction:ltr}
+.statusLine{margin-top:8px;min-height:24px;font-size:19px;color:#ffb4a8}
+.formHint{text-align:center;font-size:17px;color:var(--ink-faint);margin:6px 0 14px}
+.serverSuggestWrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 4px}
+.serverSuggestTitle{grid-column:1/-1;font-size:16px;color:var(--ink-faint);margin:0 2px}
+.serverSuggestion{border:1px solid var(--line);background:#111113;border-radius:12px;padding:9px;font-size:18px;text-align:center;direction:ltr}
 
 /* ---- home: what to watch, not a menu of places to go ---- */
 .homeLayout{height:100%;display:grid;grid-template-rows:170px 1fr;gap:10px;min-height:0}
