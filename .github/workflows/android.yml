@@ -23,6 +23,7 @@ jobs:
           node --check tizen/core.js
           node --check tizen/app.js
           node --test tizen/test/parity.test.js
+          node --test tizen/test/compat.test.js
           python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('tizen/config.xml')"
 
       - uses: actions/setup-java@v4
@@ -37,6 +38,21 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
+
+      # The suite that drives the app the way a remote does: every screen, the
+      # player, search, and what it remembers between launches. It runs against
+      # a portal that answers like a real one, so a broken screen fails here
+      # rather than on someone's television.
+      - name: Walk the Tizen app end to end
+        run: |
+          npm install --no-save --silent playwright-core
+          python3 -m http.server 5300 --directory tizen &
+          for i in $(seq 1 20); do
+            curl -sf -o /dev/null http://127.0.0.1:5300/index.html && break
+            sleep 0.5
+          done
+          QA_BROWSER=$(command -v google-chrome || command -v chromium-browser || command -v chromium) \
+            node tizen/test/qa.mjs
 
       - name: Name the APK after the build
         run: cp app/build/outputs/apk/debug/app-debug.apk telohim.apk

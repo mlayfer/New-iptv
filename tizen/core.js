@@ -484,10 +484,19 @@
     return rows;
   }
 
-  /** Newest first, one entry per item, capped — the same list both apps store. */
+  /**
+   * Newest first, one entry per item, capped — the same list both apps store.
+   * Whatever else the caller attached to the entry is kept: an episode is not
+   * in the catalogue, so the copy of its card travelling with it is the only
+   * way "continue watching" can still name it after a restart.
+   */
   function mergeHistory(history, entry, limit) {
     const cap = limit || 60;
-    const out = [{ id: entry.id, at: entry.at, position: entry.position || 0, duration: entry.duration || 0 }];
+    const first = {};
+    Object.keys(entry).forEach(function (key) { first[key] = entry[key]; });
+    first.position = entry.position || 0;
+    first.duration = entry.duration || 0;
+    const out = [first];
     (history || []).forEach(function (old) {
       if (old.id === entry.id) return;
       if (out.length < cap) out.push(old);

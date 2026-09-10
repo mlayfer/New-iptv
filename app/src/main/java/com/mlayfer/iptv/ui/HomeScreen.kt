@@ -51,14 +51,16 @@ import com.mlayfer.iptv.data.HomeRows
  */
 @Composable
 fun HomeScreen(state: UiState, viewModel: AppViewModel) {
-    val home = remember(state.channels, state.series, state.recent, state.favorites) {
-        state.homeRows
-    }
+    // Building the cards walks the whole catalogue — nineteen thousand of them
+    // on a real subscription — so it happens when the catalogue changes and not
+    // once a frame.
+    val cards = remember(state.channels, state.series, state.recent) { state.homeCards }
+    val home = remember(cards, state.recent, state.favorites) { state.homeRows }
     var query by remember { mutableStateOf("") }
     // One box over the whole catalogue: a title is not filed under the section
     // you happen to be standing in. Same rule as the Tizen build, from HomeRows.
-    val rows = remember(home, query, state.channels, state.series) {
-        if (query.trim().length < 2) home else HomeRows.search(state.homeCards, query)
+    val rows = remember(home, query, cards) {
+        if (query.trim().length < 2) home else HomeRows.search(cards, query)
     }
     var highlighted by remember { mutableStateOf<HomeRows.Card?>(null) }
 
@@ -69,7 +71,7 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         HomeTopBar(state, viewModel)
-        CatalogSummary(state)
+        CatalogSummary(cards, state.notes)
 
         FormTextField(
             value = query,
@@ -172,19 +174,19 @@ private fun HomeTopBar(state: UiState, viewModel: AppViewModel) {
  * a count is the difference between the two.
  */
 @Composable
-private fun CatalogSummary(state: UiState) {
-    val cards = state.homeCards
+private fun CatalogSummary(cards: List<HomeRows.Card>, notes: List<String>) {
     if (cards.isEmpty()) return
-    val live = cards.count { it.kind == "LIVE" }
-    val series = cards.count { it.contentType == "SERIES" }
-    val movies = cards.size - live - series
-    val counts = "$live ערוצים · $movies סרטים · $series סדרות"
-    val notes = state.notes.joinToString(" · ")
+    val counts = remember(cards) {
+        val live = cards.count { it.kind == "LIVE" }
+        val series = cards.count { it.contentType == "SERIES" }
+        "$live ערוצים · ${cards.size - live - series} סרטים · $series סדרות"
+    }
+    val trouble = notes.joinToString(" · ")
 
     Text(
-        text = if (notes.isBlank()) counts else "$counts · $notes",
+        text = if (trouble.isBlank()) counts else "$counts · $trouble",
         style = MaterialTheme.typography.bodySmall,
-        color = if (state.notes.isEmpty()) {
+        color = if (notes.isEmpty()) {
             MaterialTheme.colorScheme.onSurfaceVariant
         } else {
             MaterialTheme.colorScheme.error
