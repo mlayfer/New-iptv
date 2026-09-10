@@ -151,7 +151,9 @@ input::placeholder{color:var(--ink-faint)}
 .wideArt img{max-width:82%;max-height:82%;object-fit:contain}
 .cardName{font-size:17px;margin-top:8px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .focused .cardName{color:var(--ink)}
-.homePoster{width:124px}
+/* Smaller than the catalogue's own posters, and 2:3 like every one of them —
+   the width has to out-rank .posterCard below, which is defined later. */
+.posterCard.homePoster{width:124px}
 .homePoster .vodPoster{height:168px}
 
 /* How far into something you already are, on the card and in the overlay. */
@@ -170,8 +172,8 @@ input::placeholder{color:var(--ink-faint)}
 .nnLogo{width:74px;height:44px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
   overflow:hidden;color:var(--accent);font-size:19px;font-weight:800}
 .nnLogo img{max-width:100%;max-height:100%;object-fit:contain}
-.nnText{flex:1;min-width:0}
-.nnNow{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nnText{flex:1;min-width:0;max-width:760px}
+.nnNow{font-size:21px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nnBar{height:5px;border-radius:4px;background:rgba(255,255,255,.16);margin-top:7px;overflow:hidden}
 .nnFill{height:100%;width:0;background:var(--accent)}
 .nnNext{font-size:19px;color:var(--ink-faint);white-space:nowrap;max-width:520px;overflow:hidden;text-overflow:ellipsis}
