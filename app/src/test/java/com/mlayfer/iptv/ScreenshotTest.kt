@@ -11,8 +11,12 @@ import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Series
 import com.mlayfer.iptv.ui.AppViewModel
+import com.mlayfer.iptv.ui.Catalog
+import com.mlayfer.iptv.ui.ChannelsScreen
 import com.mlayfer.iptv.ui.ChooseScreen
+import com.mlayfer.iptv.ui.HomeScreen
 import com.mlayfer.iptv.ui.LocalIsTv
+import com.mlayfer.iptv.ui.Screen
 import com.mlayfer.iptv.ui.SourcesScreen
 import com.mlayfer.iptv.ui.TelohimTheme
 import com.mlayfer.iptv.ui.UiState
@@ -70,7 +74,24 @@ class ScreenshotTest {
                 }
             }
         }
+        settle()
         compose.onRoot().captureRoboImage("src/test/screens/$name.png")
+    }
+
+    /**
+     * The lists arrive a moment after the screen does.
+     *
+     * `filteredAsync` waits out a fast typist and then does the work on a
+     * background thread, so a picture taken the instant the screen appears is a
+     * picture of an empty catalogue — which tells nobody anything. Advancing the
+     * clock releases the wait; the short real sleep lets the pool answer.
+     */
+    private fun settle() {
+        repeat(12) {
+            compose.mainClock.advanceTimeBy(100)
+            compose.waitForIdle()
+            Thread.sleep(20)
+        }
     }
 
     private fun catalogue(): UiState {
@@ -108,6 +129,33 @@ class ScreenshotTest {
     fun `the sources form`() {
         shoot("2-sources") {
             SourcesScreen(UiState(), viewModel)
+        }
+    }
+
+    @Test
+    fun `the home rows`() {
+        shoot("3-home") {
+            HomeScreen(catalogue().copy(screen = Screen.HOME), viewModel)
+        }
+    }
+
+    @Test
+    fun `the live library`() {
+        shoot("4-live") {
+            ChannelsScreen(
+                catalogue().copy(screen = Screen.CHANNELS, catalog = Catalog.LIVE),
+                viewModel,
+            )
+        }
+    }
+
+    @Test
+    fun `the series library`() {
+        shoot("5-series") {
+            ChannelsScreen(
+                catalogue().copy(screen = Screen.CHANNELS, catalog = Catalog.SERIES),
+                viewModel,
+            )
         }
     }
 }

@@ -66,6 +66,26 @@ jobs:
           path: app/src/test/screens/
           if-no-files-found: warn
 
+      # An artifact takes a sign-in and a zip to open, and the whole point of
+      # these files is that someone looks at them. A branch of their own is a
+      # direct link: /tree/screens renders them as pictures. It holds nothing
+      # but the PNGs, so it is never merged anywhere.
+      - name: Publish the screens to their own branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # A fresh orphan every time: the branch is a picture of the current
+          # build, not a history, and a parentless commit cannot trip over the
+          # shallow clone the checkout leaves behind.
+          work="$RUNNER_TEMP/screens"
+          git worktree add --orphan -b screens-build "$work"
+          cp app/src/test/screens/*.png "$work"/
+          git -C "$work" add -A
+          git -C "$work" \
+            -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "מסכי אנדרואיד מבנייה ${{ github.run_number }}"
+          git -C "$work" push --force origin screens-build:screens
+
       - name: Build debug APK
         env:
           ANDROID_KEYSTORE_FILE: ${{ steps.signing.outputs.ready == 'yes' && format('{0}/telohim.jks', runner.temp) || '' }}
