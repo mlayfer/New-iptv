@@ -422,6 +422,86 @@ const afterRows = await page.locator("#homeRows .cardRowTitle").allTextContents(
 check("what was being watched comes back", afterRows.some((r) => r.includes("המשך לצפות")), afterRows.join(" | "));
 check("how far in is drawn on the card", (await page.locator(".cardProgress").count()) > 0);
 
+// ---- the television's own player ------------------------------------------
+//
+// Everything above runs in a browser, where webapis does not exist and the app
+// quietly falls back to a <video> tag. That means the code that actually runs
+// on the television — AVPlay, and its state machine — was never once exercised
+// here. This is that state machine, with its real rule: open() is legal only
+// from NONE, and stop() walks back no further than IDLE.
+await page.addInitScript(() => {
+  const av = {
+    state: "NONE",
+    opened: [],
+    refused: 0,
+    listener: null,
+    getState() { return this.state; },
+    open(url) {
+      if (this.state !== "NONE") {
+        this.refused += 1;
+        const e = new Error("PLAYER_ERROR_INVALID_STATE");
+        e.name = "InvalidAccessError";
+        throw e;
+      }
+      this.opened.push(url);
+      this.state = "IDLE";
+    },
+    close() {
+      if (this.state === "NONE") throw new Error("InvalidAccessError");
+      this.state = "NONE";
+    },
+    stop() {
+      if (this.state === "NONE") throw new Error("InvalidAccessError");
+      this.state = "IDLE";
+    },
+    prepareAsync(ok, fail) {
+      if (this.state !== "IDLE") { fail("PLAYER_ERROR_INVALID_STATE"); return; }
+      this.state = "READY";
+      setTimeout(ok, 10);
+    },
+    play() { this.state = "PLAYING"; },
+    pause() { this.state = "PAUSED"; },
+    seekTo() {},
+    getDuration() { return 3600000; },
+    getCurrentTime() { return 0; },
+    setListener(l) { this.listener = l; },
+    setDisplayRect() {},
+    setDisplayMethod() {},
+    setStreamingProperty() {},
+    setSilentSubtitle() {},
+  };
+  window.webapis = Object.assign(window.webapis || {}, { avplay: av });
+});
+await page.reload();
+await page.waitForTimeout(2600);
+await page.click("#worldLive");
+await page.waitForTimeout(1200);
+
+const avState = () => page.evaluate(() => ({
+  state: webapis.avplay.state,
+  opened: webapis.avplay.opened.length,
+  refused: webapis.avplay.refused,
+  message: (document.querySelector("#playerMessage") || {}).textContent || "",
+}));
+
+await page.locator('[data-nav="item"]').first().click();
+await page.waitForTimeout(900);
+const first = await avState();
+check("the television's player starts a channel", first.state === "PLAYING",
+  `state ${first.state}, ${first.opened} opened`);
+
+// The one that mattered: a second stream, after the first was stopped.
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(500);
+await page.locator('[data-nav="item"]').nth(1).click();
+await page.waitForTimeout(900);
+const second = await avState();
+check("and a second one after it, which is where it used to break",
+  second.state === "PLAYING" && second.refused === 0,
+  `state ${second.state}, ${second.opened} opened, ${second.refused} refused` +
+    (second.message ? `, said "${second.message}"` : ""));
+check("no address is refused for being opened out of turn", second.refused === 0);
+
 check("no page errors anywhere", errors.length === 0, errors.slice(0, 3).join(" | "));
 
 console.log("\n" + "-".repeat(60));

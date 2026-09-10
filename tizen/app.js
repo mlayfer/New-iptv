@@ -1689,12 +1689,25 @@ function playerMessage(msg){
   el.style.display = msg ? 'flex' : 'none';
 }
 
+/**
+ * Put the player back where a new stream can be opened.
+ *
+ * AVPlay's states run NONE → open → IDLE → prepare → READY → play → PLAYING,
+ * and stop() only walks back as far as IDLE. open() is legal from NONE alone,
+ * so stopping without closing leaves the next open() throwing InvalidAccessError
+ * — which is every play after the first, and every rung of the address ladder
+ * after the first, meaning anything that needed a second address never played.
+ */
 function stopPlayback(){
   document.documentElement.classList.remove('avplayOn');
   try {
     if(window.webapis && webapis.avplay){
-      const s = webapis.avplay.getState();
-      if(s !== 'NONE') webapis.avplay.stop();
+      if(webapis.avplay.getState() !== 'NONE'){
+        try { webapis.avplay.stop(); } catch(e) {}
+      }
+      if(webapis.avplay.getState() !== 'NONE'){
+        try { webapis.avplay.close(); } catch(e) {}
+      }
     }
   } catch(e) {}
   const v = $('#htmlVideo');
@@ -1764,7 +1777,9 @@ function nextCandidate(reason){
     playCandidate();
     return;
   }
-  playerMessage(reason || 'לא הצלחתי לנגן את הפריט באף כתובת שניסיתי');
+  const tried = (state.candidates || []).length;
+  playerMessage((reason || 'לא הצלחתי לנגן את הפריט') +
+    (tried > 1 ? ' · נוסו ' + tried + ' כתובות' : ''));
 }
 
 function playCandidate(){
