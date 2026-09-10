@@ -3,6 +3,8 @@ package com.mlayfer.iptv.ui
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -353,14 +355,29 @@ private fun ChannelListPane(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = Gutter),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ListView.entries.forEach { view ->
+            Catalog.entries.forEach { catalog ->
+                FilterChip(
+                    selected = state.view == ListView.ALL && state.catalog == catalog,
+                    onClick = {
+                        viewModel.setView(ListView.ALL)
+                        viewModel.setCatalog(catalog)
+                    },
+                    label = { Text(labelOf(catalog)) },
+                    modifier = Modifier.focusHighlight(border = false),
+                )
+            }
+            // Marked and recently watched are sections of their own, and belong
+            // on the same row as the rest of them.
+            listOf(ListView.FAVORITES, ListView.RECENT).forEach { view ->
                 FilterChip(
                     selected = state.view == view,
                     onClick = { viewModel.setView(view) },
                     label = { Text(labelOf(view)) },
+                    modifier = Modifier.focusHighlight(border = false),
                 )
             }
         }
@@ -373,7 +390,6 @@ private fun ChannelListPane(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             GroupPicker(state, viewModel)
-            CatalogPicker(state, viewModel)
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = when {
@@ -609,29 +625,6 @@ private fun GroupPicker(state: UiState, viewModel: AppViewModel) {
                     onClick = {
                         open = false
                         viewModel.setGroup(name)
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CatalogPicker(state: UiState, viewModel: AppViewModel) {
-    var open by remember { mutableStateOf(false) }
-
-    Box {
-        TextButton(onClick = { open = true }) {
-            Text(labelOf(state.catalog), maxLines = 1, style = MaterialTheme.typography.bodyMedium)
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Catalog.entries.forEach { catalog ->
-                DropdownMenuItem(
-                    text = { Text(labelOf(catalog)) },
-                    onClick = {
-                        open = false
-                        viewModel.setCatalog(catalog)
                     },
                 )
             }
