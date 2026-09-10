@@ -28,11 +28,9 @@ fun <T> filteredAsync(
     immediate: Boolean = false,
     compute: () -> List<T>,
 ): State<List<T>> = produceState(initialValue = initial, keys = keys) {
-    if (immediate) {
-        value = compute()
-        return@produceState
-    }
-    delay(SETTLE_MS)
+    // "Immediate" means no waiting, not "do it here": nineteen thousand items
+    // are worth moving off the drawing thread even when the answer is easy.
+    if (!immediate) delay(SETTLE_MS)
     value = withContext(Dispatchers.Default) { compute() }
 }
 

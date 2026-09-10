@@ -59,12 +59,25 @@ const state = {
 };
 
 function text(el, value){ if(el) el.textContent = value; }
+/**
+ * Whether an element is on screen, asked cheaply.
+ *
+ * This runs for every candidate on every press of the remote. Asking
+ * getComputedStyle costs a style recalculation each time; the geometry below
+ * answers the same question for display:none anywhere up the tree, and stops at
+ * the first property that is non-zero. getClientRects covers the fixed-position
+ * player, whose children have no offset parent.
+ */
 function isVisible(el){
   if(!el) return false;
-  const s = getComputedStyle(el);
-  if(s.display === 'none' || s.visibility === 'hidden') return false;
-  const r = el.getBoundingClientRect();
-  return r.width > 0 && r.height > 0;
+  if(!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)) return false;
+  // The one thing the app hides without taking it out of the layout: the
+  // browsing screen, while the player is over it.
+  if(document.body.classList.contains('playerOpen')){
+    const browse = document.getElementById('browseScreen');
+    if(browse && browse.contains(el)) return false;
+  }
+  return true;
 }
 function focusable(el){ return el && isVisible(el) && (el.classList.contains('focusable') || el.dataset.nav); }
 function setFocus(el){
@@ -190,14 +203,45 @@ function toggleFavorite(item){
   return at === -1;
 }
 
-/** The catalogue plus anything remembered that is no longer in it. */
+/**
+ * The catalogue plus anything remembered that is no longer in it.
+ *
+ * Copying twenty-three thousand items and building a map of their ids is not
+ * something to do twice for the same catalogue, so the answer is kept until the
+ * catalogue or the history actually changes.
+ */
+let homePoolCache = null;
+
+/**
+ * What each windowed screen last put on the page.
+ *
+ * Moving one card sideways does not change which rows are on screen, but the
+ * screens rebuilt all of them anyway — three rows of twenty cards, with an
+ * image apiece, thrown away and made again for every press of the remote. The
+ * record below is how a move can tell whether anything actually has to be
+ * drawn; the guide has always done this, and now the others do too.
+ */
+const drawn = { home: null, search: null, vod: null };
+
+function needsDraw(key, rows, start){
+  const at = drawn[key];
+  return !(at && at.rows === rows && at.start === start);
+}
+
+function markDrawn(key, rows, start){ drawn[key] = { rows: rows, start: start }; }
+
 function homePool(){
+  if(homePoolCache && homePoolCache.items === state.items &&
+     homePoolCache.history === state.history){
+    return homePoolCache.pool;
+  }
   const seen = {};
   const pool = state.items.slice();
   pool.forEach(x => seen[x.id] = true);
   state.history.forEach(entry => {
     if(entry.card && !seen[entry.card.id]){ seen[entry.card.id] = true; pool.push(entry.card); }
   });
+  homePoolCache = { items: state.items, history: state.history, pool: pool };
   return pool;
 }
 function normalizeServer(v){ return Core.normalizeServer(v); }
@@ -571,6 +615,7 @@ function renderHome(){
   if(!box) return;
   box.innerHTML = '';
   const data = state.home.rows;
+  markDrawn('home', data, state.home.rowStart);
 
   if(!data.length){
     const empty = document.createElement('div');
@@ -638,7 +683,7 @@ function focusHome(){
   const row = data[state.home.row];
   state.home.col = Math.max(0, Math.min(state.home.col, row.items.length - 1));
   state.home.rowStart = Math.max(0, Math.min(state.home.row - 1, Math.max(0, data.length - HOME_ROW_WINDOW)));
-  renderHome();
+  if(needsDraw('home', data, state.home.rowStart)) renderHome();
   describeHome(homeItemAt(state.home.row, state.home.col));
   const el = $('[data-nav="homeCard"][data-row="' + state.home.row + '"][data-col="' + state.home.col + '"]');
   if(el) setFocus(el);
@@ -752,7 +797,12 @@ function decodeMaybeBase64(value){
   try {
     const bytes = atob(text.replace(/\s/g, ''));
     // A portal that base64s its titles encodes UTF-8 inside; anything else is
-    // already the text it means.
+    // already the text it means. TextDecoder does this in one pass — the older
+    // way built an escape sequence per byte, and this runs for every programme
+    // title in the guide.
+    const out = new Uint8Array(bytes.length);
+    for(let i = 0; i < bytes.length; i++) out[i] = bytes.charCodeAt(i);
+    if(typeof TextDecoder === 'function') return new TextDecoder('utf-8').decode(out);
     return decodeURIComponent(bytes.split('').map(function(c){
       return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
@@ -1023,6 +1073,7 @@ function renderSearch(){
   const query = ($('#globalSearch') && $('#globalSearch').value) || '';
   state.search.rows = Core.searchRows(state.items, query, undefined, state.searchIndex);
   box.innerHTML = '';
+  markDrawn('search', state.search.rows, state.search.rowStart);
 
   const count = $('#searchCount');
   const total = state.search.rows.reduce((n, r) => n + r.items.length, 0);
@@ -1063,7 +1114,7 @@ function focusSearch(){
   const row = data[state.search.row];
   state.search.col = Math.max(0, Math.min(state.search.col, row.items.length - 1));
   state.search.rowStart = Math.max(0, Math.min(state.search.row - 1, Math.max(0, data.length - HOME_ROW_WINDOW)));
-  renderSearch();
+  if(needsDraw('search', data, state.search.rowStart)) renderSearch();
   const el = $('[data-nav="searchCard"][data-row="' + state.search.row + '"][data-col="' + state.search.col + '"]');
   if(el) setFocus(el);
 }
@@ -1601,6 +1652,7 @@ function renderVodRows(){
   if(!box) return;
   box.innerHTML = '';
   state.vodData = vodGroups();
+  markDrawn('vod', state.vodData, state.vodRowStart);
 
   const count = $('#vodCount');
   if(count) count.textContent = state.filtered.length ? state.filtered.length + ' פריטים' : '';
@@ -1682,7 +1734,7 @@ function focusVod(){
 
   // Keep the focused row as the second one on screen, the way a TV grid scrolls.
   state.vodRowStart = Math.max(0, Math.min(state.vodRow - 1, Math.max(0, data.length - VOD_ROW_WINDOW)));
-  renderVodRows();
+  if(needsDraw('vod', data, state.vodRowStart)) renderVodRows();
   describeVod(vodItemAt(state.vodRow, state.vodCol));
 
   const el = $('[data-nav="vodCard"][data-row="' + state.vodRow + '"][data-col="' + state.vodCol + '"]');
