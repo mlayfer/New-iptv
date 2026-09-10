@@ -77,6 +77,7 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars)
+            .tvSafeArea()
     ) {
         HomeTopBar(state, viewModel)
         CatalogSummary(cards, state.notes)

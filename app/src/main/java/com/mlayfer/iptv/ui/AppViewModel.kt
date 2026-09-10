@@ -54,7 +54,7 @@ data class UiState(
     val episodesLoading: Boolean = false,
     val episodesError: String? = null,
     val selectedId: String? = null,
-    val screen: Screen = Screen.CHANNELS,
+    val screen: Screen = Screen.CHOOSE,
     val addBusy: Boolean = false,
     val addError: String? = null,
 ) {
@@ -256,7 +256,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     addBusy = false,
                     addError = null,
                     error = null,
-                    screen = Screen.CHANNELS,
+                    // Connecting a portal ends at the door, the same place a
+                    // launch ends at — not halfway inside one of the worlds.
+                    screen = Screen.CHOOSE,
                 )
                 val guide = playlist.epgUrl?.takeIf { it.isNotBlank() } ?: parsed.epgUrl
                 if (guide != null) loadEpg(guide, false)

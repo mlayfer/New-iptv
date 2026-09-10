@@ -124,14 +124,14 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 // the keyboard — this screen is nothing but text fields.
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .imePadding()
-                .then(if (LocalIsTv.current) Modifier.padding(horizontal = 24.dp) else Modifier)
+                .tvSafeArea()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (state.playlists.isNotEmpty()) {
-                    IconButton(onClick = { viewModel.setScreen(Screen.CHANNELS) }) {
+                    IconButton(onClick = { viewModel.setScreen(Screen.CHOOSE) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה")
                     }
                 }
@@ -159,7 +159,7 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                             .focusHighlight()
                             .clickable {
                                 viewModel.selectPlaylist(playlist.id)
-                                viewModel.setScreen(Screen.CHANNELS)
+                                viewModel.setScreen(Screen.CHOOSE)
                             }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,

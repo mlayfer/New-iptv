@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -48,6 +49,22 @@ fun isTelevision(context: Context): Boolean {
     if (!packages.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) return true
     return context.resources.configuration.touchscreen == Configuration.TOUCHSCREEN_NOTOUCH
 }
+
+/**
+ * The edge of a television is not the edge of the picture.
+ *
+ * A TV crops a few percent off every side — overscan, left over from tubes and
+ * still there on panels. Anything drawn in that band is simply not on the
+ * screen, which is why a title can sit at the top of the layout and be missing
+ * in the room. Leanback's guideline is 5% of each side; on a 960dp surface that
+ * is 48dp across and 27dp down.
+ *
+ * One modifier rather than a number copied into each screen: the screen that
+ * gets forgotten is the one that gets cropped.
+ */
+@Composable
+fun Modifier.tvSafeArea(): Modifier =
+    if (LocalIsTv.current) this.padding(horizontal = 48.dp, vertical = 27.dp) else this
 
 /**
  * On a touchscreen the finger says where you are; with a remote, only the

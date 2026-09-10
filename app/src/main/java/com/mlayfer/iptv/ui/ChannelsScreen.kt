@@ -169,12 +169,7 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(
-                    // TVs crop the edges of the picture; keep the UI inside the
-                    // area that is actually visible.
-                    if (LocalIsTv.current) Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-                    else Modifier
-                )
+                .tvSafeArea()
         ) {
             TopBar(state, viewModel)
 
@@ -362,7 +357,15 @@ private fun ChannelListPane(
                 .padding(horizontal = Gutter),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Catalog.entries.forEach { catalog ->
+            // Each world offers only its own shelves. Live television has no
+            // business advertising films: that separation is the whole point of
+            // the door, and a tab row that ignores it undoes it.
+            val offered = if (state.catalog == Catalog.LIVE) {
+                emptyList()
+            } else {
+                listOf(Catalog.MOVIES, Catalog.SERIES)
+            }
+            offered.forEach { catalog ->
                 FilterChip(
                     selected = state.view == ListView.ALL && state.catalog == catalog,
                     onClick = {

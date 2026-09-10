@@ -53,7 +53,8 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.statusBars),
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .tvSafeArea(),
     ) {
         Row(
             modifier = Modifier
