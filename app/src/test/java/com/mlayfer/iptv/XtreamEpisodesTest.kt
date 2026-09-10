@@ -33,11 +33,28 @@ class XtreamEpisodesTest {
         assertEquals(ChannelKind.VOD, episodes[0].kind)
 
         // Missing title falls back to the episode number, missing extension to mp4.
-        assertEquals("S1E2 · פרק 2", episodes[1].name)
+        // "פרק 2" already numbers itself, so nothing is prefixed to it.
+        assertEquals("פרק 2", episodes[1].name)
         assertTrue(episodes[1].url.endsWith("13.mp4"))
 
         assertEquals("S2E1 · Return", episodes[2].name)
         assertTrue(episodes[2].url.endsWith("991.mkv"))
+    }
+
+    @Test
+    fun `a title that already numbers itself is left alone`() {
+        val response = JSONObject(
+            """
+            {"episodes":{"1":[
+               {"id":"7","episode_num":4,"title":"ניתוק - S01E04 - האתה שאתה","container_extension":"mkv"}
+             ]}}
+            """.trimIndent()
+        )
+        val episodes = XtreamClient.parseEpisodes(response, "http://p", "u/p", seriesName = "ניתוק")
+
+        // The portal writes the series name and the numbering into the title;
+        // adding ours on top produced "S1E4 · ניתוק - S01E04 - האתה שאתה".
+        assertEquals("S01E04 - האתה שאתה", episodes[0].name)
     }
 
     @Test
