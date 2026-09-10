@@ -41,12 +41,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -334,6 +338,22 @@ fun PlayerPanel(
     }
 
     val transport = remember { FocusRequester() }
+    val picture = remember { FocusRequester() }
+
+    // Focus has to live somewhere, always.
+    //
+    // When the strip leaves, its buttons leave with it, and Compose is left with
+    // nothing focused at all — at which point no key reaches anything and the
+    // remote looks broken, which is exactly what it did. The picture itself
+    // holds focus in between, so a press always has somewhere to land.
+    LaunchedEffect(controlsShown, fullscreen, channel?.id) {
+        if (!fullscreen) return@LaunchedEffect
+        // The node being asked for focus has only just entered the tree.
+        withFrameNanos { }
+        runCatching {
+            if (controlsShown && channel != null) transport.requestFocus() else picture.requestFocus()
+        }
+    }
 
     // The same strip in both places: parked under the picture when the player
     // shares the screen, laid over the bottom of it when it has the lot.
@@ -501,6 +521,18 @@ fun PlayerPanel(
     Column(
         modifier = modifier.onPreviewKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            // Back is not ours to swallow: consuming it here would leave a film
+            // with no way out of it. The remote's own keys are the only ones
+            // this strip has any business with.
+            val fromTheRemote = event.key == Key.DirectionUp ||
+                event.key == Key.DirectionDown ||
+                event.key == Key.DirectionLeft ||
+                event.key == Key.DirectionRight ||
+                event.key == Key.DirectionCenter ||
+                event.key == Key.Enter ||
+                event.key == Key.NumPadEnter
+            if (!fromTheRemote) return@onPreviewKeyEvent false
+
             val wasHidden = !controlsShown
             wake += 1
             // While the strip is away, the first press only brings it back. That
@@ -548,6 +580,15 @@ fun PlayerPanel(
                 CircularProgressIndicator(
                     color = Color.White,
                     modifier = Modifier.align(Alignment.Center),
+                )
+            }
+
+            if (fullscreen && !controlsShown) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .focusRequester(picture)
+                        .focusable()
                 )
             }
 
