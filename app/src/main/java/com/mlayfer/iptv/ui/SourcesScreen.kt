@@ -128,7 +128,7 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
                 Text(
                     text = "טלוהים",
                     fontSize = tzSp(38),
