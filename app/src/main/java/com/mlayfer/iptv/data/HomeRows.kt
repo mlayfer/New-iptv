@@ -224,10 +224,15 @@ object HomeRows {
         if (favs.isNotEmpty()) rows.add(Row("favorites", "המועדפים שלי", favs))
 
         // What to watch next, before the catalogue starts talking about itself.
-        val suggested = recommend(items, history, marks, now)
+        // The named row explains itself, so it wins any title the two both want:
+        // two rows of the same films under different headings is one row too many.
+        val because = becauseYouWatched(items, history, marks)
+        val claimed = because?.items?.map { it.id }?.toSet() ?: emptySet()
+
+        val suggested = recommend(items, history, marks, now).filter { it.id !in claimed }
         if (suggested.isNotEmpty()) rows.add(Row("recommended", "מומלץ בשבילך", suggested))
 
-        becauseYouWatched(items, history, marks)?.let {
+        because?.let {
             rows.add(Row("because:${it.seed.id}", "כי צפית ב־${it.seed.name}", it.items))
         }
 

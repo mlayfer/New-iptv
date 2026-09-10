@@ -308,9 +308,13 @@ check("unticking clears them again", (await page.locator(".episodeCard.seen").co
 await page.evaluate(() => {
   const now = Date.now();
   localStorage.setItem("talohimWatchedV1", JSON.stringify([]));
+  // Two finished films in two different categories, so the taste has something
+  // to be a taste about.
   localStorage.setItem("talohimHistoryV1", JSON.stringify([
     { id: "v5000", at: now, position: 5900, duration: 6000,
       card: { id: "v5000", name: "סרט 1", group: "חדש בקולנוע", kind: "VOD", contentType: "MOVIE" } },
+    { id: "v5001", at: now - 60000, position: 5900, duration: 6000,
+      card: { id: "v5001", name: "סרט 2", group: "אקשן", kind: "VOD", contentType: "MOVIE" } },
   ]));
 });
 await page.reload();
@@ -322,6 +326,13 @@ check("the home screen suggests what to watch next",
   tasteRows.some((r) => r.includes("מומלץ בשבילך")), tasteRows.join(" | "));
 check("and says which title it is reasoning from",
   tasteRows.some((r) => r.includes("כי צפית ב")), tasteRows.join(" | "));
+const suggested = await page.locator('#homeRows .cardRow').first()
+  .locator('.cardName').allTextContents();
+const named = await page.locator('#homeRows .cardRow').nth(1)
+  .locator('.cardName').allTextContents();
+check("the two suggestion rows do not offer the same titles twice",
+  suggested.every((t) => !named.includes(t)),
+  `${suggested.length} suggested, ${named.length} named`);
 check("what was finished is not offered as unfinished",
   !tasteRows.some((r) => r.includes("המשך לצפות")), tasteRows.join(" | "));
 check("a finished title is ticked on its card",

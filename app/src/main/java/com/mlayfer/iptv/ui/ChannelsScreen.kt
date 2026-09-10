@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -812,13 +811,15 @@ private fun ChannelRow(
 
         if (onToggleWatched != null) {
             IconButton(onClick = onToggleWatched) {
+                // The same tick either way: lit when it is done, faint when it
+                // is an invitation to tick it.
                 Icon(
-                    imageVector = if (seen == true) Icons.Default.Check else Icons.Default.Remove,
+                    imageVector = Icons.Default.Check,
                     contentDescription = if (seen == true) "סמן כלא נצפה" else "סמן כנצפה",
                     tint = if (seen == true) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     },
                 )
             }

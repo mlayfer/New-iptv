@@ -447,10 +447,15 @@
     if (favs.length) rows.push({ key: 'favorites', title: 'המועדפים שלי', items: favs });
 
     // What to watch next, before the catalogue starts talking about itself.
-    const suggested = recommend(input);
+    // The named row explains itself, so it wins any title the two both want:
+    // two rows of the same films under different headings is one row too many.
+    const because = becauseYouWatched(input);
+    const claimed = {};
+    if (because) because.items.forEach(function (item) { claimed[item.id] = true; });
+
+    const suggested = recommend(input).filter(function (item) { return !claimed[item.id]; });
     if (suggested.length) rows.push({ key: 'recommended', title: 'מומלץ בשבילך', items: suggested });
 
-    const because = becauseYouWatched(input);
     if (because) {
       rows.push({
         key: 'because:' + because.seed.id,
