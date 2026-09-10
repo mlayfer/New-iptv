@@ -18,6 +18,7 @@ import com.mlayfer.iptv.ui.HomeScreen
 import com.mlayfer.iptv.ui.LocalIsTv
 import com.mlayfer.iptv.ui.Screen
 import com.mlayfer.iptv.ui.SourcesScreen
+import com.mlayfer.iptv.ui.TitleScreen
 import com.mlayfer.iptv.ui.TelohimTheme
 import com.mlayfer.iptv.ui.UiState
 import org.junit.Rule
@@ -150,10 +151,33 @@ class ScreenshotTest {
     }
 
     @Test
-    fun `the series library`() {
+    fun `the series shelf`() {
         shoot("5-series") {
-            ChannelsScreen(
-                catalogue().copy(screen = Screen.CHANNELS, catalog = Catalog.SERIES),
+            HomeScreen(
+                catalogue().copy(screen = Screen.HOME, catalog = Catalog.SERIES),
+                viewModel,
+            )
+        }
+    }
+
+    @Test
+    fun `a series page`() {
+        val episodes = (1..10).map { i ->
+            Channel(
+                id = "e$i",
+                name = "ניתוק - S01E%02d - פרק".format(i),
+                url = "http://example.test/e$i",
+                kind = ChannelKind.VOD,
+                group = "עונה 1",
+            )
+        }
+        shoot("6-title") {
+            TitleScreen(
+                catalogue().copy(
+                    screen = Screen.TITLE,
+                    openSeries = Series(id = "s1", name = "ניתוק (2022)", group = "דרמה"),
+                    episodes = episodes,
+                ),
                 viewModel,
             )
         }

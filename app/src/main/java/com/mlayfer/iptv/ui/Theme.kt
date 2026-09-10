@@ -6,6 +6,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 
 // The same palette the Tizen build uses: near-black ground, one blue accent that
 // doubles as the focus colour, so both apps read as the same product.
@@ -36,8 +37,13 @@ fun TelohimTheme(content: @Composable () -> Unit) {
         // so an unnamed colour meant black on black: the row headings, the
         // poster captions and the title over the door were all invisible.
         // Naming it once at the root is the whole fix.
+        // Tizen's canvas is 1920 wide, so its pixel is a dp on a 960dp
+        // television; a phone gets the same proportions drawn larger, because it
+        // is read at arm's length and not from a sofa.
+        val wide = LocalConfiguration.current.screenWidthDp >= 600
         CompositionLocalProvider(
             LocalContentColor provides DarkScheme.onBackground,
+            LocalTzScale provides if (LocalIsTv.current || wide) 0.5f else 0.8f,
             content = content,
         )
     }

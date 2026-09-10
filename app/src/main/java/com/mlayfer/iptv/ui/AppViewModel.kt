@@ -28,7 +28,7 @@ enum class Catalog { ALL, LIVE, MOVIES, SERIES }
  * Television and the library are two different products behind one door, and
  * the app opens on the choice. The same shape as the Tizen build.
  */
-enum class Screen { CHOOSE, HOME, CHANNELS, SOURCES }
+enum class Screen { CHOOSE, HOME, CHANNELS, TITLE, SOURCES }
 
 data class UiState(
     val playlists: List<Playlist> = emptyList(),
@@ -372,7 +372,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val id = card.id.removePrefix("series:")
             val match = _state.value.series.firstOrNull { it.id == id } ?: return
             _state.value = _state.value.copy(
-                screen = Screen.CHANNELS,
+                screen = Screen.TITLE,
                 catalog = Catalog.SERIES,
                 view = ListView.ALL,
                 query = "",
@@ -384,12 +384,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val channel = _state.value.channels.firstOrNull { it.id == card.id }
             ?: _state.value.episodes.firstOrNull { it.id == card.id }
             ?: return
+        val live = channel.kind == ChannelKind.LIVE
         _state.value = _state.value.copy(
-            screen = Screen.CHANNELS,
-            catalog = if (channel.kind == ChannelKind.LIVE) Catalog.LIVE else Catalog.MOVIES,
+            // A channel is a place you arrive at; a film is a thing you decide
+            // about first, so it gets its page rather than the guide.
+            screen = if (live) Screen.CHANNELS else Screen.TITLE,
+            catalog = if (live) Catalog.LIVE else Catalog.MOVIES,
             view = ListView.ALL,
             query = "",
             group = null,
+            openSeries = null,
+            episodes = emptyList(),
         )
         select(channel)
     }
@@ -523,6 +528,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val target = when {
             current.screen == Screen.CHANNELS && current.catalog == Catalog.LIVE -> Screen.CHOOSE
             current.screen == Screen.CHANNELS -> Screen.HOME
+            current.screen == Screen.TITLE -> Screen.HOME
             else -> Screen.CHOOSE
         }
         setScreen(target)
