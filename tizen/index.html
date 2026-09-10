@@ -146,14 +146,16 @@
             <div class="detailFacts" id="detailFacts"></div>
             <div class="detailPlot" id="detailPlot"></div>
             <div class="detailActions" id="detailActions">
-              <button class="focusable ctrlBtn ctrlMain" id="detailPlay" data-nav="detailAction">צפה</button>
-              <button class="focusable ctrlBtn" id="detailFavorite" data-nav="detailAction">הוסף למועדפים</button>
-              <button class="focusable ctrlBtn" id="detailWatched" data-nav="detailAction">סמן כנצפה</button>
+              <button class="focusable detailBtn detailMain" id="detailPlay" data-nav="detailAction">צפה</button>
+              <button class="focusable detailBtn" id="detailFavorite" data-nav="detailAction">הוסף למועדפים</button>
+              <button class="focusable detailBtn" id="detailWatched" data-nav="detailAction">סמן כנצפה</button>
             </div>
-            <div class="seasonStrip hidden" id="seasonStrip"></div>
           </div>
         </div>
-        <div class="episodeStrip hidden" id="episodeStrip"></div>
+        <div class="detailBelow">
+          <div class="seasonList hidden" id="seasonStrip"></div>
+          <div class="episodeGrid hidden" id="episodeStrip"></div>
+        </div>
       </div>
 
       <div id="vodScreen" class="hidden vodLayout">

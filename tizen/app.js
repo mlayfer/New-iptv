@@ -833,10 +833,23 @@ function renderEpisodes(){
     card.className = 'focusable episodeCard';
     card.dataset.nav = 'episode';
     card.dataset.index = String(index);
-    card.innerHTML = '<div class="episodeName"></div><div class="episodeMeta"></div>';
+    card.innerHTML = '<div class="episodeArt"><div class="episodeNum"></div></div>' +
+      '<div class="episodeName"></div><div class="episodeMeta"></div>';
     const seen = isSeen(episode);
     if(seen) card.classList.add('seen');
-    $('.episodeName', card).textContent = (seen ? '✓ ' : '') + episode.name;
+    // The still the portal sends for the episode, and the series poster when it
+    // sends none — a card with a hole in it is worse than a repeated picture.
+    const art = $('.episodeArt', card);
+    const num = $('.episodeNum', art);
+    if(episode.logo){
+      const img = document.createElement('img');
+      img.src = episode.logo;
+      img.alt = '';
+      img.addEventListener('error', () => { img.remove(); });
+      art.insertBefore(img, num);
+    }
+    num.textContent = (seen ? '✓ ' : '') + 'פרק ' + (index + 1);
+    $('.episodeName', card).textContent = episode.name;
     const entry = state.history.find(x => x.id === episode.id);
     $('.episodeMeta', card).textContent = seen ? 'נצפה'
       : (entry && Core.isResumable(entry) ? 'המשך מ-' + formatClock(entry.position) : episode.group);
@@ -900,6 +913,35 @@ function closeDetail(){
   focusHome();
 }
 
+/**
+ * Up and down across a grid that wraps.
+ *
+ * How many cards fit on a line is a question only the layout can answer, so it
+ * is asked of the layout: the cards are grouped by the line they landed on, and
+ * the move goes to whichever card in the next line sits closest across.
+ */
+function stepGrid(items, active, dir){
+  if(!items.length) return null;
+  const rows = [];
+  items.forEach(function(el){
+    const top = Math.round(el.offsetTop);
+    let row = rows.find(function(r){ return Math.abs(r.top - top) < 8; });
+    if(!row){ row = { top: top, items: [] }; rows.push(row); }
+    row.items.push(el);
+  });
+  rows.sort(function(a, b){ return a.top - b.top; });
+
+  const at = rows.findIndex(function(r){ return r.items.indexOf(active) !== -1; });
+  if(at === -1) return null;
+  const target = rows[at + (dir === 'down' ? 1 : -1)];
+  if(!target) return null;
+
+  const x = active.offsetLeft;
+  return target.items.reduce(function(best, el){
+    return Math.abs(el.offsetLeft - x) < Math.abs(best.offsetLeft - x) ? el : best;
+  }, target.items[0]);
+}
+
 function navDetail(active, dir){
   const type = active && active.dataset ? active.dataset.nav : null;
   const actions = visible('[data-nav="detailAction"]');
@@ -912,13 +954,26 @@ function navDetail(active, dir){
     return active;
   }
   if(type === 'season'){
-    if(dir === 'left' || dir === 'right') return moveRtlRow(seasons, active, dir) || active;
-    if(dir === 'up') return actions[0] || active;
-    if(dir === 'down') return episodes[0] || active;
+    // The seasons are a column now, so up and down walk them; left leads out to
+    // the episodes, which sit beside them.
+    if(dir === 'up' || dir === 'down'){
+      const at = seasons.indexOf(active);
+      const next = seasons[at + (dir === 'down' ? 1 : -1)];
+      if(next) return next;
+      return dir === 'up' ? (actions[0] || active) : active;
+    }
+    if(dir === 'left') return episodes[0] || active;
     return active;
   }
   if(type === 'episode'){
-    if(dir === 'left' || dir === 'right') return moveRtlRow(episodes, active, dir) || active;
+    if(dir === 'left' || dir === 'right'){
+      const next = moveRtlRow(episodes, active, dir);
+      // Off the right-hand end of a line is out of the grid altogether.
+      if(next) return next;
+      return dir === 'right' ? (seasons[0] || actions[0] || active) : active;
+    }
+    const across = stepGrid(episodes, active, dir);
+    if(across) return across;
     if(dir === 'up') return seasons[0] || actions[0] || active;
     return active;
   }
