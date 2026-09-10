@@ -1,0 +1,21 @@
+<!-- A caption box with two lines of text: the subtitle picker. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="2"
+        android:pathData="M5,5h14a2.5,2.5 0 0 1 2.5,2.5v9a2.5,2.5 0 0 1 -2.5,2.5H5a2.5,2.5 0 0 1 -2.5,-2.5v-9A2.5,2.5 0 0 1 5,5z" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M6,9h8v2h-8z" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M6,13h5.5v2h-5.5z" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M13,13h5v2h-5z" />
+</vector>

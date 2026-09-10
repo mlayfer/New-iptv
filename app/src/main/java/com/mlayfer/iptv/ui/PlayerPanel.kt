@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -21,6 +22,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +48,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -59,6 +63,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.media3.common.C
+import androidx.media3.common.Tracks
+import com.mlayfer.iptv.R
+import com.mlayfer.iptv.data.TrackChoices
 import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Http
@@ -132,6 +140,13 @@ fun PlayerPanel(
     var diagnosing by remember { mutableStateOf(false) }
     var report by remember { mutableStateOf<String?>(null) }
     var buffering by remember { mutableStateOf(false) }
+    // What the stream turned out to carry. Read from the player rather than
+    // guessed, because it only knows once the stream is open.
+    var tracks by remember { mutableStateOf<Tracks>(Tracks.EMPTY) }
+    var trackMenu by remember { mutableStateOf<Int?>(null) }
+    // Whether subtitles are off is a setting on the player, not a snapshot the
+    // UI is watching; kept here so the icon reflects it the moment it changes.
+    var subsOff by remember { mutableStateOf(false) }
     var retries by remember { mutableIntStateOf(0) }
     var reloadToken by remember { mutableIntStateOf(0) }
     // Every way this channel might be reachable, in the order worth trying.
@@ -193,6 +208,11 @@ fun PlayerPanel(
                         ?.let { currentQueue.getOrNull(it + 1) }
                     if (next != null) currentPlayItem(next)
                 }
+            }
+
+            override fun onTracksChanged(available: Tracks) {
+                tracks = available
+                subsOff = TrackChoices.subtitlesOff(player)
             }
 
             override fun onPlayerError(e: PlaybackException) {
@@ -413,6 +433,64 @@ fun PlayerPanel(
             IconButton(onClick = onNext) {
                 Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "$unit הבא")
             }
+
+            // Offered only when the stream actually carries a choice; a button
+            // that opens an empty list is worse than no button.
+            val audio = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_AUDIO) }
+            val subs = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_TEXT) }
+
+            if (audio.size > 1) {
+                Box {
+                    IconButton(onClick = { trackMenu = C.TRACK_TYPE_AUDIO }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_audio_track),
+                            contentDescription = "שמע",
+                        )
+                    }
+                    TrackMenu(
+                        open = trackMenu == C.TRACK_TYPE_AUDIO,
+                        choices = audio,
+                        offLabel = null,
+                        offSelected = false,
+                        onDismiss = { trackMenu = null },
+                        onPick = { TrackChoices.choose(player, tracks, C.TRACK_TYPE_AUDIO, it); trackMenu = null },
+                        onOff = {},
+                    )
+                }
+            }
+
+            if (subs.isNotEmpty()) {
+                Box {
+                    IconButton(onClick = { trackMenu = C.TRACK_TYPE_TEXT }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_subtitles),
+                            contentDescription = "כתוביות",
+                            tint = if (subsOff) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        )
+                    }
+                    TrackMenu(
+                        open = trackMenu == C.TRACK_TYPE_TEXT,
+                        choices = subs,
+                        offLabel = "בלי כתוביות",
+                        offSelected = subsOff,
+                        onDismiss = { trackMenu = null },
+                        onPick = {
+                            TrackChoices.choose(player, tracks, C.TRACK_TYPE_TEXT, it)
+                            subsOff = false
+                            trackMenu = null
+                        },
+                        onOff = {
+                            TrackChoices.turnOff(player, C.TRACK_TYPE_TEXT)
+                            subsOff = true
+                            trackMenu = null
+                        },
+                    )
+                }
+            }
         }
 
         if (!fullscreen && now != null) {
@@ -562,4 +640,44 @@ private fun progressOf(programme: Programme): Float {
     if (span <= 0f) return 0f
     val done = (System.currentTimeMillis() - programme.start) / span
     return done.coerceIn(0f, 1f)
+}
+
+/**
+ * The list behind the sound and subtitle buttons. Short enough that a dropdown
+ * beats a dialog, and the one in use carries a tick so you can see where you
+ * are without reading every line.
+ */
+@Composable
+private fun TrackMenu(
+    open: Boolean,
+    choices: List<TrackChoices.Choice>,
+    /** Non-null only for subtitles: sound cannot be switched off. */
+    offLabel: String?,
+    offSelected: Boolean,
+    onDismiss: () -> Unit,
+    onPick: (TrackChoices.Choice) -> Unit,
+    onOff: () -> Unit,
+) {
+    DropdownMenu(expanded = open, onDismissRequest = onDismiss) {
+        if (offLabel != null) {
+            DropdownMenuItem(
+                text = { Text(offLabel) },
+                onClick = onOff,
+                leadingIcon = {
+                    if (offSelected) Icon(Icons.Default.Check, contentDescription = null)
+                },
+            )
+        }
+        choices.forEach { choice ->
+            DropdownMenuItem(
+                text = { Text(choice.label) },
+                onClick = { onPick(choice) },
+                leadingIcon = {
+                    if (choice.selected && !offSelected) {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                    }
+                },
+            )
+        }
+    }
 }
