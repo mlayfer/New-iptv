@@ -11,6 +11,7 @@ fun AppRoot(viewModel: AppViewModel = viewModel()) {
 
     when (state.screen) {
         Screen.SOURCES -> SourcesScreen(state, viewModel)
+        Screen.CHOOSE -> ChooseScreen(state, viewModel)
         Screen.HOME -> HomeScreen(state, viewModel)
         Screen.CHANNELS -> ChannelsScreen(state, viewModel)
     }

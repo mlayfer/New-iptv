@@ -77,9 +77,9 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
     var fullscreen by remember { mutableStateOf(false) }
     BackHandler(enabled = fullscreen) { fullscreen = false }
     BackHandler(enabled = !fullscreen && state.openSeries != null) { viewModel.closeSeries() }
-    // Back out of a catalogue lands on the home screen, not out of the app.
+    // Back retraces the way in — to the library's home, or out to the door.
     BackHandler(enabled = !fullscreen && state.openSeries == null) {
-        viewModel.setScreen(Screen.HOME)
+        viewModel.back()
     }
     ImmersiveWhileFullscreen(fullscreen)
 
@@ -278,7 +278,7 @@ private fun TopBar(state: UiState, viewModel: AppViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(
-                onClick = { viewModel.setScreen(Screen.HOME) },
+                onClick = { viewModel.back() },
                 modifier = Modifier.focusHighlight(),
             ) {
                 Text(text = "טלוהים", style = MaterialTheme.typography.titleMedium)

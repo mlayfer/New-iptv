@@ -1,5 +1,6 @@
 package com.mlayfer.iptv.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +52,9 @@ import com.mlayfer.iptv.data.HomeRows
  */
 @Composable
 fun HomeScreen(state: UiState, viewModel: AppViewModel) {
+    // The library's home is one step in from the door, not the way out.
+    BackHandler { viewModel.setScreen(Screen.CHOOSE) }
+
     // Building the cards walks the whole catalogue — nineteen thousand of them
     // on a real subscription — so it happens when the catalogue changes and not
     // once a frame.
@@ -141,13 +145,6 @@ private fun HomeTopBar(state: UiState, viewModel: AppViewModel) {
         Spacer(Modifier.width(16.dp))
         TextButton(
             onClick = {
-                viewModel.setCatalog(Catalog.LIVE)
-                viewModel.setScreen(Screen.CHANNELS)
-            },
-            modifier = Modifier.focusHighlight(),
-        ) { Text("ערוצים") }
-        TextButton(
-            onClick = {
                 viewModel.setCatalog(Catalog.MOVIES)
                 viewModel.setScreen(Screen.CHANNELS)
             },
@@ -161,6 +158,11 @@ private fun HomeTopBar(state: UiState, viewModel: AppViewModel) {
             modifier = Modifier.focusHighlight(),
         ) { Text("סדרות") }
         Spacer(Modifier.weight(1f))
+        // Live television is a world of its own, reached through the door.
+        TextButton(
+            onClick = { viewModel.setScreen(Screen.CHOOSE) },
+            modifier = Modifier.focusHighlight(),
+        ) { Text("טלוויזיה") }
         TextButton(
             onClick = { viewModel.setScreen(Screen.SOURCES) },
             modifier = Modifier.focusHighlight(),
@@ -176,10 +178,11 @@ private fun HomeTopBar(state: UiState, viewModel: AppViewModel) {
 @Composable
 private fun CatalogSummary(cards: List<HomeRows.Card>, notes: List<String>) {
     if (cards.isEmpty()) return
+    // Channels are counted on the door; this is the library, so count the library.
     val counts = remember(cards) {
         val live = cards.count { it.kind == "LIVE" }
         val series = cards.count { it.contentType == "SERIES" }
-        "$live ערוצים · ${cards.size - live - series} סרטים · $series סדרות"
+        "${cards.size - live - series} סרטים · $series סדרות"
     }
     val trouble = notes.joinToString(" · ")
 

@@ -24,7 +24,11 @@ enum class ListView { ALL, FAVORITES, RECENT }
 /** What the list is showing: everything, live TV, films, or series. */
 enum class Catalog { ALL, LIVE, MOVIES, SERIES }
 
-enum class Screen { HOME, CHANNELS, SOURCES }
+/**
+ * Television and the library are two different products behind one door, and
+ * the app opens on the choice. The same shape as the Tizen build.
+ */
+enum class Screen { CHOOSE, HOME, CHANNELS, SOURCES }
 
 data class UiState(
     val playlists: List<Playlist> = emptyList(),
@@ -72,7 +76,8 @@ data class UiState(
      */
     val homeRows: List<HomeRows.Row>
         get() = HomeRows.build(
-            items = homeCards,
+            // Channels have a guide of their own; the library's home is its own.
+            items = homeCards.filter { it.kind != "LIVE" },
             history = recent.map {
                 HomeRows.Entry(it.channelId, it.at, it.position, it.duration)
             },
@@ -150,7 +155,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             activeId = active,
             favorites = store.favorites,
             recent = store.recent,
-            screen = if (playlists.isEmpty()) Screen.SOURCES else Screen.HOME,
+            screen = if (playlists.isEmpty()) Screen.SOURCES else Screen.CHOOSE,
         )
         active?.let { selectPlaylist(it) }
     }
@@ -414,6 +419,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setScreen(screen: Screen) {
         _state.value = _state.value.copy(screen = screen, addError = null)
+    }
+
+    /** Entering a world shows only what belongs to it. */
+    fun enterWorld(catalog: Catalog) {
+        setCatalog(catalog)
+        setScreen(if (catalog == Catalog.LIVE) Screen.CHANNELS else Screen.HOME)
+    }
+
+    /**
+     * Back retraces the way in: out of a catalogue to the library's home, and
+     * out of live television or the library to the door.
+     */
+    fun back() {
+        val current = _state.value
+        val target = when {
+            current.screen == Screen.CHANNELS && current.catalog == Catalog.LIVE -> Screen.CHOOSE
+            current.screen == Screen.CHANNELS -> Screen.HOME
+            else -> Screen.CHOOSE
+        }
+        setScreen(target)
     }
 
     fun clearAddError() {
