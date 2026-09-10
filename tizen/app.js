@@ -1611,16 +1611,32 @@ function beginEdit(el){
   try { const v = el.value; el.value = ''; el.value = v; } catch(e) {}
 }
 
-function endEdit(){
+/**
+ * Leaving a field. `advance` hands over the next one to fill in, which is what
+ * closing the keyboard means in practice — the text is already in the field, so
+ * there is nothing to cancel by staying on it.
+ */
+function endEdit(advance){
   const el = state.editingEl;
   state.editingEl = null;
   if(!el) return;
-  // Back means "leave this field alone", so the highlight stays on it.
-  state.editExit = 'back';
+  state.editExit = 'handled';
   el.setAttribute('readonly', 'readonly');
   try { el.blur(); } catch(e) {}
-  setFocus(el);
   state.editExit = null;
+  if(advance === false){ setFocus(el); return; }
+  focusNextField(el);
+}
+
+/** The next thing to fill in, or the button that uses what was filled in. */
+function focusNextField(el){
+  const fields = editableFields().filter(isVisible);
+  const next = fields[fields.indexOf(el) + 1];
+  if(next){ setFocus(next); return; }
+  const submit = visible('.bigBtn')[0];
+  if(submit){ setFocus(submit); return; }
+  setFocus(el);
+  moveFocus('down');
 }
 
 /**
@@ -1629,19 +1645,10 @@ function endEdit(){
  * address in order to stand on it afterwards.
  */
 function afterKeyboardClosed(el){
-  if(state.editExit === 'back') return;
+  if(state.editExit === 'handled') return;
   setTimeout(() => {
     if(state.editingEl) return;
-    // The next thing to fill in, not the next thing in the tab order: after
-    // typing an address nobody wants to land on the list of suggested ones.
-    const fields = editableFields().filter(isVisible);
-    const next = fields[fields.indexOf(el) + 1];
-    if(next){ setFocus(next); return; }
-    // The last field hands over the button that uses it.
-    const submit = visible('.bigBtn')[0];
-    if(submit){ setFocus(submit); return; }
-    setFocus(el);
-    moveFocus('down');
+    focusNextField(el);
   }, 60);
 }
 
@@ -1753,8 +1760,18 @@ function wireStatic(){
     const code = e.keyCode;
 
     // While the keyboard is open it owns the remote, except for the way out.
+    //
+    // A Samsung keyboard does not report that it closed — no blur, no event —
+    // so the app cannot wait for one. What it does send is 65376 when "done"
+    // is pressed and 65385 when the keyboard is cancelled, and Back always
+    // arrives. All three end the field; only an explicit cancel stays on it.
     if(isEditing()){
-      if(code === 10009 || e.key === 'Escape'){ endEdit(); e.preventDefault(); }
+      if(code === 65385){ endEdit(false); e.preventDefault(); return; }
+      if(code === 65376 || code === 10009 || e.key === 'Escape'){
+        endEdit(true);
+        e.preventDefault();
+        return;
+      }
       return;
     }
     if(e.key === 'ArrowLeft' || code === 37){ moveFocus('left'); e.preventDefault(); return; }
