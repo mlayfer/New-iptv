@@ -44,7 +44,7 @@ button,input{font-family:inherit;color:inherit}
   background-color:var(--accent-soft)!important}
 /* Anything already carrying the accent as a fill keeps it, and says "focused"
    with a white ring instead — a tint over a fill only ruins the contrast. */
-.primary.focused,.sourceTab.active.focused,.groupChip.active.focused{
+.primary.focused,.sourceTab.active.focused,.groupChip.active.focused,.ctrlBtn.ctrlMain.focused{
   background-color:var(--accent)!important;color:#04142e;border-color:#fff!important;
   box-shadow:0 0 0 4px #ffffff, 0 0 40px rgba(77,155,255,.55)}
 
@@ -152,7 +152,12 @@ html.avplayOn body,
 html.avplayOn #app,
 html.avplayOn .playerScreen,
 html.avplayOn .playerStage{background:transparent!important;background-image:none!important}
-html.avplayOn #browseScreen{visibility:hidden}
+
+/* While something is playing, nothing else is on screen. The top bar lives
+   outside the browsing screen, so hiding that one alone left it over the film. */
+body.playerOpen .topbar{display:none}
+body.playerOpen #browseScreen{visibility:hidden}
+body.playerOpen #app{padding:0}
 .playerStage{position:absolute;inset:0;background:#000}
 .playerStage object,.playerStage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
 #htmlVideo{display:none}

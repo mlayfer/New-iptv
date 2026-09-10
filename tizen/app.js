@@ -776,6 +776,7 @@ function openPlayer(item, returnTo){
   state.controlsOpen = false;
   state.pendingSeek = null;
   closeTrackPanel();
+  document.body.classList.add('playerOpen');
   $('#playerScreen').classList.remove('hidden');
   describePlayer(item);
   renderControls();
@@ -792,8 +793,8 @@ function describePlayer(item){
   $('#ovBadge').classList.toggle('hidden', !live);
   $('#scrubRow').classList.toggle('hidden', live);
   text($('#ovHint'), live
-    ? 'מעלה/מטה — ערוץ · אישור — פקדים · צהוב — מועדפים · Back — יציאה'
-    : 'ימין/שמאל — דילוג 10 שניות · מטה — פקדים · אישור — נגן/השהה · Back — יציאה');
+    ? 'מעלה/מטה — ערוץ · אישור — הפקדים · צהוב — מועדפים · Back — יציאה'
+    : 'ימין/שמאל — דילוג · מטה — הפקדים · אישור — נגן/השהה · Back — יציאה');
   renderProgress();
 }
 
@@ -828,7 +829,9 @@ function episodeNeighbour(step){
 function renderControls(){
   const row = $('#controlRow');
   if(!row) return;
-  row.classList.toggle('hidden', !state.controlsOpen);
+  // Whenever the bar is up the buttons are on it. Down (or OK) reaches them;
+  // hiding them until then meant nobody knew a player had controls at all.
+  row.classList.remove('hidden');
 
   const live = !onDemand();
   const show = (act, visible) => {
@@ -849,6 +852,12 @@ function openControls(){
   showOverlay();
   const first = $('#btnToggle');
   if(first && !first.classList.contains('hidden')) setFocus(first);
+}
+
+/** Any key wakes the bar; that is where you see what the player can do. */
+function wakePlayerUi(){
+  renderControls();
+  showOverlay();
 }
 
 function closeControls(){
@@ -1002,6 +1011,7 @@ function closePlayer(){
   state.controlsOpen = false;
   state.paused = false;
   closeTrackPanel();
+  document.body.classList.remove('playerOpen');
   rememberPosition();
   stopPlayback();
   if(state.progressTimer){ clearInterval(state.progressTimer); state.progressTimer = null; }
@@ -1186,6 +1196,7 @@ function backToHome(){
   if(!$('#playerScreen').classList.contains('hidden')){
     rememberPosition();
     stopPlayback();
+    document.body.classList.remove('playerOpen');
     $('#playerScreen').classList.add('hidden');
     state.current = null;
   }
@@ -1194,6 +1205,7 @@ function backToHome(){
 
 function resetToSetup(){
   stopPlayback();
+  document.body.classList.remove('playerOpen');
   $('#playerScreen').classList.add('hidden');
   $('#navLive').classList.add('hidden');
   $('#navVod').classList.add('hidden');
@@ -1460,7 +1472,7 @@ function navLive(active, dir){
  * Once the controls are open the same D-pad moves between them.
  */
 function navPlayer(active, dir){
-  showOverlay();
+  wakePlayerUi();
   const live = !onDemand();
 
   if(state.trackType){
@@ -1485,6 +1497,8 @@ function navPlayer(active, dir){
   // On a channel the D-pad stays what it is on a television: up and down are
   // the channel. On a film there is nothing to zap, so down opens the controls.
   if(live){
+    // Channel up and down stay what they are on a television. The buttons are
+    // on the bar in front of you; OK reaches them.
     if(dir === 'up') zap(-1);
     if(dir === 'down') zap(1);
     return null;
