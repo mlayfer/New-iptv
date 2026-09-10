@@ -292,9 +292,12 @@
     const marks = (input && input.marks) || [];
     const now = (input && input.now) || 0;
 
-    const byId = {};
-    items.forEach(function (item) { byId[item.id] = item; });
-    const seen = watchedSet(history, marks);
+    let byId = input && input.byId;
+    if (!byId) {
+      byId = {};
+      items.forEach(function (item) { byId[item.id] = item; });
+    }
+    const seen = (input && input.seen) || watchedSet(history, marks);
 
     const groups = {};
     const add = function (id, at, ratio) {
@@ -336,7 +339,9 @@
     const profile = taste(input);
     if (!profile.order.length) return [];
 
-    const seen = watchedSet(history, marks);
+    // Handed down by build() when it has one: three passes over nine thousand
+    // items, each working out the same answer, is two passes too many.
+    const seen = (input && input.seen) || watchedSet(history, marks);
     // Whatever is waiting in "continue watching" has its own row already.
     const resuming = {};
     history.forEach(function (entry) { if (isResumable(entry)) resuming[entry.id] = true; });
@@ -378,9 +383,12 @@
     const marks = (input && input.marks) || [];
     const limit = (input && input.limit) || 20;
 
-    const byId = {};
-    items.forEach(function (item) { byId[item.id] = item; });
-    const seen = watchedSet(history, marks);
+    let byId = input && input.byId;
+    if (!byId) {
+      byId = {};
+      items.forEach(function (item) { byId[item.id] = item; });
+    }
+    const seen = (input && input.seen) || watchedSet(history, marks);
 
     const ordered = history.slice().sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
     let seed = null;
@@ -417,6 +425,12 @@
 
     const byId = {};
     items.forEach(function (item) { byId[item.id] = item; });
+    // Worked out once here and handed to everything below.
+    const shared = {
+      items: items, history: history, favorites: favorites,
+      marks: (input && input.marks) || [], now: (input && input.now) || 0,
+      byId: byId, seen: watchedSet(history, (input && input.marks) || [])
+    };
 
     const ordered = history.slice().sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
     const favoriteSet = {};
@@ -449,11 +463,11 @@
     // What to watch next, before the catalogue starts talking about itself.
     // The named row explains itself, so it wins any title the two both want:
     // two rows of the same films under different headings is one row too many.
-    const because = becauseYouWatched(input);
+    const because = becauseYouWatched(shared);
     const claimed = {};
     if (because) because.items.forEach(function (item) { claimed[item.id] = true; });
 
-    const suggested = recommend(input).filter(function (item) { return !claimed[item.id]; });
+    const suggested = recommend(shared).filter(function (item) { return !claimed[item.id]; });
     if (suggested.length) rows.push({ key: 'recommended', title: 'מומלץ בשבילך', items: suggested });
 
     if (because) {
@@ -637,19 +651,72 @@
   const SEARCH_ROW_LIMIT = 40;
   const SEARCH_MIN_QUERY = 2;
 
-  function searchRows(items, query, limit) {
+  /**
+   * The same answer, prepared in advance.
+   *
+   * The sound-alike path costs a skeleton() per item, and it is paid again on
+   * every keystroke: on a real catalogue that is forty-eight milliseconds of
+   * arithmetic per letter on a desktop, and several times that on a television.
+   * None of it depends on the query — only on which alphabet the query is in —
+   * so all three answers are worked out once when the catalogue arrives.
+   *
+   * The row keeps the plain text too, so an indexed search never touches the
+   * item again.
+   */
+  function buildSearchIndex(items) {
+    return (items || []).map(function (item) {
+      const text = searchableText(item);
+      const words = String(text).split(/\s+/);
+      const notHe = [], notLa = [], notBoth = [];
+      words.forEach(function (word) {
+        const kind = scriptOf(word);
+        if (kind === 'none') return;
+        if (kind !== 'he') notHe.push(word);
+        if (kind !== 'la') notLa.push(word);
+        if (kind !== 'both') notBoth.push(word);
+      });
+      return {
+        item: item,
+        text: text,
+        he: skeleton(notHe.join(' ')),
+        la: skeleton(notLa.join(' ')),
+        both: skeleton(notBoth.join(' '))
+      };
+    });
+  }
+
+  /** The indexed twin of matchesQuery; the two must always agree. */
+  function matchesIndexed(row, q, wanted) {
+    if (!q) return false;
+    if (row.text.indexOf(q) !== -1) return true;
+    if (q.length < QUERY_MIN_FOR_SKELETON) return false;
+    if ((q.match(/[a-z\u0590-\u05ff]/g) || []).length < QUERY_MIN_FOR_SKELETON) return false;
+    if ((wanted.match(/[A-Z]/g) || []).length < SKELETON_MIN) return false;
+    const asked = scriptOf(q);
+    const against = asked === 'he' ? row.he : (asked === 'la' ? row.la : row.both);
+    return !!against && against.indexOf(wanted) !== -1;
+  }
+
+  function searchRows(items, query, limit, index) {
     const q = (query || '').trim().toLowerCase();
     if (q.length < SEARCH_MIN_QUERY) return [];
     const cap = limit || SEARCH_ROW_LIMIT;
 
     const live = [], movies = [], series = [];
     const wanted = skeleton(q);
-    (items || []).forEach(function (item) {
-      if (!matchesQuery(item, q, wanted)) return;
+    const take = function (item) {
       if (item.kind === 'LIVE') { if (live.length < cap) live.push(item); }
       else if (item.contentType === 'SERIES') { if (series.length < cap) series.push(item); }
       else if (movies.length < cap) movies.push(item);
-    });
+    };
+
+    if (index && index.length) {
+      index.forEach(function (row) { if (matchesIndexed(row, q, wanted)) take(row.item); });
+    } else {
+      (items || []).forEach(function (item) {
+        if (matchesQuery(item, q, wanted)) take(item);
+      });
+    }
 
     const rows = [];
     if (series.length) rows.push({ key: 'series', title: 'סדרות', items: series });
@@ -696,6 +763,8 @@
     recommend: recommend,
     becauseYouWatched: becauseYouWatched,
     searchRows: searchRows,
+    buildSearchIndex: buildSearchIndex,
+    matchesIndexed: matchesIndexed,
     skeleton: skeleton,
     matchesQuery: matchesQuery,
     scriptOf: scriptOf,

@@ -92,9 +92,11 @@ object HomeRows {
         history: List<Entry>,
         marks: List<String>,
         now: Long,
+        /** Handed down when the caller already has it. */
+        seen: Set<String>? = null,
     ): Taste {
         val byId = items.associateBy { it.id }
-        val seen = watchedSet(history, marks)
+        val seenSet = seen ?: watchedSet(history, marks)
         val groups = LinkedHashMap<String, Double>()
 
         fun add(id: String, at: Long, ratio: Double) {
@@ -107,7 +109,7 @@ object HomeRows {
         }
 
         for (entry in history) {
-            add(entry.id, entry.at, if (entry.id in seen) 1.0 else progressRatio(entry))
+            add(entry.id, entry.at, if (entry.id in seenSet) 1.0 else progressRatio(entry))
         }
         val inHistory = history.map { it.id }.toSet()
         for (id in marks) if (id !in inHistory) add(id, now, 1.0)
@@ -129,18 +131,19 @@ object HomeRows {
         marks: List<String>,
         now: Long,
         limit: Int = ROW_LIMIT,
+        /** Handed down when the caller already has it. */
+        seen: Set<String>? = null,
     ): List<Card> {
-        val profile = taste(items, history, marks, now)
+        val seenSet = seen ?: watchedSet(history, marks)
+        val profile = taste(items, history, marks, now, seenSet)
         if (profile.order.isEmpty()) return emptyList()
-
-        val seen = watchedSet(history, marks)
         // Whatever is waiting in "continue watching" has its own row already.
         val resuming = history.filter { isResumable(it) }.map { it.id }.toSet()
 
         val scored = items.asSequence()
             .withIndex()
             .filter { (_, card) ->
-                card.kind != "LIVE" && card.id !in seen && card.id !in resuming
+                card.kind != "LIVE" && card.id !in seenSet && card.id !in resuming
             }
             .mapNotNull { (index, card) ->
                 val score = profile.groups[card.group.ifBlank { NO_GROUP }] ?: 0.0
@@ -172,14 +175,16 @@ object HomeRows {
         history: List<Entry>,
         marks: List<String>,
         limit: Int = ROW_LIMIT,
+        /** Handed down when the caller already has it. */
+        seen: Set<String>? = null,
     ): Because? {
         val byId = items.associateBy { it.id }
-        val seen = watchedSet(history, marks)
+        val seenSet = seen ?: watchedSet(history, marks)
 
         var seed = history.sortedByDescending { it.at }
             .asSequence()
             .mapNotNull { byId[it.id] }
-            .firstOrNull { it.kind != "LIVE" && it.id in seen }
+            .firstOrNull { it.kind != "LIVE" && it.id in seenSet }
         // Nothing finished yet: fall back to what was marked by hand, newest last.
         if (seed == null) {
             seed = marks.asReversed().asSequence()
@@ -190,7 +195,7 @@ object HomeRows {
 
         val group = chosen.group.ifBlank { NO_GROUP }
         val near = items.asSequence()
-            .filter { it.id != chosen.id && it.kind != "LIVE" && it.id !in seen }
+            .filter { it.id != chosen.id && it.kind != "LIVE" && it.id !in seenSet }
             .filter { it.group.ifBlank { NO_GROUP } == group }
             .take(limit)
             .toList()
@@ -206,6 +211,9 @@ object HomeRows {
         now: Long = 0,
     ): List<Row> {
         val byId = items.associateBy { it.id }
+        // Worked out once here; the suggestion rows below would each build it
+        // again otherwise, over nine thousand items apiece.
+        val seenOnce = watchedSet(history, marks)
         val ordered = history.sortedByDescending { it.at }
         val favoriteSet = favorites.toSet()
         val rows = ArrayList<Row>()
@@ -226,10 +234,11 @@ object HomeRows {
         // What to watch next, before the catalogue starts talking about itself.
         // The named row explains itself, so it wins any title the two both want:
         // two rows of the same films under different headings is one row too many.
-        val because = becauseYouWatched(items, history, marks)
+        val because = becauseYouWatched(items, history, marks, seen = seenOnce)
         val claimed = because?.items?.map { it.id }?.toSet() ?: emptySet()
 
-        val suggested = recommend(items, history, marks, now).filter { it.id !in claimed }
+        val suggested = recommend(items, history, marks, now, seen = seenOnce)
+            .filter { it.id !in claimed }
         if (suggested.isNotEmpty()) rows.add(Row("recommended", "מומלץ בשבילך", suggested))
 
         because?.let {
@@ -256,11 +265,72 @@ object HomeRows {
     }
 
     /**
+     * The same answer, prepared in advance.
+     *
+     * The sound-alike path costs a skeleton() per item and pays it again on
+     * every keystroke — on a real catalogue that is tens of milliseconds per
+     * letter. None of it depends on the query, only on which alphabet the query
+     * is in, so all three answers are worked out once when the catalogue lands.
+     */
+    data class IndexRow(
+        val card: Card,
+        val text: String,
+        val he: String,
+        val la: String,
+        val both: String,
+    )
+
+    fun buildSearchIndex(items: List<Card>): List<IndexRow> = items.map { card ->
+        val text = Search.searchableText(card.name, card.group, card.alias)
+        val notHe = ArrayList<String>()
+        val notLa = ArrayList<String>()
+        val notBoth = ArrayList<String>()
+        for (word in text.split(WHITESPACE)) {
+            when (Search.scriptOf(word)) {
+                "none" -> {}
+                "he" -> { notLa.add(word); notBoth.add(word) }
+                "la" -> { notHe.add(word); notBoth.add(word) }
+                else -> { notHe.add(word); notLa.add(word) }
+            }
+        }
+        IndexRow(
+            card = card,
+            text = text,
+            he = Search.skeleton(notHe.joinToString(" ")),
+            la = Search.skeleton(notLa.joinToString(" ")),
+            both = Search.skeleton(notBoth.joinToString(" ")),
+        )
+    }
+
+    private val WHITESPACE = Regex("\\s+")
+
+    /** The indexed twin of Search.matches; the two must always agree. */
+    fun matchesIndexed(row: IndexRow, query: String, wanted: String): Boolean {
+        if (query.isEmpty()) return false
+        if (row.text.contains(query)) return true
+        if (query.length < 3) return false
+        if (query.count { it.isLetter() } < 3) return false
+        if (wanted.count { it in 'A'..'Z' } < 2) return false
+        val against = when (Search.scriptOf(query)) {
+            "he" -> row.he
+            "la" -> row.la
+            else -> row.both
+        }
+        return against.isNotEmpty() && against.contains(wanted)
+    }
+
+    /**
      * One box over the whole catalogue. A title someone remembers is not filed
      * under the section they happen to be standing in, so the search never asks
      * which one that is; results come back grouped by what they are.
      */
-    fun search(items: List<Card>, query: String, limit: Int = SEARCH_ROW_LIMIT): List<Row> {
+    fun search(
+        items: List<Card>,
+        query: String,
+        limit: Int = SEARCH_ROW_LIMIT,
+        /** Prepared answers; without them the catalogue is walked as before. */
+        index: List<IndexRow>? = null,
+    ): List<Row> {
         val q = query.trim().lowercase()
         if (q.length < SEARCH_MIN_QUERY) return emptyList()
 
@@ -268,13 +338,20 @@ object HomeRows {
         val movies = ArrayList<Card>()
         val series = ArrayList<Card>()
         val wanted = Search.skeleton(q)
-        for (item in items) {
-            val text = Search.searchableText(item.name, item.group, item.alias)
-            if (!Search.matches(text, q, wanted)) continue
+        fun take(item: Card) {
             when {
                 item.kind == "LIVE" -> if (live.size < limit) live.add(item)
                 item.contentType == "SERIES" -> if (series.size < limit) series.add(item)
                 else -> if (movies.size < limit) movies.add(item)
+            }
+        }
+
+        if (index != null && index.isNotEmpty()) {
+            for (row in index) if (matchesIndexed(row, q, wanted)) take(row.card)
+        } else {
+            for (item in items) {
+                val text = Search.searchableText(item.name, item.group, item.alias)
+                if (Search.matches(text, q, wanted)) take(item)
             }
         }
 

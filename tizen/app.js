@@ -43,6 +43,8 @@ const state = {
   // What you watched and what you marked — the home screen is built from these.
   history: [],
   favorites: [],
+  // Prepared answers for the search, filled in after the catalogue arrives.
+  searchIndex: null,
   // Titles and episodes ticked off by hand, and the set derived from those
   // plus whatever was played to the end.
   marks: [],
@@ -334,8 +336,41 @@ async function loadXtream(){
   }catch(e){ setError('שגיאה: ' + e.message); return false; }
 }
 
+/**
+ * Prepare the search index without stalling the screen.
+ *
+ * Working it out costs about a fifth of a second on a desktop and several times
+ * that on a television — one long freeze if it is done in a single go. So it is
+ * built a couple of thousand items at a time, between frames. A search that
+ * arrives before it is ready simply walks the catalogue itself: slower, and
+ * exactly as correct.
+ */
+const INDEX_CHUNK = 2000;
+let indexTimer = null;
+
+function buildSearchIndexSoon(){
+  if(indexTimer) clearTimeout(indexTimer);
+  state.searchIndex = null;
+  const items = state.items || [];
+  const out = [];
+  let at = 0;
+  const step = function(){
+    const slice = items.slice(at, at + INDEX_CHUNK);
+    if(!slice.length){
+      state.searchIndex = out;
+      indexTimer = null;
+      return;
+    }
+    Core.buildSearchIndex(slice).forEach(function (row) { out.push(row); });
+    at += INDEX_CHUNK;
+    indexTimer = setTimeout(step, 0);
+  };
+  indexTimer = setTimeout(step, 0);
+}
+
 function finishLoad(items){
   state.items = items;
+  buildSearchIndexSoon();
   state.current = null;
   state.mode = null;
   state.group = 'הכל';
@@ -986,7 +1021,7 @@ function renderSearch(){
   const box = $('#searchRows');
   if(!box) return;
   const query = ($('#globalSearch') && $('#globalSearch').value) || '';
-  state.search.rows = Core.searchRows(state.items, query);
+  state.search.rows = Core.searchRows(state.items, query, undefined, state.searchIndex);
   box.innerHTML = '';
 
   const count = $('#searchCount');

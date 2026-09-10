@@ -142,3 +142,28 @@ test('suggests nothing at all before there is anything to go on', () => {
   );
   assert.strictEqual(core.becauseYouWatched({ items: f.items, history: [], marks: [] }), null);
 });
+
+test('the prepared search answers exactly what walking the catalogue does', () => {
+  const names = ['ניתוק (2022)', 'Severance', 'ברייקינג באד', 'Breaking Bad', 'פאודה',
+    'Fauda', 'i24NEWS', 'כאן 11', 'ספורט 1', 'Game of Thrones', 'גיים אוף ת׳רונס',
+    'שטיסל', 'The Crown', 'הכתר', 'Moana 2', 'מוואנה 2', 'X-Men', 'אקס מן'];
+  const items = names.map((name, i) => ({
+    id: 'x' + i, name,
+    group: i % 2 ? 'דרמה' : 'Action',
+    kind: i % 5 === 0 ? 'LIVE' : 'VOD',
+    contentType: i % 3 ? 'MOVIE' : 'SERIES',
+  }));
+  const index = core.buildSearchIndex(items);
+  const ids = (rows) => rows.map((r) => [r.key, r.items.map((x) => x.id)]);
+
+  // Queries in both alphabets, one that mixes them, and ones that match nothing.
+  ['ניתוק', 'sev', 'severance', 'breaking', 'באד', 'i24', 'game', 'גיים',
+    'moana', 'מוואנה', 'x-men', 'אקס', 'הכתר', 'crown', 'zzz', 'ab', 'דרמה',
+  ].forEach((q) => {
+    assert.deepStrictEqual(
+      ids(core.searchRows(items, q, undefined, index)),
+      ids(core.searchRows(items, q)),
+      `the two paths disagreed on ${JSON.stringify(q)}`,
+    );
+  });
+});

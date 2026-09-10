@@ -317,4 +317,36 @@ class ParityTest {
         )
         assertNull(HomeRows.becauseYouWatched(items, emptyList(), emptyList()))
     }
+
+    @Test
+    fun `the prepared search answers exactly what walking the catalogue does`() {
+        val names = listOf(
+            "ניתוק (2022)", "Severance", "ברייקינג באד", "Breaking Bad", "פאודה",
+            "Fauda", "i24NEWS", "כאן 11", "ספורט 1", "Game of Thrones",
+            "גיים אוף ת׳רונס", "שטיסל", "The Crown", "הכתר", "Moana 2",
+            "מוואנה 2", "X-Men", "אקס מן",
+        )
+        val items = names.mapIndexed { i, name ->
+            HomeRows.Card(
+                id = "x$i",
+                name = name,
+                group = if (i % 2 == 1) "דרמה" else "Action",
+                kind = if (i % 5 == 0) "LIVE" else "VOD",
+                contentType = if (i % 3 != 0) "MOVIE" else "SERIES",
+            )
+        }
+        val index = HomeRows.buildSearchIndex(items)
+        fun ids(rows: List<HomeRows.Row>) = rows.map { it.key to it.items.map { c -> c.id } }
+
+        listOf(
+            "ניתוק", "sev", "severance", "breaking", "באד", "i24", "game", "גיים",
+            "moana", "מוואנה", "x-men", "אקס", "הכתר", "crown", "zzz", "ab", "דרמה",
+        ).forEach { q ->
+            assertEquals(
+                "the two paths disagreed on $q",
+                ids(HomeRows.search(items, q)),
+                ids(HomeRows.search(items, q, index = index)),
+            )
+        }
+    }
 }

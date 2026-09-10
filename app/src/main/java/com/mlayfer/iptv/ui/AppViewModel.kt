@@ -42,6 +42,8 @@ data class UiState(
     val recent: List<RecentEntry> = emptyList(),
     /** Ticked off by hand; newest last, so the order says which was last. */
     val watched: List<String> = emptyList(),
+    /** Prepared answers for the search, filled in once the catalogue lands. */
+    val searchIndex: List<HomeRows.IndexRow> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
     val query: String = "",
@@ -76,8 +78,8 @@ data class UiState(
      * The home screen, decided by the rules in HomeRows — the same ones the
      * Tizen app runs, so both open on the same thing.
      */
-    val homeRows: List<HomeRows.Row>
-        get() = HomeRows.build(
+    val homeRows: List<HomeRows.Row> by lazy {
+        HomeRows.build(
             // Channels have a guide of their own; the library's home is its own.
             items = homeCards.filter { it.kind != "LIVE" },
             history = historyEntries,
@@ -87,10 +89,17 @@ data class UiState(
             marks = watched,
             now = System.currentTimeMillis(),
         )
+    }
 
-    /** The catalogue plus anything remembered that is no longer in it. */
-    val homeCards: List<HomeRows.Card>
-        get() {
+    /**
+     * The catalogue plus anything remembered that is no longer in it.
+     *
+     * Worked out once for each state rather than on every read: a getter looks
+     * free at the call site and is twenty-three thousand map insertions behind
+     * it, and the screen reads this more than once per frame.
+     */
+    val homeCards: List<HomeRows.Card> by lazy {
+        run {
             val cards = LinkedHashMap<String, HomeRows.Card>()
             for (channel in channels) cards[channel.id] = channel.toCard()
             for (item in series) {
@@ -115,18 +124,19 @@ data class UiState(
                     logo = entry.logo,
                 )
             }
-            return cards.values.toList()
+            cards.values.toList()
         }
+    }
 
     /**
      * One answer to "have I seen this" — a hand-tick, or something played to
      * the end. Derived rather than stored, so the two can never disagree.
      */
-    val seen: Set<String>
-        get() = HomeRows.watchedSet(historyEntries, watched)
+    val seen: Set<String> by lazy { HomeRows.watchedSet(historyEntries, watched) }
 
-    private val historyEntries: List<HomeRows.Entry>
-        get() = recent.map { HomeRows.Entry(it.channelId, it.at, it.position, it.duration) }
+    private val historyEntries: List<HomeRows.Entry> by lazy {
+        recent.map { HomeRows.Entry(it.channelId, it.at, it.position, it.duration) }
+    }
 
     fun resumeFor(id: String): Long {
         val entry = recent.firstOrNull { it.channelId == id } ?: return 0
@@ -197,6 +207,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         load(playlist, force = true)
     }
 
+    /**
+     * Prepare the search once, in the background.
+     *
+     * Every keystroke would otherwise redo the same alphabet arithmetic for
+     * every item in the catalogue. It costs a fraction of a second to work out
+     * and nothing to reuse, and until it is ready the search simply walks the
+     * catalogue as it always did.
+     */
+    private fun indexSearchSoon() {
+        viewModelScope.launch {
+            val cards = _state.value.homeCards
+            val index = withContext(Dispatchers.Default) { HomeRows.buildSearchIndex(cards) }
+            // The catalogue may have been replaced while this was being built.
+            if (_state.value.homeCards === cards) {
+                _state.value = _state.value.copy(searchIndex = index)
+            }
+        }
+    }
+
     private fun load(playlist: Playlist, force: Boolean) {
         _state.value = _state.value.copy(loading = true, error = null)
         viewModelScope.launch {
@@ -208,7 +237,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     notes = parsed.notes,
                     loading = false,
                     error = null,
+                    searchIndex = emptyList(),
                 )
+                indexSearchSoon()
                 val guide = playlist.epgUrl?.takeIf { it.isNotBlank() } ?: parsed.epgUrl
                 if (guide != null) loadEpg(guide, force)
             } catch (e: Exception) {
@@ -259,7 +290,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     // Connecting a portal ends at the door, the same place a
                     // launch ends at — not halfway inside one of the worlds.
                     screen = Screen.CHOOSE,
+                    searchIndex = emptyList(),
                 )
+                indexSearchSoon()
                 val guide = playlist.epgUrl?.takeIf { it.isNotBlank() } ?: parsed.epgUrl
                 if (guide != null) loadEpg(guide, false)
             } catch (e: Exception) {

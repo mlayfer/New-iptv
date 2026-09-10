@@ -70,10 +70,10 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
     // draws the screen.
     val searching = query.trim().length >= 2
     val rows by filteredAsync(
-        home, query, cards,
+        home, query, cards, state.searchIndex,
         initial = home,
         immediate = !searching,
-    ) { if (searching) HomeRows.search(cards, query) else home }
+    ) { if (searching) HomeRows.search(cards, query, index = state.searchIndex) else home }
     var highlighted by remember { mutableStateOf<HomeRows.Card?>(null) }
     val seen = remember(state.recent, state.watched) { state.seen }
 
