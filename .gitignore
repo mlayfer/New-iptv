@@ -8,3 +8,7 @@ captures/
 .cxx/
 node_modules/
 package-lock.json
+
+# A signing key must never be committed; it arrives from a repository secret.
+*.jks
+*.keystore

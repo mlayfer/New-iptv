@@ -4,6 +4,27 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+/*
+ * Android will only install a new version over an old one when both were signed
+ * with the same key. A debug build is signed with the throwaway keystore Gradle
+ * makes on the spot, and a CI runner is a fresh machine every time — so every
+ * build came out signed by a different key, every install demanded an uninstall
+ * first, and an uninstall takes the sign-in details and the viewing history
+ * with it.
+ *
+ * With ANDROID_KEYSTORE_* set, the build signs with one key that stays the same
+ * from build to build and updates install straight over. Without them nothing
+ * changes, so a checkout with no secrets still builds.
+ */
+val signingStore: String? = System.getenv("ANDROID_KEYSTORE_FILE")
+val signingStorePassword: String? = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+val signingAlias: String? = System.getenv("ANDROID_KEY_ALIAS")
+val signingKeyPassword: String? = System.getenv("ANDROID_KEY_PASSWORD")
+val stableSigning = !signingStore.isNullOrBlank() &&
+    !signingStorePassword.isNullOrBlank() &&
+    !signingAlias.isNullOrBlank() &&
+    file(signingStore!!).exists()
+
 android {
     namespace = "com.mlayfer.iptv"
     compileSdk = 35
@@ -12,14 +33,33 @@ android {
         applicationId = "com.mlayfer.iptv"
         minSdk = 21
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Each build is a version of its own, so a phone can tell an update
+        // from a reinstall. A local build stays at 1.
+        versionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInt()
+        versionName = System.getenv("ANDROID_VERSION_NAME") ?: "1.0"
+    }
+
+    signingConfigs {
+        if (stableSigning) {
+            create("stable") {
+                storeFile = file(signingStore!!)
+                storePassword = signingStorePassword
+                keyAlias = signingAlias
+                // A key with no password of its own uses the store's.
+                keyPassword = signingKeyPassword?.takeIf { it.isNotBlank() } ?: signingStorePassword
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        debug {
+            // The build people actually install, so it is the one that needs a
+            // key that outlives the machine that built it.
+            if (stableSigning) signingConfig = signingConfigs.getByName("stable")
         }
     }
 
