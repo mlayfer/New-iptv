@@ -286,6 +286,48 @@ await page.keyboard.press("Backspace");
 await page.waitForTimeout(500);
 check("Back from the title returns to the catalogue", await shown("#vodScreen"));
 
+// ---- what has been seen, and what to watch next ----------------------------
+await page.locator('[data-nav="vodCard"]').first().click();
+await page.waitForTimeout(1200);
+const markLabel = await page.textContent("#detailWatched");
+check("a series is ticked off by the season, not as one lump",
+  markLabel.includes("העונה"), markLabel);
+await page.click("#detailWatched");
+await page.waitForTimeout(400);
+check("ticking a whole season ticks every episode",
+  (await page.locator(".episodeCard.seen").count()) > 0,
+  `${await page.locator(".episodeCard.seen").count()} episodes marked`);
+check("and the button now offers to untick it",
+  /לא נצפתה|לא נצפה/.test(await page.textContent("#detailWatched")),
+  await page.textContent("#detailWatched"));
+await page.click("#detailWatched");
+await page.waitForTimeout(400);
+check("unticking clears them again", (await page.locator(".episodeCard.seen").count()) === 0);
+
+// Watch one episode to the end, then look at what the home screen makes of it.
+await page.evaluate(() => {
+  const now = Date.now();
+  localStorage.setItem("talohimWatchedV1", JSON.stringify([]));
+  localStorage.setItem("talohimHistoryV1", JSON.stringify([
+    { id: "v5000", at: now, position: 5900, duration: 6000,
+      card: { id: "v5000", name: "סרט 1", group: "חדש בקולנוע", kind: "VOD", contentType: "MOVIE" } },
+  ]));
+});
+await page.reload();
+await page.waitForTimeout(2600);
+await page.click("#worldVod");
+await page.waitForTimeout(1400);
+const tasteRows = await page.locator("#homeRows .cardRowTitle").allTextContents();
+check("the home screen suggests what to watch next",
+  tasteRows.some((r) => r.includes("מומלץ בשבילך")), tasteRows.join(" | "));
+check("and says which title it is reasoning from",
+  tasteRows.some((r) => r.includes("כי צפית ב")), tasteRows.join(" | "));
+check("what was finished is not offered as unfinished",
+  !tasteRows.some((r) => r.includes("המשך לצפות")), tasteRows.join(" | "));
+check("a finished title is ticked on its card",
+  (await page.locator("#homeRows .seenTick").count()) > 0,
+  `${await page.locator("#homeRows .seenTick").count()} ticks`);
+
 // ---- search -----------------------------------------------------------------
 await page.click("#navSearch");
 await page.waitForTimeout(500);

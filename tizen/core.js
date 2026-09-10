@@ -254,6 +254,162 @@
     });
   }
 
+  /**
+   * What counts as seen: something you marked by hand, or something you played
+   * to the end. Both apps ask this the same way, because a tick on one screen
+   * has to mean a tick on the other.
+   */
+  function watchedSet(history, marks) {
+    const seen = {};
+    (marks || []).forEach(function (id) { if (id) seen[id] = true; });
+    (history || []).forEach(function (entry) {
+      if (!entry || !(entry.duration > 0) || !(entry.position > 0)) return;
+      if (entry.position > entry.duration * RESUME_MAX_RATIO) seen[entry.id] = true;
+    });
+    return seen;
+  }
+
+  /**
+   * A taste is just a weighted count of the categories you actually spend time
+   * in. Two things move the weight: how recently you watched (a month-old
+   * evening says less about tonight) and how much of it you got through — five
+   * minutes of a film is not a vote for it.
+   */
+  const TASTE_HALF_LIFE_MS = 21 * 24 * 60 * 60 * 1000;
+  const TASTE_FLOOR = 0.05;
+  const TASTE_BASE = 0.3;
+
+  function decayAt(at, now) {
+    const age = (now || 0) - (at || 0);
+    if (!(age > 0)) return 1;
+    const d = Math.pow(0.5, age / TASTE_HALF_LIFE_MS);
+    return d < TASTE_FLOOR ? TASTE_FLOOR : d;
+  }
+
+  function taste(input) {
+    const items = (input && input.items) || [];
+    const history = (input && input.history) || [];
+    const marks = (input && input.marks) || [];
+    const now = (input && input.now) || 0;
+
+    const byId = {};
+    items.forEach(function (item) { byId[item.id] = item; });
+    const seen = watchedSet(history, marks);
+
+    const groups = {};
+    const add = function (id, at, ratio) {
+      const item = byId[id];
+      // Channels are a different appetite from a film; they do not vote here.
+      if (!item || item.kind === 'LIVE') return;
+      const group = item.group || 'ללא קטגוריה';
+      const weight = decayAt(at, now) * (TASTE_BASE + (1 - TASTE_BASE) * ratio);
+      groups[group] = (groups[group] || 0) + weight;
+    };
+
+    history.forEach(function (entry) {
+      if (!entry) return;
+      const ratio = seen[entry.id] ? 1 : progressRatio(entry);
+      add(entry.id, entry.at, ratio);
+    });
+    // Something marked by hand with nothing in the history is still a full vote.
+    const inHistory = {};
+    history.forEach(function (e) { if (e) inHistory[e.id] = true; });
+    marks.forEach(function (id) { if (!inHistory[id]) add(id, now, 1); });
+
+    const order = Object.keys(groups).sort(function (a, b) {
+      const d = groups[b] - groups[a];
+      return d !== 0 ? d : (a < b ? -1 : (a > b ? 1 : 0));
+    });
+    return { groups: groups, order: order };
+  }
+
+  /**
+   * More of what you like, minus what you have already seen. Scored by taste,
+   * then capped per category — twenty titles from one shelf is a shelf, not a
+   * recommendation.
+   */
+  function recommend(input) {
+    const items = (input && input.items) || [];
+    const history = (input && input.history) || [];
+    const marks = (input && input.marks) || [];
+    const limit = (input && input.limit) || 20;
+    const profile = taste(input);
+    if (!profile.order.length) return [];
+
+    const seen = watchedSet(history, marks);
+    // Whatever is waiting in "continue watching" has its own row already.
+    const resuming = {};
+    history.forEach(function (entry) { if (isResumable(entry)) resuming[entry.id] = true; });
+
+    const scored = [];
+    items.forEach(function (item, index) {
+      if (item.kind === 'LIVE' || seen[item.id] || resuming[item.id]) return;
+      const score = profile.groups[item.group || 'ללא קטגוריה'] || 0;
+      if (!(score > 0)) return;
+      scored.push({ item: item, score: score, index: index });
+    });
+    scored.sort(function (a, b) {
+      const d = b.score - a.score;
+      return d !== 0 ? d : a.index - b.index;
+    });
+
+    const perGroup = Math.max(2, Math.floor(limit / 3));
+    const taken = {};
+    const out = [];
+    scored.forEach(function (row) {
+      if (out.length >= limit) return;
+      const g = row.item.group || 'ללא קטגוריה';
+      if ((taken[g] || 0) >= perGroup) return;
+      taken[g] = (taken[g] || 0) + 1;
+      out.push(row.item);
+    });
+    return out;
+  }
+
+  /**
+   * The most recent thing you finished, and what sits next to it. Named after
+   * the title so the row explains itself.
+   */
+  const BECAUSE_MIN = 3;
+
+  function becauseYouWatched(input) {
+    const items = (input && input.items) || [];
+    const history = (input && input.history) || [];
+    const marks = (input && input.marks) || [];
+    const limit = (input && input.limit) || 20;
+
+    const byId = {};
+    items.forEach(function (item) { byId[item.id] = item; });
+    const seen = watchedSet(history, marks);
+
+    const ordered = history.slice().sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    let seed = null;
+    ordered.forEach(function (entry) {
+      if (seed) return;
+      const item = byId[entry.id];
+      if (item && item.kind !== 'LIVE' && seen[entry.id]) seed = item;
+    });
+    // Nothing finished yet: fall back to what was marked by hand, newest last.
+    if (!seed) {
+      for (let i = marks.length - 1; i >= 0 && !seed; i--) {
+        const item = byId[marks[i]];
+        if (item && item.kind !== 'LIVE') seed = item;
+      }
+    }
+    if (!seed) return null;
+
+    const group = seed.group || 'ללא קטגוריה';
+    const near = [];
+    items.forEach(function (item) {
+      if (near.length >= limit) return;
+      if (item.id === seed.id || item.kind === 'LIVE' || seen[item.id]) return;
+      if ((item.group || 'ללא קטגוריה') !== group) return;
+      near.push(item);
+    });
+    if (near.length < BECAUSE_MIN) return null;
+    return { seed: seed, items: near };
+  }
+
   function buildHomeRows(input) {
     const items = (input && input.items) || [];
     const history = (input && input.history) || [];
@@ -289,6 +445,19 @@
       if (item && favs.length < 20) favs.push(item);
     });
     if (favs.length) rows.push({ key: 'favorites', title: 'המועדפים שלי', items: favs });
+
+    // What to watch next, before the catalogue starts talking about itself.
+    const suggested = recommend(input);
+    if (suggested.length) rows.push({ key: 'recommended', title: 'מומלץ בשבילך', items: suggested });
+
+    const because = becauseYouWatched(input);
+    if (because) {
+      rows.push({
+        key: 'because:' + because.seed.id,
+        title: 'כי צפית ב־' + because.seed.name,
+        items: because.items
+      });
+    }
 
     const recentLive = [];
     ordered.forEach(function (entry) {
@@ -517,6 +686,10 @@
     isResumable: isResumable,
     progressRatio: progressRatio,
     buildHomeRows: buildHomeRows,
+    watchedSet: watchedSet,
+    taste: taste,
+    recommend: recommend,
+    becauseYouWatched: becauseYouWatched,
     searchRows: searchRows,
     skeleton: skeleton,
     matchesQuery: matchesQuery,

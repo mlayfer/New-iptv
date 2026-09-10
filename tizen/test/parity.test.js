@@ -55,6 +55,7 @@ test('lays out the same home screen', () => {
   const f = fixtures.home;
   const rows = core.buildHomeRows({
     items: f.items, history: f.history, favorites: f.favorites,
+    marks: f.marks, now: f.now,
   });
 
   assert.strictEqual(rows.length, f.expected.length);
@@ -113,4 +114,31 @@ test('reads a name the same way in both alphabets', () => {
     assert.strictEqual(core.matchesQuery(item, c.query), c.expected,
       `${c.query} vs ${c.name}`);
   }
+});
+
+test('agrees on what has been seen, and on what to suggest next', () => {
+  const f = fixtures.taste;
+  const input = { items: f.items, history: f.history, marks: f.marks, now: f.now };
+
+  assert.deepStrictEqual(
+    Object.keys(core.watchedSet(f.history, f.marks)).sort(),
+    f.expected.watched.slice().sort(),
+  );
+  assert.deepStrictEqual(core.taste(input).order, f.expected.order);
+  assert.deepStrictEqual(
+    core.recommend(Object.assign({ limit: f.limit }, input)).map((x) => x.id),
+    f.expected.recommend,
+  );
+
+  const because = core.becauseYouWatched(input);
+  assert.strictEqual(because.seed.id, f.expected.becauseSeed);
+  assert.deepStrictEqual(because.items.map((x) => x.id), f.expected.because);
+});
+
+test('suggests nothing at all before there is anything to go on', () => {
+  const f = fixtures.taste;
+  assert.deepStrictEqual(
+    core.recommend({ items: f.items, history: [], marks: [], now: f.now }), [],
+  );
+  assert.strictEqual(core.becauseYouWatched({ items: f.items, history: [], marks: [] }), null);
 });

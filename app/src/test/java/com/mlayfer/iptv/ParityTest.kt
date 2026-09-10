@@ -8,6 +8,8 @@ import com.mlayfer.iptv.data.StreamVariants
 import com.mlayfer.iptv.data.XtreamClient
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.io.File
 
@@ -123,8 +125,11 @@ class ParityTest {
         val favorites = spec.getJSONArray("favorites").let { array ->
             (0 until array.length()).map { array.getString(it) }
         }
+        val marks = spec.getJSONArray("marks").let { array ->
+            (0 until array.length()).map { array.getString(it) }
+        }
 
-        val rows = HomeRows.build(items, history, favorites)
+        val rows = HomeRows.build(items, history, favorites, marks, spec.getLong("now"))
         val expected = spec.getJSONArray("expected")
 
         assertEquals(expected.length(), rows.size)
@@ -240,5 +245,76 @@ class ParityTest {
         )
         assertEquals(listOf("b", "a"), merged.map { it.id })
         assertEquals(90L, merged[0].position)
+    }
+
+    @Test
+    fun `agrees on what has been seen, and on what to suggest next`() {
+        val spec = fixtures.getJSONObject("taste")
+        val items = spec.getJSONArray("items").let { array ->
+            (0 until array.length()).map { i ->
+                val o = array.getJSONObject(i)
+                HomeRows.Card(
+                    id = o.getString("id"),
+                    name = o.getString("name"),
+                    group = o.getString("group"),
+                    kind = o.getString("kind"),
+                    contentType = o.getString("contentType"),
+                )
+            }
+        }
+        val history = spec.getJSONArray("history").let { array ->
+            (0 until array.length()).map { i ->
+                val o = array.getJSONObject(i)
+                HomeRows.Entry(
+                    id = o.getString("id"),
+                    at = o.getLong("at"),
+                    position = o.getLong("position"),
+                    duration = o.getLong("duration"),
+                )
+            }
+        }
+        val marks = spec.getJSONArray("marks").let { array ->
+            (0 until array.length()).map { array.getString(it) }
+        }
+        val now = spec.getLong("now")
+        val limit = spec.getInt("limit")
+        val expected = spec.getJSONObject("expected")
+        fun strings(key: String) = expected.getJSONArray(key).let { array ->
+            (0 until array.length()).map { array.getString(it) }
+        }
+
+        assertEquals(strings("watched").sorted(), HomeRows.watchedSet(history, marks).sorted())
+        assertEquals(strings("order"), HomeRows.taste(items, history, marks, now).order)
+        assertEquals(
+            strings("recommend"),
+            HomeRows.recommend(items, history, marks, now, limit).map { it.id },
+        )
+
+        val because = HomeRows.becauseYouWatched(items, history, marks)
+        assertNotNull(because)
+        assertEquals(expected.getString("becauseSeed"), because!!.seed.id)
+        assertEquals(strings("because"), because.items.map { it.id })
+    }
+
+    @Test
+    fun `suggests nothing at all before there is anything to go on`() {
+        val spec = fixtures.getJSONObject("taste")
+        val items = spec.getJSONArray("items").let { array ->
+            (0 until array.length()).map { i ->
+                val o = array.getJSONObject(i)
+                HomeRows.Card(
+                    id = o.getString("id"),
+                    name = o.getString("name"),
+                    group = o.getString("group"),
+                    kind = o.getString("kind"),
+                    contentType = o.getString("contentType"),
+                )
+            }
+        }
+        assertEquals(
+            emptyList<String>(),
+            HomeRows.recommend(items, emptyList(), emptyList(), spec.getLong("now")).map { it.id },
+        )
+        assertNull(HomeRows.becauseYouWatched(items, emptyList(), emptyList()))
     }
 }

@@ -139,7 +139,7 @@
     "seriesName": "ניתוק"
   },
   "home": {
-    "_comment": "buildHomeRows in tizen/core.js and HomeRows.build in Kotlin must return this.",
+    "_comment": "buildHomeRows in tizen/core.js and HomeRows.build in Kotlin must return this. 'now' is fixed so the recency decay is the same number in both languages.",
     "items": [
       {
         "id": "l1",
@@ -321,6 +321,18 @@
         ]
       },
       {
+        "key": "recommended",
+        "title": "מומלץ בשבילך",
+        "items": [
+          "v5",
+          "v2"
+        ],
+        "resumeAt": [
+          0,
+          0
+        ]
+      },
+      {
         "key": "recentLive",
         "title": "ערוצים שנצפו לאחרונה",
         "items": [
@@ -416,7 +428,11 @@
           0
         ]
       }
-    ]
+    ],
+    "marks": [
+      "v4"
+    ],
+    "now": 1000
   },
   "search": {
     "_comment": "searchRows in tizen/core.js and HomeRows.search in Kotlin must return this.",
@@ -881,5 +897,141 @@
         "expected": true
       }
     ]
+  },
+  "taste": {
+    "_comment": "Core.watchedSet/taste/recommend/becauseYouWatched, and HomeRows' Kotlin twins.",
+    "items": [
+      {
+        "id": "a1",
+        "name": "מרדף",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "a2",
+        "name": "קו האש",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "a3",
+        "name": "נקודת רתיחה",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "a4",
+        "name": "המרדף האחרון",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "a5",
+        "name": "פיצוץ",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "a6",
+        "name": "מטרה נעה",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "a7",
+        "name": "שקט תעשייתי",
+        "group": "אקשן",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "c1",
+        "name": "חתונה",
+        "group": "קומדיה",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "c2",
+        "name": "שכנים",
+        "group": "קומדיה",
+        "kind": "VOD",
+        "contentType": "MOVIE"
+      },
+      {
+        "id": "d1",
+        "name": "שטיסל",
+        "group": "דרמה",
+        "kind": "VOD",
+        "contentType": "SERIES"
+      },
+      {
+        "id": "L1",
+        "name": "ספורט 1",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "contentType": "LIVE"
+      }
+    ],
+    "history": [
+      {
+        "id": "a1",
+        "at": 900,
+        "position": 5300,
+        "duration": 5400
+      },
+      {
+        "id": "a2",
+        "at": 800,
+        "position": 600,
+        "duration": 6000
+      },
+      {
+        "id": "c1",
+        "at": 700,
+        "position": 100,
+        "duration": 6000
+      },
+      {
+        "id": "L1",
+        "at": 600,
+        "position": 0,
+        "duration": 0
+      }
+    ],
+    "marks": [
+      "a3"
+    ],
+    "now": 1000,
+    "limit": 6,
+    "expected": {
+      "watched": [
+        "a1",
+        "a3"
+      ],
+      "order": [
+        "אקשן",
+        "קומדיה"
+      ],
+      "recommend": [
+        "a4",
+        "a5",
+        "c2"
+      ],
+      "becauseSeed": "a1",
+      "because": [
+        "a2",
+        "a4",
+        "a5",
+        "a6",
+        "a7"
+      ]
+    }
   }
 }

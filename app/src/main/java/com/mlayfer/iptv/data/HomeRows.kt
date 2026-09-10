@@ -19,6 +19,13 @@ object HomeRows {
     private const val CATEGORY_ROWS = 3
     private const val SEARCH_ROW_LIMIT = 40
     private const val SEARCH_MIN_QUERY = 2
+    private const val TASTE_HALF_LIFE_MS = 21L * 24 * 60 * 60 * 1000
+    private const val TASTE_FLOOR = 0.05
+    private const val TASTE_BASE = 0.3
+    private const val BECAUSE_MIN = 3
+
+    /** The bucket an item with no category of its own falls into. */
+    private const val NO_GROUP = "ללא קטגוריה"
 
     /** A card on the home screen: any item, live or on demand, in one shape. */
     data class Card(
@@ -53,7 +60,151 @@ object HomeRows {
         return (entry.position.toDouble() / entry.duration).coerceIn(0.0, 1.0)
     }
 
-    fun build(items: List<Card>, history: List<Entry>, favorites: List<String>): List<Row> {
+    /**
+     * What counts as seen: something marked by hand, or something played to the
+     * end. Both apps ask this the same way, because a tick on one screen has to
+     * mean a tick on the other.
+     */
+    fun watchedSet(history: List<Entry>, marks: List<String>): Set<String> {
+        val seen = HashSet<String>(marks.filter { it.isNotBlank() })
+        for (entry in history) {
+            if (entry.duration <= 0 || entry.position <= 0) continue
+            if (entry.position > entry.duration * RESUME_MAX_RATIO) seen.add(entry.id)
+        }
+        return seen
+    }
+
+    data class Taste(val groups: Map<String, Double>, val order: List<String>)
+
+    private fun decayAt(at: Long, now: Long): Double {
+        val age = now - at
+        if (age <= 0) return 1.0
+        return Math.pow(0.5, age.toDouble() / TASTE_HALF_LIFE_MS).coerceAtLeast(TASTE_FLOOR)
+    }
+
+    /**
+     * A taste is a weighted count of the categories actually spent time in. Two
+     * things move the weight: how recently (a month-old evening says less about
+     * tonight) and how much of it got watched — five minutes is not a vote.
+     */
+    fun taste(
+        items: List<Card>,
+        history: List<Entry>,
+        marks: List<String>,
+        now: Long,
+    ): Taste {
+        val byId = items.associateBy { it.id }
+        val seen = watchedSet(history, marks)
+        val groups = LinkedHashMap<String, Double>()
+
+        fun add(id: String, at: Long, ratio: Double) {
+            // Channels are a different appetite from a film; they do not vote.
+            val card = byId[id] ?: return
+            if (card.kind == "LIVE") return
+            val group = card.group.ifBlank { NO_GROUP }
+            val weight = decayAt(at, now) * (TASTE_BASE + (1 - TASTE_BASE) * ratio)
+            groups[group] = (groups[group] ?: 0.0) + weight
+        }
+
+        for (entry in history) {
+            add(entry.id, entry.at, if (entry.id in seen) 1.0 else progressRatio(entry))
+        }
+        val inHistory = history.map { it.id }.toSet()
+        for (id in marks) if (id !in inHistory) add(id, now, 1.0)
+
+        val order = groups.keys.sortedWith(
+            compareByDescending<String> { groups[it] ?: 0.0 }.thenBy { it }
+        )
+        return Taste(groups, order)
+    }
+
+    /**
+     * More of what you like, minus what you have already seen. Scored by taste,
+     * then capped per category — twenty titles from one shelf is a shelf, not a
+     * recommendation.
+     */
+    fun recommend(
+        items: List<Card>,
+        history: List<Entry>,
+        marks: List<String>,
+        now: Long,
+        limit: Int = ROW_LIMIT,
+    ): List<Card> {
+        val profile = taste(items, history, marks, now)
+        if (profile.order.isEmpty()) return emptyList()
+
+        val seen = watchedSet(history, marks)
+        // Whatever is waiting in "continue watching" has its own row already.
+        val resuming = history.filter { isResumable(it) }.map { it.id }.toSet()
+
+        val scored = items.asSequence()
+            .withIndex()
+            .filter { (_, card) ->
+                card.kind != "LIVE" && card.id !in seen && card.id !in resuming
+            }
+            .mapNotNull { (index, card) ->
+                val score = profile.groups[card.group.ifBlank { NO_GROUP }] ?: 0.0
+                if (score > 0) Triple(card, score, index) else null
+            }
+            .sortedWith(compareByDescending<Triple<Card, Double, Int>> { it.second }.thenBy { it.third })
+
+        val perGroup = maxOf(2, limit / 3)
+        val taken = HashMap<String, Int>()
+        val out = ArrayList<Card>()
+        for ((card, _, _) in scored) {
+            if (out.size >= limit) break
+            val group = card.group.ifBlank { NO_GROUP }
+            if ((taken[group] ?: 0) >= perGroup) continue
+            taken[group] = (taken[group] ?: 0) + 1
+            out.add(card)
+        }
+        return out
+    }
+
+    data class Because(val seed: Card, val items: List<Card>)
+
+    /**
+     * The most recent thing finished, and what sits next to it. Named after the
+     * title so the row explains itself.
+     */
+    fun becauseYouWatched(
+        items: List<Card>,
+        history: List<Entry>,
+        marks: List<String>,
+        limit: Int = ROW_LIMIT,
+    ): Because? {
+        val byId = items.associateBy { it.id }
+        val seen = watchedSet(history, marks)
+
+        var seed = history.sortedByDescending { it.at }
+            .asSequence()
+            .mapNotNull { byId[it.id] }
+            .firstOrNull { it.kind != "LIVE" && it.id in seen }
+        // Nothing finished yet: fall back to what was marked by hand, newest last.
+        if (seed == null) {
+            seed = marks.asReversed().asSequence()
+                .mapNotNull { byId[it] }
+                .firstOrNull { it.kind != "LIVE" }
+        }
+        val chosen = seed ?: return null
+
+        val group = chosen.group.ifBlank { NO_GROUP }
+        val near = items.asSequence()
+            .filter { it.id != chosen.id && it.kind != "LIVE" && it.id !in seen }
+            .filter { it.group.ifBlank { NO_GROUP } == group }
+            .take(limit)
+            .toList()
+        if (near.size < BECAUSE_MIN) return null
+        return Because(chosen, near)
+    }
+
+    fun build(
+        items: List<Card>,
+        history: List<Entry>,
+        favorites: List<String>,
+        marks: List<String> = emptyList(),
+        now: Long = 0,
+    ): List<Row> {
         val byId = items.associateBy { it.id }
         val ordered = history.sortedByDescending { it.at }
         val favoriteSet = favorites.toSet()
@@ -71,6 +222,14 @@ object HomeRows {
 
         val favs = favorites.mapNotNull { byId[it] }.take(FAVORITE_LIMIT)
         if (favs.isNotEmpty()) rows.add(Row("favorites", "המועדפים שלי", favs))
+
+        // What to watch next, before the catalogue starts talking about itself.
+        val suggested = recommend(items, history, marks, now)
+        if (suggested.isNotEmpty()) rows.add(Row("recommended", "מומלץ בשבילך", suggested))
+
+        becauseYouWatched(items, history, marks)?.let {
+            rows.add(Row("because:${it.seed.id}", "כי צפית ב־${it.seed.name}", it.items))
+        }
 
         val recentLive = ordered.asSequence()
             .mapNotNull { byId[it.id] }
@@ -140,7 +299,7 @@ object HomeRows {
     private fun topGroups(pool: List<Card>): List<Pair<String, List<Card>>> {
         val byGroup = LinkedHashMap<String, MutableList<Card>>()
         for (item in pool) {
-            byGroup.getOrPut(item.group.ifBlank { "ללא קטגוריה" }) { ArrayList() }.add(item)
+            byGroup.getOrPut(item.group.ifBlank { NO_GROUP }) { ArrayList() }.add(item)
         }
         val order = byGroup.keys.toList()
         val rank = order.withIndex().associate { (i, g) -> g to i }

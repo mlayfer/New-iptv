@@ -43,6 +43,10 @@ const state = {
   // What you watched and what you marked — the home screen is built from these.
   history: [],
   favorites: [],
+  // Titles and episodes ticked off by hand, and the set derived from those
+  // plus whatever was played to the end.
+  marks: [],
+  seen: {},
   home: {rows: [], row: 0, col: 0, rowStart: 0},
   search: {rows: [], row: 0, col: 0, rowStart: 0},
   playerReturn: 'home',
@@ -106,16 +110,53 @@ function hideSplash(){
 // means the same thing in both.
 const HISTORY_KEY = 'talohimHistoryV1';
 const FAVORITES_KEY = 'talohimFavoritesV1';
+const WATCHED_KEY = 'talohimWatchedV1';
 
 function loadPrefs(){
   try { state.history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') || []; } catch(e) { state.history = []; }
   try { state.favorites = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') || []; } catch(e) { state.favorites = []; }
+  try { state.marks = JSON.parse(localStorage.getItem(WATCHED_KEY) || '[]') || []; } catch(e) { state.marks = []; }
+  refreshSeen();
 }
 function savePrefs(){
   try {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history.slice(0, 60)));
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(state.favorites.slice(0, 200)));
+    localStorage.setItem(WATCHED_KEY, JSON.stringify(state.marks.slice(0, 4000)));
   } catch(e) {}
+  refreshSeen();
+}
+
+/**
+ * One answer to "have I seen this", recomputed whenever the memory changes, so
+ * a tick can be drawn on a card without walking the history for every tile.
+ */
+function refreshSeen(){
+  state.seen = Core.watchedSet(state.history, state.marks);
+}
+
+function isSeen(item){ return !!(item && state.seen && state.seen[item.id]); }
+
+/** Marking by hand, the way you tick an episode off a list. */
+function toggleWatched(item){
+  if(!item || !item.id) return false;
+  const at = state.marks.indexOf(item.id);
+  if(at === -1) {
+    state.marks.push(item.id);
+  } else {
+    state.marks.splice(at, 1);
+    // Playing it to the end also counts as seen, so unticking has to forget
+    // that too — otherwise the tick comes straight back.
+    state.history = state.history.map(function (entry) {
+      if(entry.id !== item.id) return entry;
+      const copy = {};
+      Object.keys(entry).forEach(function (k) { copy[k] = entry[k]; });
+      copy.position = 0;
+      return copy;
+    });
+  }
+  savePrefs();
+  return at === -1;
 }
 
 /** A history entry carries a copy of the card, so an episode you were watching
@@ -432,7 +473,9 @@ function buildHome(){
   state.home.rows = Core.buildHomeRows({
     items: pool,
     history: state.history,
-    favorites: state.favorites
+    favorites: state.favorites,
+    marks: state.marks,
+    now: Date.now()
   });
   if(state.home.row >= state.home.rows.length){ state.home.row = 0; state.home.col = 0; state.home.rowStart = 0; }
 }
@@ -464,6 +507,13 @@ function makeCard(item, navName, row, col){
     '<div class="cardName"></div>';
   fillArt($(live ? '.wideArt' : '.vodPoster', card), item);
   $('.cardName', card).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
+  if(isSeen(item)){
+    card.classList.add('seen');
+    const tick = document.createElement('div');
+    tick.className = 'seenTick';
+    tick.textContent = '✓';
+    $(live ? '.wideArt' : '.vodPoster', card).appendChild(tick);
+  }
   if(item.progress > 0){
     const bar = document.createElement('div');
     bar.className = 'cardProgress';
@@ -784,13 +834,18 @@ function renderEpisodes(){
     card.dataset.nav = 'episode';
     card.dataset.index = String(index);
     card.innerHTML = '<div class="episodeName"></div><div class="episodeMeta"></div>';
-    $('.episodeName', card).textContent = episode.name;
+    const seen = isSeen(episode);
+    if(seen) card.classList.add('seen');
+    $('.episodeName', card).textContent = (seen ? '✓ ' : '') + episode.name;
     const entry = state.history.find(x => x.id === episode.id);
-    $('.episodeMeta', card).textContent = entry && Core.isResumable(entry)
-      ? 'המשך מ-' + formatClock(entry.position) : episode.group;
+    $('.episodeMeta', card).textContent = seen ? 'נצפה'
+      : (entry && Core.isResumable(entry) ? 'המשך מ-' + formatClock(entry.position) : episode.group);
     card.addEventListener('click', () => activateItem(episode));
     strip.appendChild(card);
   });
+  // The episodes arrive after the page is drawn, and the tick's label depends
+  // on them — a series is ticked off by the season, a film by itself.
+  if(detail.item && detail.item.contentType === 'SERIES') renderDetailActions();
 }
 
 function renderDetailActions(){
@@ -801,6 +856,28 @@ function renderDetailActions(){
     ? 'צפה בפרק הראשון'
     : (resume ? 'המשך מ-' + formatClock(resume) : 'צפה'));
   text($('#detailFavorite'), isFavorite(item) ? 'הסר מהמועדפים' : 'הוסף למועדפים');
+  // A series is ticked off episode by episode, so the button says so.
+  const everyEpisode = item.contentType === 'SERIES' && detail.episodes.length;
+  const done = everyEpisode
+    ? detail.episodes.every(function (ep) { return isSeen(ep); })
+    : isSeen(item);
+  text($('#detailWatched'), done
+    ? (everyEpisode ? 'סמן את העונה כלא נצפתה' : 'סמן כלא נצפה')
+    : (everyEpisode ? 'סמן את כל העונה כנצפתה' : 'סמן כנצפה'));
+}
+
+/** The tick from the title page: one title, or a whole season at once. */
+function markFromDetail(){
+  const item = detail.item;
+  if(!item) return;
+  if(item.contentType === 'SERIES' && detail.episodes.length){
+    const done = detail.episodes.every(function (ep) { return isSeen(ep); });
+    detail.episodes.forEach(function (ep) { if(isSeen(ep) === done) toggleWatched(ep); });
+  } else {
+    toggleWatched(item);
+  }
+  renderDetailActions();
+  renderEpisodes();
 }
 
 function playFromDetail(){
@@ -2119,6 +2196,7 @@ function wireStatic(){
     toggleFavorite(detail.item);
     renderDetailActions();
   });
+  $('#detailWatched').addEventListener('click', markFromDetail);
   $('#globalSearch').dataset.nav = 'globalSearch';
 
   $$('.serverSuggestion').forEach(btn => {
