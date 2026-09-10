@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -109,9 +112,12 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
+      Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxHeight()
+                .widthIn(max = 820.dp)
+                .fillMaxWidth()
                 // Keeps the form clear of the status bar, the navigation bar and
                 // the keyboard — this screen is nothing but text fields.
                 .windowInsetsPadding(WindowInsets.systemBars)
@@ -119,7 +125,7 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 .then(if (LocalIsTv.current) Modifier.padding(horizontal = 24.dp) else Modifier)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (state.playlists.isNotEmpty()) {
@@ -131,7 +137,11 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
             }
 
             Text(
-                text = "האפליקציה היא נגן בלבד — התוכן מגיע מהרשימה או מהמנוי שלך.",
+                text = if (LocalIsTv.current) {
+                    "אישור על שדה פותח את המקלדת · Back סוגר · התוכן מגיע מהמנוי שלך"
+                } else {
+                    "האפליקציה היא נגן בלבד — התוכן מגיע מהרשימה או מהמנוי שלך."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -192,23 +202,6 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 )
             }
 
-            // With a remote, a field is a place you stand before it is a place
-            // you type: say so, since the keyboard no longer opens by itself.
-            if (LocalIsTv.current) {
-                Text(
-                    text = "עמוד על שדה ולחץ אישור כדי לפתוח את המקלדת · Back סוגר אותה",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            FormTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = "שם לרשימה (רשות)",
-                modifier = Modifier.fillMaxWidth(),
-            )
-
             when (kind) {
                 SourceKind.URL -> {
                     FormTextField(
@@ -217,7 +210,20 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                         label = "כתובת M3U",
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    EpgField(epgUrl) { epgUrl = it }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FormTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = "שם (רשות)",
+                            modifier = Modifier.weight(1f),
+                        )
+                        FormTextField(
+                            value = epgUrl,
+                            onValueChange = { epgUrl = it },
+                            label = "מדריך שידורים (רשות)",
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     AddButton(
                         enabled = url.isNotBlank() && !state.addBusy,
                         busy = state.addBusy,
@@ -243,7 +249,20 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                         maxLines = 8,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    EpgField(epgUrl) { epgUrl = it }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FormTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = "שם (רשות)",
+                            modifier = Modifier.weight(1f),
+                        )
+                        FormTextField(
+                            value = epgUrl,
+                            onValueChange = { epgUrl = it },
+                            label = "מדריך שידורים (רשות)",
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     AddButton(
                         enabled = content.isNotBlank() && !state.addBusy,
                         busy = state.addBusy,
@@ -263,58 +282,62 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                     )
 
                     // Typing a portal address on a remote is miserable; one press
-                    // beats forty. The list narrows as the field is typed into.
+                    // beats forty. As chips they cost one line instead of three.
                     val suggestions = KNOWN_SERVERS.filter { option ->
                         server.isBlank() || option.contains(server.trim(), ignoreCase = true)
                     }
                     if (suggestions.isNotEmpty()) {
-                        Text(
-                            text = "שרתים מוצעים",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             suggestions.forEach { option ->
-                                OutlinedButton(
+                                SuggestionChip(
                                     onClick = { server = option },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        // The button has an outline of its own.
-                                        .focusHighlight(border = false),
-                                ) {
-                                    Text(option)
-                                }
+                                    label = { Text(option) },
+                                    modifier = Modifier.focusHighlight(border = false),
+                                )
                             }
                         }
                     }
 
-                    FormTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = "שם משתמש",
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    FormTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = "סיסמה",
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("לכלול גם ספריית סרטים")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FormTextField(
+                            value = username,
+                            onValueChange = { username = it },
+                            label = "שם משתמש",
+                            modifier = Modifier.weight(1f),
+                        )
+                        FormTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = "סיסמה",
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FormTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = "שם לרשימה (רשות)",
+                            modifier = Modifier.weight(1f),
+                        )
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
-                                text = "טעינה איטית יותר במנויים גדולים",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = "לכלול סרטים וסדרות",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Switch(
+                                checked = includeVod,
+                                onCheckedChange = { includeVod = it },
+                                modifier = Modifier.focusHighlight(border = false),
                             )
                         }
-                        Switch(checked = includeVod, onCheckedChange = { includeVod = it })
                     }
+
                     AddButton(
                         enabled = server.isNotBlank() && username.isNotBlank() &&
                             password.isNotBlank() && !state.addBusy,
@@ -343,17 +366,8 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 Text(text = addError, color = MaterialTheme.colorScheme.error)
             }
         }
+      }
     }
-}
-
-@Composable
-private fun EpgField(value: String, onChange: (String) -> Unit) {
-    FormTextField(
-        value = value,
-        onValueChange = onChange,
-        label = "כתובת מדריך שידורים XMLTV (רשות)",
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 @Composable
