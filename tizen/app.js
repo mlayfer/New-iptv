@@ -47,6 +47,8 @@ const state = {
   // plus whatever was played to the end.
   marks: [],
   seen: {},
+  // The decisions behind those two lists: {favorites: {id: {at, on}}, watched: {...}}
+  flags: { favorites: {}, watched: {} },
   home: {rows: [], row: 0, col: 0, rowStart: 0},
   search: {rows: [], row: 0, col: 0, rowStart: 0},
   playerReturn: 'home',
@@ -112,19 +114,97 @@ const HISTORY_KEY = 'talohimHistoryV1';
 const FAVORITES_KEY = 'talohimFavoritesV1';
 const WATCHED_KEY = 'talohimWatchedV1';
 
+const FLAGS_KEY = 'talohimFlagsV1';
+
+/**
+ * Favourites and ticks are kept twice: as the plain lists the screens read, and
+ * as timestamped decisions. Only the timestamps can be merged with another
+ * device — "not a favourite" has to be a value with a time on it, or the
+ * television would silently undo the phone.
+ */
 function loadPrefs(){
   try { state.history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') || []; } catch(e) { state.history = []; }
-  try { state.favorites = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') || []; } catch(e) { state.favorites = []; }
-  try { state.marks = JSON.parse(localStorage.getItem(WATCHED_KEY) || '[]') || []; } catch(e) { state.marks = []; }
+  let flags = null;
+  try { flags = JSON.parse(localStorage.getItem(FLAGS_KEY) || 'null'); } catch(e) { flags = null; }
+
+  if(flags && flags.favorites){
+    state.flags = flags;
+  } else {
+    // First run after the upgrade: the old lists become the first decisions.
+    let favorites = [], marks = [];
+    try { favorites = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') || []; } catch(e) {}
+    try { marks = JSON.parse(localStorage.getItem(WATCHED_KEY) || '[]') || []; } catch(e) {}
+    state.flags = {
+      favorites: Core.flagsFrom(favorites, Date.now()),
+      watched: Core.flagsFrom(marks, Date.now())
+    };
+  }
+  applyFlags();
+}
+
+/** The lists the screens read, derived from the decisions. */
+function applyFlags(){
+  state.favorites = Core.flagsOn(state.flags.favorites);
+  state.marks = Core.flagsOn(state.flags.watched);
   refreshSeen();
 }
+
 function savePrefs(){
   try {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history.slice(0, 60)));
+    localStorage.setItem(FLAGS_KEY, JSON.stringify(state.flags));
+    // Kept so an older build installed over this one still finds its memory.
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(state.favorites.slice(0, 200)));
     localStorage.setItem(WATCHED_KEY, JSON.stringify(state.marks.slice(0, 4000)));
   } catch(e) {}
   refreshSeen();
+  scheduleSync();
+}
+
+/** Flip one decision and write down when it was made. */
+function setFlag(kind, id, on){
+  if(!id) return;
+  state.flags[kind][id] = { at: Date.now(), on: !!on };
+  applyFlags();
+}
+
+/** This device's memory, in the shape that travels. */
+function localDoc(){
+  return {
+    v: Core.SYNC_VERSION,
+    history: state.history,
+    favorites: state.flags.favorites,
+    watched: state.flags.watched
+  };
+}
+
+let syncTimer = null;
+
+/** Changes arrive in bursts — a season ticked off is ten of them. */
+function scheduleSync(){
+  if(!global_sync() || syncTimer) return;
+  syncTimer = setTimeout(function(){ syncTimer = null; runSync(); }, 4000);
+}
+
+function global_sync(){
+  return (typeof TalohimSyncClient !== 'undefined') && TalohimSyncClient.state.config;
+}
+
+function runSync(){
+  if(typeof TalohimSyncClient === 'undefined') return Promise.resolve();
+  return TalohimSyncClient.cycle(localDoc()).then(function(merged){
+    if(!merged) { renderNotes(); return; }
+    state.history = merged.history || [];
+    state.flags = { favorites: merged.favorites || {}, watched: merged.watched || {} };
+    applyFlags();
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history.slice(0, 60)));
+      localStorage.setItem(FLAGS_KEY, JSON.stringify(state.flags));
+    } catch(e) {}
+    // Something may have been watched elsewhere, so the shelves change.
+    if(state.world === 'VOD' && !state.mode) { buildHome(); renderHome(); }
+    renderNotes();
+  });
 }
 
 /**
@@ -140,11 +220,9 @@ function isSeen(item){ return !!(item && state.seen && state.seen[item.id]); }
 /** Marking by hand, the way you tick an episode off a list. */
 function toggleWatched(item){
   if(!item || !item.id) return false;
-  const at = state.marks.indexOf(item.id);
-  if(at === -1) {
-    state.marks.push(item.id);
-  } else {
-    state.marks.splice(at, 1);
+  const wanted = !isSeen(item);
+  setFlag('watched', item.id, wanted);
+  if(!wanted){
     // Playing it to the end also counts as seen, so unticking has to forget
     // that too — otherwise the tick comes straight back.
     state.history = state.history.map(function (entry) {
@@ -152,11 +230,12 @@ function toggleWatched(item){
       const copy = {};
       Object.keys(entry).forEach(function (k) { copy[k] = entry[k]; });
       copy.position = 0;
+      copy.at = Date.now();
       return copy;
     });
   }
   savePrefs();
-  return at === -1;
+  return wanted;
 }
 
 /** A history entry carries a copy of the card, so an episode you were watching
@@ -182,10 +261,10 @@ function noteWatched(item, position, duration){
 function isFavorite(item){ return item && state.favorites.indexOf(item.id) !== -1; }
 function toggleFavorite(item){
   if(!item || !item.id) return;
-  const at = state.favorites.indexOf(item.id);
-  if(at === -1) state.favorites.unshift(item.id); else state.favorites.splice(at, 1);
+  const wanted = !isFavorite(item);
+  setFlag('favorites', item.id, wanted);
   savePrefs();
-  return at === -1;
+  return wanted;
 }
 
 /** The catalogue plus anything remembered that is no longer in it. */
@@ -401,7 +480,9 @@ function renderCatalogSummary(){
 function renderNotes(){
   const box = $('#notes');
   if(!box) return;
-  const notes = state.notes || [];
+  const notes = (state.notes || []).slice();
+  const sync = (typeof TalohimSyncClient !== 'undefined') ? TalohimSyncClient.describe() : '';
+  if(sync) notes.push(sync);
   box.textContent = notes.join(' · ');
   box.style.display = notes.length ? 'block' : 'none';
 }
@@ -2368,6 +2449,12 @@ function demoItems(count){
 }
 
 loadPrefs();
+if(typeof TalohimSyncClient !== 'undefined'){
+  TalohimSyncClient.loadConfig();
+  // The first pull can bring back a whole other device's evening, so it runs
+  // before the shelves are drawn rather than after.
+  runSync();
+}
 wireStatic();
 registerKeys();
 

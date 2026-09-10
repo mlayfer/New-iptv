@@ -71,7 +71,12 @@ test('the stylesheet stays inside what the television can render', () => {
 });
 
 test('the scripts stay inside what the television can run', () => {
-  for (const name of ['app.js', 'core.js', 'dev-credentials.js']) {
+  // Every script that ships, found rather than listed: a list is a thing you
+  // forget to add a new file to, and the file that slips past is exactly the
+  // one nobody checked.
+  const scripts = fs.readdirSync(TIZEN).filter((f) => f.endsWith('.js'));
+  assert.ok(scripts.length >= 4, `only found ${scripts.join(', ')}`);
+  for (const name of scripts) {
     const found = offenders(read(name), JS_RULES);
     assert.deepStrictEqual(found, [], `${name}: Chromium ${CHROMIUM} cannot run:\n  ${found.join('\n  ')}`);
   }

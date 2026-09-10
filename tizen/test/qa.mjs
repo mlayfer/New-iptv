@@ -39,8 +39,12 @@ page.on("pageerror", (e) => errors.push(e.message));
 // A stream request is expected to fail here: nothing is being served. That
 // includes the endpoint ladder's plainest rung, which carries no /live/ in it.
 const portal = /ilvips\.com|ilvip\.net/;
+// The sync table is deliberately taken down at the end of the walk, to prove
+// that losing it costs the device nothing.
+const syncHost = /sync\.example\.test/;
 const expected = (url) =>
   /\$WEBAPIS|favicon/.test(url) ||
+  syncHost.test(url) ||
   (portal.test(url) && !/player_api\.php|\/art\//.test(url));
 page.on("requestfailed", (r) => { if (!expected(r.url())) errors.push("request failed: " + r.url()); });
 page.on("response", (r) => {
@@ -105,6 +109,20 @@ await page.route("**/player_api.php*", (route) => {
   }));
   return route.fulfill(json([]));
 });
+// A stand-in for the sync table: one row, upserted, exactly as PostgREST does.
+let syncRow = null;
+const syncCalls = { get: 0, post: 0 };
+await page.route("**/rest/v1/talohim_state*", (route) => {
+  const req = route.request();
+  if (req.method() === "GET") {
+    syncCalls.get += 1;
+    return route.fulfill(json(syncRow ? [{ doc: syncRow }] : []));
+  }
+  syncCalls.post += 1;
+  syncRow = JSON.parse(req.postData() || "[]")[0].doc;
+  return route.fulfill({ status: 201, contentType: "application/json", body: "" });
+});
+
 await page.route("**/live/**", (r) => r.abort());
 await page.route("**/movie/**", (r) => r.abort());
 await page.route("**/series/**", (r) => r.abort());
@@ -374,6 +392,50 @@ await page.waitForTimeout(900);
 const afterRows = await page.locator("#homeRows .cardRowTitle").allTextContents();
 check("what was being watched comes back", afterRows.some((r) => r.includes("המשך לצפות")), afterRows.join(" | "));
 check("how far in is drawn on the card", (await page.locator(".cardProgress").count()) > 0);
+
+// ---- carrying the memory to another device --------------------------------
+await page.evaluate(() => {
+  localStorage.setItem("talohimSyncV1", JSON.stringify({
+    url: "https://sync.example.test", key: "anon-key", room: "room-code",
+  }));
+});
+await page.reload();
+await page.waitForTimeout(3000);
+check("a paired device talks to the table", syncCalls.get > 0 && syncCalls.post > 0,
+  `${syncCalls.get} reads, ${syncCalls.post} writes`);
+check("and says so on screen",
+  (await page.textContent("#notes")).includes("מסונכרן"),
+  await page.textContent("#notes"));
+check("what it uploaded carries the marks",
+  syncRow && typeof syncRow.watched === "object" && typeof syncRow.favorites === "object",
+  JSON.stringify(syncRow).slice(0, 120));
+check("and never the portal password",
+  !/nyGefYq7PA|R62hJa6ZFX|player_api|\/live\//.test(JSON.stringify(syncRow || {})));
+
+// Another device marked something; this one should pick it up.
+syncRow = {
+  v: 1,
+  history: syncRow.history || [],
+  favorites: syncRow.favorites || {},
+  watched: Object.assign({}, syncRow.watched, { "v5100": { at: Date.now(), on: true } }),
+};
+await page.reload();
+await page.waitForTimeout(3000);
+const pulled = await page.evaluate(() =>
+  JSON.parse(localStorage.getItem("talohimFlagsV1") || "{}").watched || {});
+check("a mark made on another device arrives here",
+  pulled.v5100 && pulled.v5100.on === true, JSON.stringify(pulled.v5100 || null));
+
+// The table going down must never cost this device its own memory.
+await page.route("**/rest/v1/talohim_state*", (route) => route.abort());
+await page.reload();
+await page.waitForTimeout(3000);
+const survived = await page.evaluate(() =>
+  Object.keys(JSON.parse(localStorage.getItem("talohimFlagsV1") || "{}").watched || {}).length);
+check("a sync failure never costs the device its memory", survived > 0, `${survived} marks kept`);
+check("and the failure is said out loud",
+  (await page.textContent("#notes")).includes("סנכרון"),
+  await page.textContent("#notes"));
 
 check("no page errors anywhere", errors.length === 0, errors.slice(0, 3).join(" | "));
 

@@ -1033,5 +1033,108 @@
         "a7"
       ]
     }
+  },
+  "sync": {
+    "_comment": "Core.mergeDocs in tizen/core.js and Sync.mergeDocs in Kotlin must agree, in both orders. The two sides are a television and a phone that were each changed while the other was offline.",
+    "tv": {
+      "v": 1,
+      "history": [
+        {
+          "id": "a",
+          "at": 300,
+          "position": 100,
+          "duration": 1000,
+          "card": {
+            "id": "a",
+            "name": "סרט א",
+            "group": "אקשן",
+            "kind": "VOD",
+            "contentType": "MOVIE"
+          }
+        }
+      ],
+      "favorites": {
+        "f1": {
+          "at": 150,
+          "on": false
+        },
+        "f2": {
+          "at": 100,
+          "on": true
+        }
+      },
+      "watched": {
+        "m1": {
+          "at": 200,
+          "on": true
+        }
+      }
+    },
+    "phone": {
+      "v": 1,
+      "history": [
+        {
+          "id": "a",
+          "at": 100,
+          "position": 50,
+          "duration": 1000,
+          "card": {
+            "id": "a",
+            "name": "סרט א",
+            "group": "אקשן",
+            "kind": "VOD",
+            "contentType": "MOVIE"
+          }
+        },
+        {
+          "id": "b",
+          "at": 250,
+          "position": 900,
+          "duration": 1000,
+          "card": {
+            "id": "b",
+            "name": "סרט ב",
+            "group": "קומדיה",
+            "kind": "VOD",
+            "contentType": "MOVIE"
+          }
+        }
+      ],
+      "favorites": {
+        "f1": {
+          "at": 180,
+          "on": true
+        }
+      },
+      "watched": {
+        "m2": {
+          "at": 90,
+          "on": true
+        },
+        "m1": {
+          "at": 200,
+          "on": false
+        }
+      }
+    },
+    "expected": {
+      "_note": "a keeps the newer position (300 beats 100). f1 was unfavourited on the TV at 150 and favourited again on the phone at 180, so it is on. m1 was marked at 200 and unmarked at 200 — a tie keeps the mark.",
+      "history": [
+        "a",
+        "b"
+      ],
+      "historyPositions": [
+        100,
+        900
+      ],
+      "favoritesOn": [
+        "f1",
+        "f2"
+      ],
+      "watchedOn": [
+        "m1",
+        "m2"
+      ]
+    }
   }
 }

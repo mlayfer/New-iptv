@@ -142,3 +142,36 @@ test('suggests nothing at all before there is anything to go on', () => {
   );
   assert.strictEqual(core.becauseYouWatched({ items: f.items, history: [], marks: [] }), null);
 });
+
+test('merges two devices item by item, whichever order they meet in', () => {
+  const f = fixtures.sync;
+  const merged = core.mergeDocs(f.tv, f.phone);
+
+  assert.deepStrictEqual(merged.history.map((x) => x.id), f.expected.history);
+  assert.deepStrictEqual(merged.history.map((x) => x.position), f.expected.historyPositions);
+  assert.deepStrictEqual(core.flagsOn(merged.favorites), f.expected.favoritesOn);
+  assert.deepStrictEqual(core.flagsOn(merged.watched), f.expected.watchedOn);
+
+  // Either device may be the one that merges, so the answer cannot depend on
+  // which of them got there first.
+  assert.deepStrictEqual(core.mergeDocs(f.phone, f.tv), merged);
+});
+
+test('never puts the portal password on the wire', () => {
+  const doc = {
+    v: 1,
+    history: [{
+      id: 'e1', at: 5, position: 10, duration: 20,
+      card: {
+        id: 'e1', name: 'פרק', group: 'דרמה', kind: 'VOD', contentType: 'EPISODE',
+        url: 'http://portal/live/user/PASSWORD/1.m3u8',
+        server: 'http://portal:80', user: 'USERNAME', pass: 'PASSWORD',
+      },
+    }],
+    favorites: {}, watched: {},
+  };
+  const wire = JSON.stringify(core.sanitizeDoc(doc));
+  assert.ok(!/PASSWORD|USERNAME|portal/.test(wire), wire);
+  // ...and still keeps what the card is for.
+  assert.strictEqual(core.sanitizeDoc(doc).history[0].card.name, 'פרק');
+});
