@@ -764,6 +764,10 @@
       {
         "text": "טד לאסו",
         "expected": "TDLS"
+      },
+      {
+        "text": "ניתוק",
+        "expected": "NTK"
       }
     ],
     "cases": [
@@ -837,6 +841,31 @@
       {
         "query": "ted lasso",
         "name": "טד לאסו",
+        "expected": true
+      },
+      {
+        "query": "ניתוק",
+        "name": "ניתוק (2022)",
+        "expected": true
+      },
+      {
+        "query": "ניתוק",
+        "name": "על תנועת כדור הארץ",
+        "expected": false
+      },
+      {
+        "query": "ניתוק",
+        "name": "אקדמיית האנטי קסם",
+        "expected": false
+      },
+      {
+        "query": "ניתוק",
+        "name": "רק לא רומנטיקה",
+        "expected": false
+      },
+      {
+        "query": "ברייקינג באד",
+        "name": "Breaking Bad",
         "expected": true
       }
     ]

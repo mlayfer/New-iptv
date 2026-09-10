@@ -363,6 +363,20 @@
   const SKELETON_MIN = 2;
   const QUERY_MIN_FOR_SKELETON = 3;
 
+  /**
+   * Which alphabet something is written in. The sound-alike path exists to
+   * cross between alphabets; inside one alphabet it only removes information —
+   * "ניתוק" and "האנטי קסם" share the consonants N-T-K and nothing else.
+   */
+  function scriptOf(text) {
+    const hebrew = /[\u0590-\u05ff]/.test(text);
+    const latin = /[a-z]/i.test(text);
+    if (hebrew && latin) return 'both';
+    if (hebrew) return 'he';
+    if (latin) return 'la';
+    return 'none';
+  }
+
   function skeleton(text) {
     let s = String(text || '').toLowerCase()
       .split(/\s+/)
@@ -408,7 +422,17 @@
     if ((q.match(/[a-z\u0590-\u05ff]/g) || []).length < QUERY_MIN_FOR_SKELETON) return false;
     const wanted = querySkeleton === undefined ? skeleton(q) : querySkeleton;
     if ((wanted.match(/[A-Z]/g) || []).length < SKELETON_MIN) return false;
-    return skeleton(searchableText(item)).indexOf(wanted) !== -1;
+
+    // ...and only against text written in the other alphabet. Within one
+    // alphabet the plain match above is the whole truth.
+    const asked = scriptOf(q);
+    const text = searchableText(item);
+    const parts = String(text).split(/\s+/).filter(function (word) {
+      const kind = scriptOf(word);
+      return kind !== 'none' && kind !== asked;
+    });
+    if (!parts.length) return false;
+    return skeleton(parts.join(' ')).indexOf(wanted) !== -1;
   }
 
   /**
@@ -466,6 +490,7 @@
     searchRows: searchRows,
     skeleton: skeleton,
     matchesQuery: matchesQuery,
+    scriptOf: scriptOf,
     searchableText: searchableText,
     seekTarget: seekTarget,
     formatClock: formatClock,

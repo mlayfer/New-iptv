@@ -19,6 +19,25 @@ object Search {
     private const val SKELETON_MIN = 2
     private const val QUERY_MIN_FOR_SKELETON = 3
 
+    private val HEBREW_LETTERS = Regex("[\\u0590-\\u05ff]")
+    private val LATIN_LETTERS = Regex("[a-zA-Z]")
+
+    /**
+     * Which alphabet something is written in. The sound-alike path exists to
+     * cross between alphabets; inside one alphabet it only removes information
+     * — "ניתוק" and "האנטי קסם" share the consonants N-T-K and nothing else.
+     */
+    fun scriptOf(text: String): String {
+        val hebrew = HEBREW_LETTERS.containsMatchIn(text)
+        val latin = LATIN_LETTERS.containsMatchIn(text)
+        return when {
+            hebrew && latin -> "both"
+            hebrew -> "he"
+            latin -> "la"
+            else -> "none"
+        }
+    }
+
     private val HEBREW = mapOf(
         'א' to "", 'ב' to "B", 'ג' to "G", 'ד' to "D", 'ה' to "", 'ו' to "",
         'ז' to "Z", 'ח' to "X", 'ט' to "T", 'י' to "", 'כ' to "K", 'ך' to "K",
@@ -88,6 +107,15 @@ object Search {
         if (q.count { it.isLetter() } < QUERY_MIN_FOR_SKELETON) return false
         val wanted = querySkeleton ?: skeleton(q)
         if (wanted.count { it in 'A'..'Z' } < SKELETON_MIN) return false
-        return skeleton(text).contains(wanted)
+
+        // ...and only against text written in the other alphabet. Within one
+        // alphabet the plain match above is the whole truth.
+        val asked = scriptOf(q)
+        val parts = text.split(Regex("\\s+")).filter {
+            val kind = scriptOf(it)
+            kind != "none" && kind != asked
+        }
+        if (parts.isEmpty()) return false
+        return skeleton(parts.joinToString(" ")).contains(wanted)
     }
 }
