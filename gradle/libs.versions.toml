@@ -9,6 +9,9 @@ media3 = "1.4.1"
 junit = "4.13.2"
 coil = "2.7.0"
 json = "20240303"
+# Screenshot tests that render Compose on the JVM — no emulator, no device.
+roborazzi = "1.74.0"
+robolectric = "4.16.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,7 +34,15 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 json = { group = "org.json", name = "json", version.ref = "json" }
 
+roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
+roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+
 [plugins]
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

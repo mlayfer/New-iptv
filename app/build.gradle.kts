@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.roborazzi)
 }
 
 /*
@@ -77,6 +78,13 @@ android {
         freeCompilerArgs += "-opt-in=androidx.media3.common.util.UnstableApi"
     }
 
+    testOptions {
+        unitTests {
+            // Robolectric renders against the app's real resources and theme.
+            isIncludeAndroidResources = true
+        }
+    }
+
     buildFeatures {
         compose = true
         // So the app can say which build it is. Without that, "is this the new
@@ -116,4 +124,14 @@ dependencies {
     testImplementation(libs.junit)
     // org.json ships with Android, but the unit-test android.jar only stubs it.
     testImplementation(libs.json)
+
+    // Screens rendered to PNG on the JVM. No emulator and no device, so it runs
+    // in the same job as the unit tests and finishes in seconds.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
 }

@@ -52,6 +52,20 @@ jobs:
       - name: Unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 
+      # The Android screens as pictures. They render on the JVM, so this needs
+      # no emulator and costs seconds — and it is the only way anyone gets to
+      # look at this app without a television in the room.
+      - name: Draw the Android screens
+        run: ./gradlew --no-daemon recordRoborazziDebug
+
+      - name: Upload the screens
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-screens
+          path: app/src/test/screens/
+          if-no-files-found: warn
+
       - name: Build debug APK
         env:
           ANDROID_KEYSTORE_FILE: ${{ steps.signing.outputs.ready == 'yes' && format('{0}/telohim.jks', runner.temp) || '' }}
