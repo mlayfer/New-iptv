@@ -68,6 +68,7 @@ import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Filtering
 import com.mlayfer.iptv.data.M3uParser
+import com.mlayfer.iptv.data.Playback
 import com.mlayfer.iptv.data.Series
 import com.mlayfer.iptv.data.XmltvParser
 
@@ -103,38 +104,69 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
         )
     }
 
-    /** Moves through the list the user is actually looking at, filters included. */
+    /**
+     * Moves through the list the viewer is actually in.
+     *
+     * An episode belongs to its series, not to the catalogue behind it: stepping
+     * on from episode three has to reach episode four, not the next series
+     * along. Looking an episode up in the channel list never finds it, and
+     * falling back to index zero is how the arrows ended up opening whichever
+     * series happened to be first.
+     */
     fun step(delta: Int) {
+        val episodes = state.episodes
+        if (state.openSeries != null && episodes.isNotEmpty()) {
+            val next = Playback.stepInList(episodes.map { it.id }, state.selectedId.orEmpty(), delta)
+            episodes.firstOrNull { it.id == next }?.let(viewModel::select)
+            return
+        }
         if (visible.isEmpty()) return
         val index = visible.indexOfFirst { it.id == state.selectedId }
-        val next = if (index == -1) 0 else (index + delta + visible.size) % visible.size
+        // Zapping stops at the ends of the guide rather than wrapping round,
+        // which is what the Tizen build does with the same list.
+        val next = (if (index == -1) 0 else index + delta).coerceIn(0, visible.size - 1)
         viewModel.select(visible[next])
     }
 
-    DisposableEffect(visible, state.selectedId, fullscreen) {
+    // Zapping is what you do to television. A film is not a channel, and a
+    // series is a thing you sit inside, so the arrows must not carry you out of
+    // it — and must reach the player's own controls instead.
+    // ...though before anything is playing, the channel keys should still start
+    // the guide off, the way they always have.
+    val zappable = state.selectedChannel?.let { it.kind == ChannelKind.LIVE }
+        ?: (state.catalog == Catalog.LIVE)
+
+    DisposableEffect(visible, state.selectedId, fullscreen, zappable) {
         RemoteKeys.setHandler { event ->
             when (event.keyCode) {
-                // Dedicated channel keys always zap, wherever focus happens to be.
-                KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                // The channel keys mean channels; on anything else they mean
+                // nothing, and swallowing them would only be confusing.
+                KeyEvent.KEYCODE_CHANNEL_UP -> if (zappable) { step(1); true } else false
+                KeyEvent.KEYCODE_CHANNEL_DOWN -> if (zappable) { step(-1); true } else false
+
+                // The media keys mean "the next thing", which is a channel here
+                // and an episode there — step() knows which list it is in.
+                KeyEvent.KEYCODE_MEDIA_NEXT -> {
                     step(1)
                     true
                 }
 
-                KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
                     step(-1)
                     true
                 }
 
-                // The D-pad only zaps on the full-screen player; with the list on
-                // screen it has to keep moving the selection as usual.
-                KeyEvent.KEYCODE_DPAD_UP -> if (fullscreen) {
+                // The D-pad only zaps on the full-screen player, and only for
+                // live television; over a film or an episode it has to fall
+                // through, or the focus can never reach the controls.
+                KeyEvent.KEYCODE_DPAD_UP -> if (fullscreen && zappable) {
                     step(-1)
                     true
                 } else {
                     false
                 }
 
-                KeyEvent.KEYCODE_DPAD_DOWN -> if (fullscreen) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> if (fullscreen && zappable) {
                     step(1)
                     true
                 } else {

@@ -403,11 +403,15 @@ fun PlayerPanel(
             IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
                 Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש")
             }
+            // These two step through whatever list you are in, so they have to
+            // be named after it: a channel out in the guide, an episode inside
+            // a series.
+            val unit = if (channel?.kind == ChannelKind.LIVE) "הערוץ" else "הפרק"
             IconButton(onClick = onPrev) {
-                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "הערוץ הקודם")
+                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "$unit הקודם")
             }
             IconButton(onClick = onNext) {
-                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "הערוץ הבא")
+                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "$unit הבא")
             }
         }
 
