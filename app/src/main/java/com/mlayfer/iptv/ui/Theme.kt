@@ -1,8 +1,10 @@
 package com.mlayfer.iptv.ui
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 
 // The same palette the Tizen build uses: near-black ground, one blue accent that
@@ -27,5 +29,16 @@ private val DarkScheme = darkColorScheme(
 
 @Composable
 fun TelohimTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = DarkScheme, content = content)
+    MaterialTheme(colorScheme = DarkScheme) {
+        // A `Text` that does not name a colour takes LocalContentColor, and
+        // Compose's default for that is black — the colour scheme has nothing
+        // to do with it. Every screen here paints itself a near-black ground,
+        // so an unnamed colour meant black on black: the row headings, the
+        // poster captions and the title over the door were all invisible.
+        // Naming it once at the root is the whole fix.
+        CompositionLocalProvider(
+            LocalContentColor provides DarkScheme.onBackground,
+            content = content,
+        )
+    }
 }
