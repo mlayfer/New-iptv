@@ -10,13 +10,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,26 +23,41 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mlayfer.iptv.BuildConfig
 import com.mlayfer.iptv.data.ChannelKind
+
+/** The Tizen build's card: a near-black plate with one coloured glow in a corner. */
+private val CardBase = Color(0xFF141417)
+private val CardEdge = Color(0xFF2E2E33)
+private val LiveGlow = Color(0xFF4D9BFF)
+private val LiveWash = Color(0xFF16243D)
+private val VodGlow = Color(0xFFC8322B)
+private val VodWash = Color(0xFF2A1420)
+
+/** How much of each world there is, said on its own door. */
+private data class WorldCounts(val live: Int, val movies: Int, val series: Int)
+
+private fun Int.grouped(): String = "%,d".format(this)
 
 /**
  * The door. Television and a library of films are two different things to be in
  * the mood for, and asking once — before either — is what keeps each of them
- * clean. The Tizen build opens on the same choice.
+ * clean. Drawn to match the Tizen build, down to the glow in the corner.
  */
-/** How much of each world there is, said on its own door. */
-private data class WorldCounts(val live: Int, val movies: Int, val series: Int)
-
 @Composable
 fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
     val counts = remember(state.channels, state.series) {
@@ -59,27 +73,34 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
             .tvSafeArea(),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
         ) {
-            Text(
-                text = "טלוהים",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = BuildConfig.VERSION_NAME,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.weight(1f))
             TextButton(
                 onClick = { viewModel.setScreen(Screen.SOURCES) },
                 modifier = Modifier.focusHighlight(),
-            ) { Text("מקורות") }
+            ) { Text("החלף מקור") }
+
+            Spacer(Modifier.weight(1f))
+
+            // The brand block sits in the corner, the way it does on the TV.
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "טלוהים",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "טלוויזיה בלייב • סרטים • סדרות",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "גרסה ${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         if (state.channels.isEmpty() && state.series.isEmpty()) {
@@ -97,54 +118,60 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
             return@Column
         }
 
-        Text(
-            text = "במה נתחיל?",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-        )
-
-        // Written once and placed twice, so the two layouts cannot drift apart.
-        val television: @Composable (Modifier) -> Unit = { place ->
-            WorldCard(
-                title = "טלוויזיה בלייב",
-                subtitle = if (counts.live > 0) "${counts.live} ערוצים" else "",
-                blurb = "כל הערוצים, מדריך שידורים, וזפזופ עם החצים",
-                tint = Color(0xFF1D4ED8),
-                onClick = { viewModel.enterWorld(Catalog.LIVE) },
-                modifier = place,
-            )
-        }
-        val library: @Composable (Modifier) -> Unit = { place ->
-            WorldCard(
-                title = "סרטים וסדרות",
-                subtitle = "${counts.movies} סרטים · ${counts.series} סדרות",
-                blurb = "המשך לצפות, המועדפים שלך, וכל הקטלוג",
-                tint = Color(0xFF7C3AED),
-                onClick = { viewModel.enterWorld(Catalog.MOVIES) },
-                modifier = place,
-            )
-        }
-
         BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            // Two doors side by side where there is room, stacked where there
-            // is not — a phone held upright has no room for two.
-            if (maxWidth > 560.dp) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    television(Modifier.weight(1f).fillMaxHeight())
-                    library(Modifier.weight(1f).fillMaxHeight())
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    television(Modifier.fillMaxWidth().height(180.dp))
-                    library(Modifier.fillMaxWidth().height(180.dp))
+            // The cards are a fixed share of the screen rather than all of it —
+            // the room around them is what stops the page shouting.
+            val sideBySide = maxWidth > 560.dp
+            val cardWidth = if (sideBySide) (maxWidth - 20.dp) / 2 * 0.82f else maxWidth
+            val cardHeight = if (sideBySide) cardWidth * 0.68f else 150.dp
+
+            val television: @Composable () -> Unit = {
+                WorldCard(
+                    title = "טלוויזיה בשידור חי",
+                    count = if (counts.live > 0) "${counts.live.grouped()} ערוצים" else "",
+                    blurb = "ערוצים, ספורט, חדשות וילדים",
+                    glow = LiveGlow,
+                    wash = LiveWash,
+                    glowAtX = 0.78f,
+                    onClick = { viewModel.enterWorld(Catalog.LIVE) },
+                    modifier = Modifier.width(cardWidth).height(cardHeight),
+                )
+            }
+            val library: @Composable () -> Unit = {
+                WorldCard(
+                    title = "סרטים וסדרות",
+                    count = "${counts.movies.grouped()} סרטים · ${counts.series.grouped()} סדרות",
+                    blurb = "הספרייה, ומה שהתחלת לראות",
+                    glow = VodGlow,
+                    wash = VodWash,
+                    glowAtX = 0.22f,
+                    onClick = { viewModel.enterWorld(Catalog.MOVIES) },
+                    modifier = Modifier.width(cardWidth).height(cardHeight),
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                Text(
+                    text = "מה בא לך לראות?",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (sideBySide) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        television()
+                        library()
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        television()
+                        library()
+                    }
                 }
             }
         }
@@ -154,46 +181,64 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
 @Composable
 private fun WorldCard(
     title: String,
-    subtitle: String,
+    count: String,
     blurb: String,
-    tint: Color,
+    glow: Color,
+    wash: Color,
+    /** Where the glow sits across the card: the two doors mirror each other. */
+    glowAtX: Float,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(24.dp)
+    var focused by remember { mutableStateOf(false) }
+    val edge = if (focused) MaterialTheme.colorScheme.primary else CardEdge
+
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    listOf(tint.copy(alpha = 0.85f), tint.copy(alpha = 0.22f)),
-                ),
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
-            .focusHighlight(shape = shape)
+            .background(CardBase)
+            .drawBehind {
+                drawRect(
+                    Brush.linearGradient(
+                        colors = listOf(wash, Color(0xFF0A0A0B)),
+                        start = Offset(size.width, 0f),
+                        end = Offset(0f, size.height),
+                    )
+                )
+                drawRect(
+                    Brush.radialGradient(
+                        colors = listOf(glow.copy(alpha = 0.40f), Color.Transparent),
+                        center = Offset(size.width * glowAtX, size.height * 0.18f),
+                        radius = size.width * 0.75f,
+                    )
+                )
+            }
+            .border(if (focused) 2.dp else 1.dp, edge, shape)
+            .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = onClick)
-            .padding(24.dp),
+            .padding(horizontal = 24.dp, vertical = 20.dp),
         contentAlignment = Alignment.BottomStart,
     ) {
         Column {
             Text(
                 text = title,
-                fontSize = 32.sp,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = Color(0xFFE9EEFA),
             )
-            if (subtitle.isNotBlank()) {
+            if (count.isNotBlank()) {
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.86f),
+                    text = count,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
-            Spacer(Modifier.height(6.dp))
             Text(
                 text = blurb,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.72f),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF93A3BF),
             )
         }
     }

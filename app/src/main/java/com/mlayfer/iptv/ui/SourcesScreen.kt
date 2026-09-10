@@ -3,6 +3,11 @@ package com.mlayfer.iptv.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -114,39 +119,58 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-      BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+      BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val wide = maxWidth >= 600.dp
+        val card = RoundedCornerShape(24.dp)
         Column(
             modifier = Modifier
-                .fillMaxHeight()
-                .widthIn(max = 820.dp)
+                // A sign-in form is one object, not a row of fields flung across
+                // a television. The Tizen build puts it on a card of its own and
+                // sets it in the middle; this is the same card.
+                .widthIn(max = 560.dp)
                 .fillMaxWidth()
                 // Keeps the form clear of the status bar, the navigation bar and
                 // the keyboard — this screen is nothing but text fields.
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .imePadding()
                 .tvSafeArea()
+                .clip(card)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outline, card)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (state.playlists.isNotEmpty()) {
                     IconButton(onClick = { viewModel.setScreen(Screen.CHOOSE) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה")
                     }
                 }
-                Text("מקורות תוכן", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    text = "ברוכים הבאים לטלוהים",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
+                )
+                // Balances the back arrow so the title sits in the middle.
+                if (state.playlists.isNotEmpty()) Spacer(Modifier.width(48.dp))
             }
 
             Text(
                 text = if (LocalIsTv.current) {
-                    "אישור על שדה פותח את המקלדת · Back סוגר · התוכן מגיע מהמנוי שלך"
+                    "הזן מקור IPTV, ואחר כך תוכל לבחור בין טלוויזיה בלייב לבין סרטים וסדרות · אישור פותח את המקלדת"
                 } else {
                     "האפליקציה היא נגן בלבד — התוכן מגיע מהרשימה או מהמנוי שלך."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
 
             if (state.playlists.isNotEmpty()) {
@@ -330,13 +354,6 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         },
-                    )
-
-                    FormTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = "שם לרשימה (רשות)",
-                        modifier = Modifier.fillMaxWidth(),
                     )
 
                     Row(
