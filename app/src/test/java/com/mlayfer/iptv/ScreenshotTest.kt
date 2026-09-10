@@ -42,8 +42,11 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-// A 1080p television, which is the screen this app is mostly looked at on.
-@Config(qualifiers = "w960dp-h540dp-television-notouch-xhdpi")
+// A 1080p television, which is the screen this app is mostly looked at on:
+// 960x540dp at xhdpi is 1920x1080 pixels. Android fixes the order these
+// qualifiers may be written in — size, then ui mode, then density, then
+// touchscreen — and Robolectric rejects any other.
+@Config(qualifiers = "w960dp-h540dp-television-xhdpi-notouch")
 class ScreenshotTest {
 
     @get:Rule
