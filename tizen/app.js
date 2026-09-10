@@ -1276,7 +1276,26 @@ function renderControls(){
   show('fwd10', !live);
   show('prevEp', !!episodeNeighbour(-1));
   show('nextEp', !!episodeNeighbour(1));
-  text($('#btnToggle'), state.paused ? 'נגן' : 'השהה');
+  setToggleIcon(state.paused);
+}
+
+const PLAY_ICON = '<path d="M8 5v14l11-7L8 5z"/>';
+const PAUSE_ICON = '<rect x="6" y="5" width="4" height="14" rx="1.2"/>' +
+  '<rect x="14" y="5" width="4" height="14" rx="1.2"/>';
+
+/**
+ * The main button is a shape, not a word, so it is swapped rather than
+ * relabelled — writing text into it would throw the icon away. The name it
+ * carries for the remote and for the focused label changes with it.
+ */
+function setToggleIcon(paused){
+  const btn = $('#btnToggle');
+  if(!btn) return;
+  const icon = $('#toggleIcon', btn);
+  if(icon) icon.innerHTML = paused ? PLAY_ICON : PAUSE_ICON;
+  const label = paused ? 'נגן' : 'השהה';
+  btn.setAttribute('aria-label', label);
+  text($('.ctrlName', btn), label);
 }
 
 function openControls(){

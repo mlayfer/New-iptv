@@ -269,6 +269,53 @@ check("the controls are there without hunting for them",
   `${await page.locator("#controlRow .ctrlBtn:visible").count()} buttons`);
 check("an episode offers the next one", (await page.locator('[data-act="nextEp"]:visible').count()) === 1);
 
+// The controls are shapes, not words — and a shape nobody can name is worse
+// than a word, so the focused one still says what it is.
+const drawn = await page.locator("#controlRow .ctrlBtn:visible svg").count();
+const buttons = await page.locator("#controlRow .ctrlBtn:visible").count();
+check("every control is drawn, not spelled out", drawn === buttons,
+  `${drawn} icons for ${buttons} buttons`);
+check("an unfocused control keeps its name out of sight",
+  (await page.evaluate(() => {
+    const el = document.querySelector("#controlRow .ctrlBtn:not(.focused) .ctrlName");
+    return el ? getComputedStyle(el).opacity : "none";
+  })) === "0");
+
+// Down is the way to the controls, and the one under the cursor says its name.
+await page.keyboard.press("ArrowDown");
+await page.waitForTimeout(500);
+check("but the focused one names itself",
+  (await page.evaluate(() => {
+    const el = document.querySelector("#controlRow .ctrlBtn.focused .ctrlName");
+    return el ? getComputedStyle(el).opacity : "none";
+  })) === "1",
+  await page.evaluate(() => {
+    const el = document.querySelector("#controlRow .ctrlBtn.focused .ctrlName");
+    return el ? el.textContent : "nothing focused";
+  }));
+
+// Play and pause are the same button wearing two faces; writing text into it
+// would have thrown the face away.
+const faceOf = () => page.evaluate(() =>
+  document.querySelector("#toggleIcon").innerHTML.replace(/\s+/g, ""));
+const pausedFace = await faceOf();
+const pausedName = await page.getAttribute("#btnToggle", "aria-label");
+await page.click("#btnToggle");
+await page.waitForTimeout(400);
+check("the play button changes its face, and keeps having one",
+  (await faceOf()) !== pausedFace && (await faceOf()).length > 0,
+  `${pausedName} -> ${await page.getAttribute("#btnToggle", "aria-label")}`);
+check("and the name follows the face",
+  (await page.getAttribute("#btnToggle", "aria-label")) !== pausedName);
+await page.click("#btnToggle");
+await page.waitForTimeout(400);
+// Opening the controls above changed where the remote is pointing; put it back
+// where the rest of the walk expects to find it.
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(500);
+check("closing the controls stays in the player, it does not leave it",
+  await shown("#playerScreen"));
+
 await page.evaluate(() => { const a = window.__talohim; a.state.duration = 3600; a.state.position = 600; a.renderProgress(); });
 await page.keyboard.press("ArrowLeft");
 await page.waitForTimeout(700);

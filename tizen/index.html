@@ -201,14 +201,38 @@
           </div>
 
           <div class="controlRow" id="controlRow">
-            <button class="focusable ctrlBtn" data-act="restart">מהתחלה</button>
-            <button class="focusable ctrlBtn" data-act="back10">אחורה 10</button>
-            <button class="focusable ctrlBtn ctrlMain" id="btnToggle" data-act="toggle">השהה</button>
-            <button class="focusable ctrlBtn" data-act="fwd10">קדימה 10</button>
-            <button class="focusable ctrlBtn" data-act="prevEp">הפרק הקודם</button>
-            <button class="focusable ctrlBtn" data-act="nextEp">הפרק הבא</button>
-            <button class="focusable ctrlBtn" data-act="audio">שמע</button>
-            <button class="focusable ctrlBtn" data-act="subs">כתוביות</button>
+            <button class="focusable ctrlBtn" data-act="prevEp" aria-label="הפרק הקודם">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6v12L9 12l9-6z"/><rect x="5" y="6" width="2.4" height="12" rx="1"/></svg>
+              <span class="ctrlName" aria-hidden="true">הפרק הקודם</span>
+            </button>
+            <button class="focusable ctrlBtn" data-act="back10" aria-label="אחורה 10 שניות">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5.5 5.5 0 1 1-5.5 5.5H4.5A7.5 7.5 0 1 0 12 5z"/><text x="12" y="16" text-anchor="middle" font-size="8" font-weight="700">10</text></svg>
+              <span class="ctrlName" aria-hidden="true">אחורה 10</span>
+            </button>
+            <button class="focusable ctrlBtn ctrlMain" id="btnToggle" data-act="toggle" aria-label="השהה">
+              <svg viewBox="0 0 24 24" aria-hidden="true" id="toggleIcon"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+              <span class="ctrlName" aria-hidden="true">השהה</span>
+            </button>
+            <button class="focusable ctrlBtn" data-act="fwd10" aria-label="קדימה 10 שניות">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2l5 4-5 4V7a5.5 5.5 0 1 0 5.5 5.5h2A7.5 7.5 0 1 1 12 5z"/><text x="12" y="16" text-anchor="middle" font-size="8" font-weight="700">10</text></svg>
+              <span class="ctrlName" aria-hidden="true">קדימה 10</span>
+            </button>
+            <button class="focusable ctrlBtn" data-act="nextEp" aria-label="הפרק הבא">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6v12l9-6-9-6z"/><rect x="16.6" y="6" width="2.4" height="12" rx="1"/></svg>
+              <span class="ctrlName" aria-hidden="true">הפרק הבא</span>
+            </button>
+            <button class="focusable ctrlBtn" data-act="restart" aria-label="מהתחלה">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5.5 5.5 0 1 1-5.5 5.5H4.5A7.5 7.5 0 1 0 12 5z"/></svg>
+              <span class="ctrlName" aria-hidden="true">מהתחלה</span>
+            </button>
+            <button class="focusable ctrlBtn" data-act="audio" aria-label="שמע">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="ctrlName" aria-hidden="true">שמע</span>
+            </button>
+            <button class="focusable ctrlBtn" data-act="subs" aria-label="כתוביות">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="6" y="13" width="5.5" height="2" rx="1"/><rect x="13" y="13" width="5" height="2" rx="1"/><rect x="6" y="9" width="8" height="2" rx="1"/></svg>
+              <span class="ctrlName" aria-hidden="true">כתוביות</span>
+            </button>
           </div>
 
           <div class="ovHint" id="ovHint"></div>
