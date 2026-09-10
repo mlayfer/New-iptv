@@ -60,10 +60,19 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
         immediate = !searching,
     ) { if (searching) HomeRows.search(cards, query, index = state.searchIndex) else home }
 
-    // "Films" and "Series" are one shelf seen through a filter, not a different
-    // screen — which is how the Tizen build reads, and why its sections feel
-    // like one place rather than three.
-    val rows = remember(found, state.catalog) { forCatalog(found, state.catalog) }
+    // "Films" and "Series" are one place with the home shelf, not a different
+    // screen — but they are not the home shelf filtered. Home keeps twenty of
+    // each kind because it is a summary; a section is the list, and a list that
+    // stops at twenty out of three hundred is a bug rather than a summary. So a
+    // section is built from the whole catalogue, grouped by the category the
+    // portal gave it, which is exactly what the Tizen build draws.
+    val rows = remember(found, cards, state.catalog, searching) {
+        if (searching || state.catalog == Catalog.ALL) {
+            forCatalog(found, state.catalog)
+        } else {
+            sectionRows(cards, state.catalog)
+        }
+    }
 
     var highlighted by remember { mutableStateOf<HomeRows.Card?>(null) }
     val seen = remember(state.recent, state.watched) { state.seen }
@@ -149,17 +158,32 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
     }
 }
 
-/** The rows a chosen section keeps: an empty shelf is not a shelf. */
+/** The rows a chosen section keeps out of the home shelf: an empty shelf is not a shelf. */
 private fun forCatalog(rows: List<HomeRows.Row>, catalog: Catalog): List<HomeRows.Row> {
-    val keep: (HomeRows.Card) -> Boolean = when (catalog) {
-        Catalog.MOVIES -> { c -> c.kind != "LIVE" && c.contentType != "SERIES" }
-        Catalog.SERIES -> { c -> c.contentType == "SERIES" }
-        else -> return rows
-    }
+    val keep = keeperFor(catalog) ?: return rows
     return rows.mapNotNull { row ->
         val items = row.items.filter(keep)
         if (items.isEmpty()) null else row.copy(items = items)
     }
+}
+
+/**
+ * A whole section, as its own shelves: everything of that kind, under the
+ * category the portal filed it in, in the order it arrived. Nothing is dropped.
+ */
+private fun sectionRows(cards: List<HomeRows.Card>, catalog: Catalog): List<HomeRows.Row> {
+    val keep = keeperFor(catalog) ?: return emptyList()
+    val byGroup = LinkedHashMap<String, MutableList<HomeRows.Card>>()
+    for (card in cards) {
+        if (keep(card)) byGroup.getOrPut(card.group) { mutableListOf() }.add(card)
+    }
+    return byGroup.map { (name, items) -> HomeRows.Row("group:$name", name, items) }
+}
+
+private fun keeperFor(catalog: Catalog): ((HomeRows.Card) -> Boolean)? = when (catalog) {
+    Catalog.MOVIES -> { c -> c.kind != "LIVE" && c.contentType != "SERIES" }
+    Catalog.SERIES -> { c -> c.contentType == "SERIES" }
+    else -> null
 }
 
 /**

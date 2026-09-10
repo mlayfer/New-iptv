@@ -34,6 +34,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -41,7 +42,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -148,6 +154,15 @@ fun PlayerPanel(
     // UI is watching; kept here so the icon reflects it the moment it changes.
     var subsOff by remember { mutableStateOf(false) }
     var retries by remember { mutableIntStateOf(0) }
+    var playing by remember { mutableStateOf(true) }
+    var position by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(0L) }
+    // The controls come and go the way they do on a television: any press brings
+    // them back, and a few seconds of stillness takes them away again. A strip
+    // of buttons parked across the bottom of a film is not a control, it is a
+    // thing in the way.
+    var controlsShown by remember { mutableStateOf(true) }
+    var wake by remember { mutableIntStateOf(0) }
     var reloadToken by remember { mutableIntStateOf(0) }
     // Every way this channel might be reachable, in the order worth trying.
     // Not an effect key: the ladder is climbed from inside the error listener,
@@ -208,6 +223,10 @@ fun PlayerPanel(
                         ?.let { currentQueue.getOrNull(it + 1) }
                     if (next != null) currentPlayItem(next)
                 }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playing = isPlaying
             }
 
             override fun onTracksChanged(available: Tracks) {
@@ -280,6 +299,24 @@ fun PlayerPanel(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Windowed, the row is part of the layout and always there. Full screen, it
+    // is an overlay, and it leaves.
+    LaunchedEffect(wake, fullscreen, channel?.id) {
+        controlsShown = true
+        if (!fullscreen) return@LaunchedEffect
+        delay(CONTROLS_LINGER)
+        controlsShown = false
+    }
+
+    // Only worth reading while someone is looking at it.
+    LaunchedEffect(controlsShown, channel?.id) {
+        while (controlsShown) {
+            position = player.currentPosition
+            duration = player.duration.takeIf { it > 0 } ?: 0L
+            delay(500)
+        }
+    }
+
     LaunchedEffect(channel?.id, reloadToken) {
         error = null
         errorDetail = null
@@ -295,7 +332,182 @@ fun PlayerPanel(
         start(0)
     }
 
-    Column(modifier = modifier) {
+    val transport = remember { FocusRequester() }
+
+    // The same strip in both places: parked under the picture when the player
+    // shares the screen, laid over the bottom of it when it has the lot.
+    val controlRow: @Composable () -> Unit = {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    if (fullscreen) {
+                        Color.Black.copy(alpha = 0.82f)
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    }
+                )
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+            // How far into a film this is. Live television has no such place.
+            if (duration > 0) {
+                LinearProgressIndicator(
+                    progress = { (position.toFloat() / duration).coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .padding(bottom = 4.dp),
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // The button this whole strip exists for, and the one that
+                // was missing: Material's core icon set carries play and not
+                // pause, so the pair is drawn in res/drawable.
+                IconButton(
+                    onClick = { if (player.isPlaying) player.pause() else player.play() },
+                    enabled = channel != null,
+                    modifier = Modifier.focusRequester(transport),
+                ) {
+                    if (playing) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_pause),
+                            contentDescription = "השהיה",
+                        )
+                    } else {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "הפעלה")
+                    }
+                }
+                // Only a recording can be moved through; live has nowhere to go.
+                if (duration > 0) {
+                    IconButton(onClick = { player.seekBack() }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_rewind),
+                            contentDescription = "אחורה",
+                        )
+                    }
+                    IconButton(onClick = { player.seekForward() }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_forward),
+                            contentDescription = "קדימה",
+                        )
+                    }
+                }
+                // The name leads the row, the way the list reads.
+                Text(
+                    text = channel?.name ?: "",
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 8.dp),
+                )
+
+                IconButton(onClick = onToggleFavorite, enabled = channel != null) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "מועדפים",
+                        tint = if (isFavorite) {
+                            MaterialTheme.colorScheme.secondary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
+                    Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש")
+                }
+                // These two step through whatever list you are in, so they have to
+                // be named after it: a channel out in the guide, an episode inside
+                // a series.
+                val unit = if (channel?.kind == ChannelKind.LIVE) "הערוץ" else "הפרק"
+                IconButton(onClick = onPrev) {
+                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = "$unit הקודם")
+                }
+                IconButton(onClick = onNext) {
+                    Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "$unit הבא")
+                }
+
+                // Offered only when the stream actually carries a choice; a button
+                // that opens an empty list is worse than no button.
+                val audio = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_AUDIO) }
+                val subs = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_TEXT) }
+
+                if (audio.size > 1) {
+                    Box {
+                        IconButton(onClick = { trackMenu = C.TRACK_TYPE_AUDIO }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_audio_track),
+                                contentDescription = "שמע",
+                            )
+                        }
+                        TrackMenu(
+                            open = trackMenu == C.TRACK_TYPE_AUDIO,
+                            choices = audio,
+                            offLabel = null,
+                            offSelected = false,
+                            onDismiss = { trackMenu = null },
+                            onPick = { TrackChoices.choose(player, tracks, C.TRACK_TYPE_AUDIO, it); trackMenu = null },
+                            onOff = {},
+                        )
+                    }
+                }
+
+                if (subs.isNotEmpty()) {
+                    Box {
+                        IconButton(onClick = { trackMenu = C.TRACK_TYPE_TEXT }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_subtitles),
+                                contentDescription = "כתוביות",
+                                tint = if (subsOff) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                            )
+                        }
+                        TrackMenu(
+                            open = trackMenu == C.TRACK_TYPE_TEXT,
+                            choices = subs,
+                            offLabel = "בלי כתוביות",
+                            offSelected = subsOff,
+                            onDismiss = { trackMenu = null },
+                            onPick = {
+                                TrackChoices.choose(player, tracks, C.TRACK_TYPE_TEXT, it)
+                                subsOff = false
+                                trackMenu = null
+                            },
+                            onOff = {
+                                TrackChoices.turnOff(player, C.TRACK_TYPE_TEXT)
+                                subsOff = true
+                                trackMenu = null
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Full screen, the strip is the only thing that can hold focus, and it should
+    // hold it the moment it appears — otherwise OK does nothing.
+    LaunchedEffect(controlsShown, fullscreen) {
+        if (controlsShown && fullscreen && channel != null) {
+            runCatching { transport.requestFocus() }
+        }
+    }
+
+    Column(
+        modifier = modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            val wasHidden = !controlsShown
+            wake += 1
+            // While the strip is away, the first press only brings it back. That
+            // is what every television does, and it stops a stray arrow from
+            // skipping an episode you could not see you were about to skip.
+            wasHidden && fullscreen
+        },
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -307,24 +519,19 @@ fun PlayerPanel(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         this.player = player
-                        useController = true
+                        // Media3 brings its own controls, and on a television
+                        // the two layers fought each other for the remote: the
+                        // built-in one never appeared, and this one had no
+                        // pause, so an episode could be started and not stopped.
+                        // There is one set of controls now, and it is this file's.
+                        useController = false
                         keepScreenOn = true
-                        setShowNextButton(false)
-                        setShowPreviousButton(false)
-                        // A film needs to be moved through, not only started.
-                        setShowRewindButton(true)
-                        setShowFastForwardButton(true)
-                        setShowShuffleButton(false)
-                        controllerShowTimeoutMs = 4_500
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        isFocusable = true
-                        setFullscreenButtonClickListener { onToggleFullscreen() }
+                        isFocusable = false
                     }
                 },
                 update = { view ->
-                    // On a TV the list normally holds focus; full screen has to hand
-                    // it to the player so the remote drives playback.
-                    if (fullscreen && !view.hasFocus()) view.requestFocus()
+                    if (view.player !== player) view.player = player
                 },
             )
 
@@ -341,6 +548,10 @@ fun PlayerPanel(
                     color = Color.White,
                     modifier = Modifier.align(Alignment.Center),
                 )
+            }
+
+            if (fullscreen && controlsShown) {
+                Box(modifier = Modifier.align(Alignment.BottomCenter)) { controlRow() }
             }
 
             val message = error
@@ -391,107 +602,7 @@ fun PlayerPanel(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(start = 4.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // The name leads the row, the way the list reads.
-            Text(
-                text = channel?.name ?: "",
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 8.dp),
-            )
-
-            IconButton(onClick = onToggleFavorite, enabled = channel != null) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "מועדפים",
-                    tint = if (isFavorite) {
-                        MaterialTheme.colorScheme.secondary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-            IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
-                Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש")
-            }
-            // These two step through whatever list you are in, so they have to
-            // be named after it: a channel out in the guide, an episode inside
-            // a series.
-            val unit = if (channel?.kind == ChannelKind.LIVE) "הערוץ" else "הפרק"
-            IconButton(onClick = onPrev) {
-                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "$unit הקודם")
-            }
-            IconButton(onClick = onNext) {
-                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "$unit הבא")
-            }
-
-            // Offered only when the stream actually carries a choice; a button
-            // that opens an empty list is worse than no button.
-            val audio = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_AUDIO) }
-            val subs = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_TEXT) }
-
-            if (audio.size > 1) {
-                Box {
-                    IconButton(onClick = { trackMenu = C.TRACK_TYPE_AUDIO }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_audio_track),
-                            contentDescription = "שמע",
-                        )
-                    }
-                    TrackMenu(
-                        open = trackMenu == C.TRACK_TYPE_AUDIO,
-                        choices = audio,
-                        offLabel = null,
-                        offSelected = false,
-                        onDismiss = { trackMenu = null },
-                        onPick = { TrackChoices.choose(player, tracks, C.TRACK_TYPE_AUDIO, it); trackMenu = null },
-                        onOff = {},
-                    )
-                }
-            }
-
-            if (subs.isNotEmpty()) {
-                Box {
-                    IconButton(onClick = { trackMenu = C.TRACK_TYPE_TEXT }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_subtitles),
-                            contentDescription = "כתוביות",
-                            tint = if (subsOff) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                        )
-                    }
-                    TrackMenu(
-                        open = trackMenu == C.TRACK_TYPE_TEXT,
-                        choices = subs,
-                        offLabel = "בלי כתוביות",
-                        offSelected = subsOff,
-                        onDismiss = { trackMenu = null },
-                        onPick = {
-                            TrackChoices.choose(player, tracks, C.TRACK_TYPE_TEXT, it)
-                            subsOff = false
-                            trackMenu = null
-                        },
-                        onOff = {
-                            TrackChoices.turnOff(player, C.TRACK_TYPE_TEXT)
-                            subsOff = true
-                            trackMenu = null
-                        },
-                    )
-                }
-            }
-        }
+        if (!fullscreen) controlRow()
 
         if (!fullscreen && now != null) {
             Column(
@@ -681,3 +792,6 @@ private fun TrackMenu(
         }
     }
 }
+
+/** Long enough to read the row, short enough not to sit on top of a film. */
+private const val CONTROLS_LINGER = 4_500L
