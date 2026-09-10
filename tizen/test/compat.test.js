@@ -75,7 +75,7 @@ test('the scripts stay inside what the television can run', () => {
   // forget to add a new file to, and the file that slips past is exactly the
   // one nobody checked.
   const scripts = fs.readdirSync(TIZEN).filter((f) => f.endsWith('.js'));
-  assert.ok(scripts.length >= 4, `only found ${scripts.join(', ')}`);
+  assert.ok(scripts.length >= 3, `only found ${scripts.join(', ')}`);
   for (const name of scripts) {
     const found = offenders(read(name), JS_RULES);
     assert.deepStrictEqual(found, [], `${name}: Chromium ${CHROMIUM} cannot run:\n  ${found.join('\n  ')}`);

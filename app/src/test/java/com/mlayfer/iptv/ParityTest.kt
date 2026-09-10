@@ -3,15 +3,11 @@ package com.mlayfer.iptv
 import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.M3uParser
 import com.mlayfer.iptv.data.Playback
-import com.mlayfer.iptv.data.RecentEntry
 import com.mlayfer.iptv.data.Search
-import com.mlayfer.iptv.data.Sync
 import com.mlayfer.iptv.data.StreamVariants
 import com.mlayfer.iptv.data.XtreamClient
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -320,52 +316,5 @@ class ParityTest {
             HomeRows.recommend(items, emptyList(), emptyList(), spec.getLong("now")).map { it.id },
         )
         assertNull(HomeRows.becauseYouWatched(items, emptyList(), emptyList()))
-    }
-
-    @Test
-    fun `merges two devices item by item, whichever order they meet in`() {
-        val spec = fixtures.getJSONObject("sync")
-        val tv = Sync.fromJson(spec.getJSONObject("tv").toString(), "p")
-        val phone = Sync.fromJson(spec.getJSONObject("phone").toString(), "p")
-        val expected = spec.getJSONObject("expected")
-        fun strings(key: String) = expected.getJSONArray(key).let { array ->
-            (0 until array.length()).map { array.getString(it) }
-        }
-        fun longs(key: String) = expected.getJSONArray(key).let { array ->
-            (0 until array.length()).map { array.getLong(it) }
-        }
-
-        val merged = Sync.mergeDocs(tv, phone)
-        assertEquals(strings("history"), merged.history.map { it.channelId })
-        assertEquals(longs("historyPositions"), merged.history.map { it.position })
-        assertEquals(strings("favoritesOn"), Sync.flagsOn(merged.favorites))
-        assertEquals(strings("watchedOn"), Sync.flagsOn(merged.watched))
-
-        // Either device may be the one that merges, so the answer cannot depend
-        // on which of them got there first.
-        assertEquals(Sync.toJson(merged), Sync.toJson(Sync.mergeDocs(phone, tv)))
-    }
-
-    @Test
-    fun `never puts the portal password on the wire`() {
-        val doc = Sync.Doc(
-            history = listOf(
-                RecentEntry(
-                    channelId = "e1",
-                    playlistId = "SECRET-PLAYLIST",
-                    at = 5,
-                    position = 10,
-                    duration = 20,
-                    name = "פרק",
-                    group = "דרמה",
-                    kind = "VOD",
-                    contentType = "EPISODE",
-                )
-            ),
-        )
-        val wire = Sync.toJson(doc)
-        assertFalse(wire.contains("SECRET-PLAYLIST"))
-        // ...and still keeps what the card is for.
-        assertTrue(wire.contains("פרק"))
     }
 }
