@@ -689,5 +689,156 @@
         "expected": null
       }
     ]
+  },
+  "matching": {
+    "_comment": "skeleton() and matchesQuery() must agree in both apps.",
+    "skeletons": [
+      {
+        "text": "fauda",
+        "expected": "PD"
+      },
+      {
+        "text": "פאודה",
+        "expected": "PD"
+      },
+      {
+        "text": "breaking bad",
+        "expected": "BRKNGBD"
+      },
+      {
+        "text": "ברייקינג באד",
+        "expected": "BRKNGBD"
+      },
+      {
+        "text": "the office",
+        "expected": "PS"
+      },
+      {
+        "text": "דה אופיס",
+        "expected": "PS"
+      },
+      {
+        "text": "game of thrones",
+        "expected": "GMTRNS"
+      },
+      {
+        "text": "גיים אוף ת׳רונס",
+        "expected": "GMTRNS"
+      },
+      {
+        "text": "eurovision",
+        "expected": "RBSN"
+      },
+      {
+        "text": "אירוויזיון",
+        "expected": "RBSN"
+      },
+      {
+        "text": "severance",
+        "expected": "SBRNS"
+      },
+      {
+        "text": "ניתוק",
+        "expected": "NTK"
+      },
+      {
+        "text": "sport",
+        "expected": "SPRT"
+      },
+      {
+        "text": "ספורט 1",
+        "expected": "SPRT1"
+      },
+      {
+        "text": "shtisel",
+        "expected": "STSL"
+      },
+      {
+        "text": "שטיסל",
+        "expected": "STSL"
+      },
+      {
+        "text": "ted lasso",
+        "expected": "TDLS"
+      },
+      {
+        "text": "טד לאסו",
+        "expected": "TDLS"
+      }
+    ],
+    "cases": [
+      {
+        "query": "fauda",
+        "name": "פאודה",
+        "expected": true
+      },
+      {
+        "query": "breaking bad",
+        "name": "ברייקינג באד",
+        "expected": true
+      },
+      {
+        "query": "the office",
+        "name": "דה אופיס",
+        "expected": true
+      },
+      {
+        "query": "game of thrones",
+        "name": "גיים אוף ת׳רונס",
+        "expected": true
+      },
+      {
+        "query": "eurovision",
+        "name": "אירוויזיון",
+        "expected": true
+      },
+      {
+        "query": "severance",
+        "name": "ניתוק",
+        "expected": false
+      },
+      {
+        "query": "severance",
+        "name": "ניתוק",
+        "alias": "Severance",
+        "expected": true
+      },
+      {
+        "query": "ספורט",
+        "name": "ספורט 1",
+        "expected": true
+      },
+      {
+        "query": "sport",
+        "name": "ספורט 1",
+        "expected": true
+      },
+      {
+        "query": "po",
+        "name": "פאודה",
+        "expected": false
+      },
+      {
+        "query": "קומדיה",
+        "name": "סרט כלשהו",
+        "group": "קומדיה",
+        "expected": true
+      },
+      {
+        "query": "i24",
+        "name": "ערוץ 124 HD",
+        "expected": false
+      },
+      {
+        "query": "i24",
+        "name": "i24NEWS",
+        "expected": true
+      },
+      {
+        "query": "ted lasso",
+        "name": "טד לאסו",
+        "expected": true
+      }
+    ]
   }
 }

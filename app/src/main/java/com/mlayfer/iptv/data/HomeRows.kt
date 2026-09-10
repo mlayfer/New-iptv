@@ -30,6 +30,8 @@ object HomeRows {
         /** "LIVE", "MOVIE", "SERIES" or "EPISODE". */
         val contentType: String,
         val logo: String? = null,
+        /** Another title the portal gave for the same thing, if it gave one. */
+        val alias: String? = null,
         /** Seconds to resume from, 0 when the item was never started. */
         val resumeAt: Long = 0,
         val progress: Double = 0.0,
@@ -101,8 +103,10 @@ object HomeRows {
         val live = ArrayList<Card>()
         val movies = ArrayList<Card>()
         val series = ArrayList<Card>()
+        val wanted = Search.skeleton(q)
         for (item in items) {
-            if (!item.name.lowercase().contains(q) && !item.group.lowercase().contains(q)) continue
+            val text = Search.searchableText(item.name, item.group, item.alias)
+            if (!Search.matches(text, q, wanted)) continue
             when {
                 item.kind == "LIVE" -> if (live.size < limit) live.add(item)
                 item.contentType == "SERIES" -> if (series.size < limit) series.add(item)

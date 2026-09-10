@@ -35,8 +35,16 @@ object Filtering {
 
         val needle = normalize(query.trim())
         if (needle.isNotEmpty()) {
+            // The same matcher the search screen uses, so a name typed in Latin
+            // letters finds a channel the portal spells in Hebrew.
+            val wanted = Search.skeleton(needle)
             list = list.filter {
-                normalize(it.name).contains(needle) || normalize(it.group ?: "").contains(needle)
+                val text = Search.searchableText(
+                    normalize(it.name),
+                    normalize(it.group ?: ""),
+                    it.alias?.let(::normalize),
+                )
+                Search.matches(text, needle, wanted)
             }
         }
 

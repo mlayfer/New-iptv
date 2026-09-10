@@ -22,6 +22,7 @@ object M3uParser {
         var pendingName: String? = null
         var pendingGroup: String? = null
         var pendingLogo: String? = null
+        var pendingAlias: String? = null
         var pendingTvgId: String? = null
         var pendingUserAgent: String? = null
         var pendingReferrer: String? = null
@@ -31,6 +32,7 @@ object M3uParser {
             pendingName = null
             pendingGroup = null
             pendingLogo = null
+            pendingAlias = null
             pendingTvgId = null
             pendingUserAgent = null
             pendingReferrer = null
@@ -51,7 +53,13 @@ object M3uParser {
                     val (attrPart, displayName) = splitExtinf(line)
                     val attrs = readAttrs(attrPart)
                     resetPending()
-                    pendingName = displayName.ifBlank { attrs["tvg-name"] ?: "ללא שם" }
+                    val tvgName = attrs["tvg-name"]?.trim().orEmpty()
+                    pendingName = displayName.ifBlank { tvgName.ifBlank { "ללא שם" } }
+                    // A playlist often carries the original name in tvg-name
+                    // while the display name is translated: an alias for free.
+                    pendingAlias = tvgName.takeIf {
+                        it.isNotEmpty() && !it.equals(displayName.trim(), ignoreCase = true)
+                    }
                     pendingTvgId = attrs["tvg-id"]?.ifBlank { null }
                     pendingLogo = attrs["tvg-logo"]?.ifBlank { null }
                     pendingGroup = attrs["group-title"]?.ifBlank { null }
@@ -90,6 +98,7 @@ object M3uParser {
                                 kind = guessKind(line, group),
                                 group = group,
                                 logo = pendingLogo,
+                                alias = pendingAlias,
                                 tvgId = pendingTvgId,
                                 userAgent = pendingUserAgent,
                                 referrer = pendingReferrer,

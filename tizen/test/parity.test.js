@@ -102,3 +102,15 @@ test('does the same playback arithmetic', () => {
     assert.strictEqual(got ? got.id : null, c.expected, `${c.id} ${c.step}`);
   }
 });
+
+test('reads a name the same way in both alphabets', () => {
+  const f = fixtures.matching;
+  for (const c of f.skeletons) {
+    assert.strictEqual(core.skeleton(c.text), c.expected, c.text);
+  }
+  for (const c of f.cases) {
+    const item = { name: c.name, group: c.group || '', alias: c.alias || null };
+    assert.strictEqual(core.matchesQuery(item, c.query), c.expected,
+      `${c.query} vs ${c.name}`);
+  }
+});

@@ -62,8 +62,10 @@
         const left = cut >= 0 ? rest.slice(0, cut) : rest;
         const name = cut >= 0 ? rest.slice(cut + 1).trim() : '';
         const a = attrs(left);
+        const tvgName = (a['tvg-name'] || '').trim();
         pending = {
-          name: name || a['tvg-name'] || 'ללא שם',
+          name: name || tvgName || 'ללא שם',
+          alias: tvgName && tvgName.toLowerCase() !== (name || '').toLowerCase() ? tvgName : null,
           group: a['group-title'] || null,
           logo: a['tvg-logo'] || null,
           tvgId: a['tvg-id'] || null,
@@ -104,6 +106,7 @@
           kind: kind,
           contentType: kind === 'LIVE' ? 'LIVE' : (looksLikeSeries(base.name, group) ? 'SERIES' : 'MOVIE'),
           url: line,
+          alias: base.alias || null,
           logo: base.logo || null,
           tvgId: base.tvgId || null,
           userAgent: base.userAgent || null,
@@ -328,6 +331,87 @@
   }
 
   /**
+   * Matching a title someone half-remembers, in either language.
+   *
+   * Two things get in the way. Providers list a show under one name only —
+   * "ניתוק" and never "Severance" — and when they do use the original name they
+   * spell it in Hebrew letters ("ברייקינג באד"). The first is answered by any
+   * original-title field the portal happens to send, kept next to the name. The
+   * second is answered here: both sides are reduced to their consonants in one
+   * shared alphabet, so a Latin query and a Hebrew spelling of the same sounds
+   * meet in the middle. A translated name still cannot be guessed from the
+   * other language, and nothing here pretends otherwise.
+   */
+  const HEBREW_SKELETON = {
+    'א': '', 'ב': 'B', 'ג': 'G', 'ד': 'D', 'ה': '', 'ו': '', 'ז': 'Z', 'ח': 'X',
+    'ט': 'T', 'י': '', 'כ': 'K', 'ך': 'K', 'ל': 'L', 'מ': 'M', 'ם': 'M',
+    'נ': 'N', 'ן': 'N', 'ס': 'S', 'ע': '', 'פ': 'P', 'ף': 'P', 'צ': 'C',
+    'ץ': 'C', 'ק': 'K', 'ר': 'R', 'ש': 'S', 'ת': 'T'
+  };
+  // Grammar words, and the Hebrew spellings of those same words as they appear
+  // in transliterated titles ("גיים אוף ת'רונס"). Dropping them on both sides
+  // keeps one spelling from hiding the other.
+  const SKELETON_STOP_WORDS = {
+    the: 1, a: 1, an: 1, of: 1, and: 1,
+    'דה': 1, 'אוף': 1, 'אנד': 1, 'א': 1
+  };
+  const LATIN_SKELETON = {
+    b: 'B', v: 'B', w: 'B', p: 'P', f: 'P', k: 'K', c: 'K', q: 'K', g: 'G',
+    j: 'G', d: 'D', t: 'T', z: 'Z', s: 'S', r: 'R', l: 'L', m: 'M', n: 'N',
+    x: 'KS'
+  };
+  const SKELETON_MIN = 2;
+  const QUERY_MIN_FOR_SKELETON = 3;
+
+  function skeleton(text) {
+    let s = String(text || '').toLowerCase()
+      .split(/\s+/)
+      .filter(function (word) { return !SKELETON_STOP_WORDS[word]; })
+      .join(' ');
+    // Digraphs first: they are one sound, and the letters would map wrongly.
+    // A doubled vav is the consonant v; a single one is a vowel.
+    s = s.replace(/וו/g, 'ב')
+      .replace(/ce/g, 'se').replace(/ci/g, 'si')
+      .replace(/sh/g, 's').replace(/ch/g, 'x').replace(/kh/g, 'x')
+      .replace(/tz/g, 'c').replace(/ts/g, 'c')
+      .replace(/ph/g, 'f').replace(/th/g, 't').replace(/ck/g, 'k').replace(/qu/g, 'k');
+
+    let out = '';
+    for (const ch of s) {
+      if (ch >= '0' && ch <= '9') { out += ch; continue; }
+      if (HEBREW_SKELETON.hasOwnProperty(ch)) { out += HEBREW_SKELETON[ch]; continue; }
+      if (ch === 'x') { out += 'KS'; continue; }
+      const latin = LATIN_SKELETON[ch];
+      if (latin) out += latin;
+      // Everything else — vowels, spaces, punctuation, ה and י — carries no
+      // information about how a name was transliterated.
+    }
+    // A doubled letter in one spelling is a single one in the other, and s
+    // between vowels is heard as z: neither difference should hide a match.
+    return out.replace(/Z/g, 'S').replace(/(.)\1+/g, '$1');
+  }
+
+  /** The text a search looks at: the name, its category, and any other title. */
+  function searchableText(item) {
+    return [item.name, item.group, item.alias].filter(Boolean).join(' ').toLowerCase();
+  }
+
+  function matchesQuery(item, query, querySkeleton) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return false;
+    if (searchableText(item).indexOf(q) !== -1) return true;
+
+    // Only then the sound-alike path, and only for a query that is actually a
+    // name: "i24" reduced to its consonants is the digits, which appear inside
+    // half the channel numbers in a playlist.
+    if (q.length < QUERY_MIN_FOR_SKELETON) return false;
+    if ((q.match(/[a-z\u0590-\u05ff]/g) || []).length < QUERY_MIN_FOR_SKELETON) return false;
+    const wanted = querySkeleton === undefined ? skeleton(q) : querySkeleton;
+    if ((wanted.match(/[A-Z]/g) || []).length < SKELETON_MIN) return false;
+    return skeleton(searchableText(item)).indexOf(wanted) !== -1;
+  }
+
+  /**
    * One box over the whole catalogue. A title someone remembers is not filed
    * under the section they happen to be standing in, so the search never asks
    * which one that is; results come back grouped by what they are.
@@ -341,10 +425,9 @@
     const cap = limit || SEARCH_ROW_LIMIT;
 
     const live = [], movies = [], series = [];
+    const wanted = skeleton(q);
     (items || []).forEach(function (item) {
-      const name = (item.name || '').toLowerCase();
-      const group = (item.group || '').toLowerCase();
-      if (name.indexOf(q) === -1 && group.indexOf(q) === -1) return;
+      if (!matchesQuery(item, q, wanted)) return;
       if (item.kind === 'LIVE') { if (live.length < cap) live.push(item); }
       else if (item.contentType === 'SERIES') { if (series.length < cap) series.push(item); }
       else if (movies.length < cap) movies.push(item);
@@ -381,6 +464,9 @@
     progressRatio: progressRatio,
     buildHomeRows: buildHomeRows,
     searchRows: searchRows,
+    skeleton: skeleton,
+    matchesQuery: matchesQuery,
+    searchableText: searchableText,
     seekTarget: seekTarget,
     formatClock: formatClock,
     stepInList: stepInList,

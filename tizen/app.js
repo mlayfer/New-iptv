@@ -189,6 +189,20 @@ async function loadM3u(){
   }catch(e){ setError('שגיאה: ' + e.message); }
 }
 
+/**
+ * Panels differ on where they put the original title, and most send none.
+ * Whichever of these turns up is kept beside the name, so a show listed as
+ * "ניתוק" is still found by typing "Severance".
+ */
+const ALIAS_FIELDS = ['o_name', 'original_name', 'orig_name', 'name_en', 'english_name', 'title'];
+function aliasOf(item, name){
+  for(const field of ALIAS_FIELDS){
+    const value = (item[field] || '').toString().trim();
+    if(value && value.toLowerCase() !== (name || '').toLowerCase()) return value;
+  }
+  return null;
+}
+
 async function loadXtream(){
   try{
     setError('מתחבר לשרת...');
@@ -213,6 +227,7 @@ async function loadXtream(){
       items.push({
         id: 'l' + id,
         name: x.name || ('ערוץ ' + id),
+        alias: aliasOf(x, x.name),
         group: liveCats[String(x.category_id)] || 'ערוצים',
         kind: 'LIVE',
         contentType: 'LIVE',
@@ -236,7 +251,8 @@ async function loadXtream(){
             kind: 'VOD',
             contentType: looksLikeSeries(x.name, vodCats[String(x.category_id)] || '') ? 'SERIES' : 'MOVIE',
             url: `${server}/movie/${enc(user)}/${enc(pass)}/${id}.${ext}`,
-            logo: x.stream_icon || null
+            logo: x.stream_icon || null,
+            alias: aliasOf(x, x.name)
           });
         });
       } catch(e) { notes.push('ספריית הסרטים לא נטענה: ' + (e.message || 'שגיאה')); }
@@ -255,6 +271,7 @@ async function loadXtream(){
             contentType: 'SERIES',
             url: '',
             logo: x.cover || x.stream_icon || null,
+            alias: aliasOf(x, x.name),
             seriesId: sid,
             isSeriesStub: true,
             server, user, pass
@@ -381,9 +398,12 @@ function searchText(){
 function applyFilter(){
   const q = searchText();
   const pool = currentPool();
+  // The same matcher the search screen uses, so a name typed in Latin letters
+  // finds a channel the portal spells in Hebrew.
+  const wanted = q ? Core.skeleton(q) : '';
   state.filtered = pool.filter(item => {
     const matchGroup = isVodMode() || state.group === 'הכל' || item.group === state.group;
-    const matchText = !q || item.name.toLowerCase().includes(q) || item.group.toLowerCase().includes(q);
+    const matchText = !q || Core.matchesQuery(item, q, wanted);
     return matchGroup && matchText;
   });
   state.liveIndex = 0;

@@ -7,6 +7,23 @@ import java.net.URLEncoder
 /** Talks to an Xtream Codes portal and normalizes it into the same channel model. */
 object XtreamClient {
 
+    /**
+     * Panels differ on where they put the original title, and most send none.
+     * Whichever of these turns up is kept beside the name, so a show listed as
+     * "ניתוק" is still found by typing "Severance".
+     */
+    private val ALIAS_FIELDS = listOf(
+        "o_name", "original_name", "orig_name", "name_en", "english_name", "title",
+    )
+
+    private fun aliasOf(item: JSONObject, name: String): String? {
+        for (field in ALIAS_FIELDS) {
+            val value = item.optString(field).trim()
+            if (value.isNotEmpty() && !value.equals(name, ignoreCase = true)) return value
+        }
+        return null
+    }
+
     private const val MAX_PER_CATEGORY = 25_000
     private const val MAX_SERIES = 10_000
 
@@ -80,6 +97,7 @@ object XtreamClient {
                             kind = ChannelKind.VOD,
                             group = vodCategories[item.opt("category_id")?.toString()],
                             logo = item.optString("stream_icon").ifBlank { null },
+                            alias = aliasOf(item, name),
                         )
                     )
                     added++
@@ -104,6 +122,7 @@ object XtreamClient {
                             name = item.optString("name").trim().ifEmpty { "סדרה $id" },
                             logo = item.optString("cover").ifBlank { null },
                             group = seriesCategories[item.opt("category_id")?.toString()],
+                            alias = aliasOf(item, item.optString("name").trim()),
                         )
                     )
                 }

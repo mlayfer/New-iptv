@@ -94,6 +94,7 @@ data class UiState(
                     kind = "VOD",
                     contentType = "SERIES",
                     logo = item.logo,
+                    alias = item.alias,
                 )
             }
             for (entry in recent) {
@@ -129,6 +130,7 @@ fun Channel.toCard(): HomeRows.Card = HomeRows.Card(
     kind = if (kind == ChannelKind.LIVE) "LIVE" else "VOD",
     contentType = if (kind == ChannelKind.LIVE) "LIVE" else "MOVIE",
     logo = logo,
+    alias = alias,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {

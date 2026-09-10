@@ -10,6 +10,11 @@ data class Channel(
     val kind: ChannelKind,
     val group: String? = null,
     val logo: String? = null,
+    /**
+     * Another title for the same thing — the original name when the portal
+     * sends one, so a show listed in Hebrew is still findable in English.
+     */
+    val alias: String? = null,
     /** XMLTV id, used to join the channel with its guide entries. */
     val tvgId: String? = null,
     /** Playback hints from the playlist. Unlike a browser, the app can honour these. */
@@ -53,6 +58,7 @@ data class Series(
     val name: String,
     val logo: String? = null,
     val group: String? = null,
+    val alias: String? = null,
 )
 
 data class ParsedPlaylist(

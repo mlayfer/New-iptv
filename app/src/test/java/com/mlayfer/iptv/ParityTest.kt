@@ -3,6 +3,7 @@ package com.mlayfer.iptv
 import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.M3uParser
 import com.mlayfer.iptv.data.Playback
+import com.mlayfer.iptv.data.Search
 import com.mlayfer.iptv.data.StreamVariants
 import com.mlayfer.iptv.data.XtreamClient
 import org.json.JSONObject
@@ -201,6 +202,32 @@ class ParityTest {
             val ids = c.getJSONArray("ids").let { a -> (0 until a.length()).map { a.getString(it) } }
             val want = if (c.isNull("expected")) null else c.getString("expected")
             assertEquals(want, Playback.stepInList(ids, c.getString("id"), c.getInt("step")))
+        }
+    }
+
+    @Test
+    fun `reads a name the same way in both alphabets`() {
+        val spec = fixtures.getJSONObject("matching")
+
+        val skeletons = spec.getJSONArray("skeletons")
+        for (i in 0 until skeletons.length()) {
+            val c = skeletons.getJSONObject(i)
+            assertEquals(c.getString("text"), c.getString("expected"), Search.skeleton(c.getString("text")))
+        }
+
+        val cases = spec.getJSONArray("cases")
+        for (i in 0 until cases.length()) {
+            val c = cases.getJSONObject(i)
+            val text = Search.searchableText(
+                c.getString("name"),
+                c.optString("group").ifBlank { null },
+                c.optString("alias").ifBlank { null },
+            )
+            assertEquals(
+                "${c.getString("query")} vs ${c.getString("name")}",
+                c.getBoolean("expected"),
+                Search.matches(text, c.getString("query")),
+            )
         }
     }
 
