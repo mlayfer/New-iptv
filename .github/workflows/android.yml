@@ -45,8 +45,15 @@ jobs:
       # here is easy; signing it is not — a Samsung TV only installs packages
       # signed with a certificate tied to that TV, so the last step is the
       # owner's to run. The name says so, to save anyone a failed install.
-      # A development build can be born signed in. The details come from
-      # repository secrets, never from the tree: this repository is public.
+      # The package anyone may download: no sign-in details inside, so it is
+      # safe as a public release asset.
+      - name: Package the Tizen app
+        run: cd tizen && zip -r -q -X ../telohim-unsigned.wgt . -x README.md
+
+      # A personal build can be born signed in. The details come from repository
+      # secrets, never from the tree, and the package that carries them is
+      # uploaded as a workflow artifact — which needs a sign-in to download —
+      # rather than attached to the public release.
       - name: Put the development sign-in details into the build
         env:
           XTREAM_SERVER: ${{ secrets.XTREAM_SERVER }}
@@ -70,8 +77,15 @@ jobs:
           print('sign-in details written for this build')
           PY
 
-      - name: Package the Tizen app
-        run: cd tizen && zip -r -q -X ../telohim-unsigned.wgt . -x README.md
+      - name: Package the personal Tizen app
+        env:
+          XTREAM_USER: ${{ secrets.XTREAM_USER }}
+        run: |
+          if [ -z "$XTREAM_USER" ]; then
+            echo "no personal build to make"
+            exit 0
+          fi
+          cd tizen && zip -r -q -X ../telohim-personal.wgt . -x README.md
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -80,7 +94,10 @@ jobs:
           path: |
             telohim.apk
             telohim-unsigned.wgt
-          if-no-files-found: error
+            telohim-personal.wgt
+          # The personal package only exists when the sign-in secrets are set;
+          # a missing APK still fails the build, at the release step below.
+          if-no-files-found: warn
 
       # Downloading an Actions artifact means signing in and unzipping, which is
       # painful on the phone the app is meant for. A release asset is a direct
