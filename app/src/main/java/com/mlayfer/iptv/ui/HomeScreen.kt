@@ -17,10 +17,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -104,11 +101,10 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
             modifier = Modifier.fillMaxWidth().padding(vertical = tz(14)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FormTextField(
+            SearchField(
                 value = query,
                 onValueChange = { query = it },
                 placeholder = "חיפוש ערוץ, סרט או סדרה",
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(tz(20)))

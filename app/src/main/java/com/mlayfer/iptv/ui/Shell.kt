@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -267,6 +268,36 @@ fun HeroBand(
                     )
                 )
         )
+        // The thumbnail stands at the far end, away from the words: the Tizen
+        // band carries one, and without it the strip reads as an empty box with
+        // a title floating in it.
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = tz(24))
+                .height(tz(150))
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(tz(10)))
+                .background(Brush.linearGradient(listOf(Color(0xFF232327), Color(0xFF111113))))
+                .border(1.dp, Ink.LineSoft, RoundedCornerShape(tz(10))),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (art != null) {
+                AsyncImage(
+                    model = art,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    text = title.take(2),
+                    fontSize = tzSp(26),
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Ink.Accent,
+                )
+            }
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -400,8 +431,11 @@ fun ChannelTile(
 ) {
     val shape = RoundedCornerShape(tz(16))
     Column(
+        // A minimum rather than a height: the Tizen tile is 172 tall, but a name
+        // that wraps or a larger type scale must push the card open rather than
+        // have its last line cut off at the edge.
         modifier = modifier
-            .height(tz(172))
+            .heightIn(min = tz(172))
             .clip(shape)
             .background(Ink.Surface)
             .border(1.dp, if (playing) Ink.Accent else Ink.LineSoft, shape)

@@ -6,8 +6,12 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalTextStyle
@@ -22,8 +26,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -32,6 +39,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -106,13 +114,108 @@ fun Modifier.focusHighlight(
 }
 
 /**
- * A text field that behaves on a remote.
+ * The rule that makes a text field usable with a remote.
  *
  * Compose opens the on-screen keyboard the moment a field takes focus. On a
  * phone that is what you want; on a TV it means the keyboard erupts every time
- * you pass a field on your way down the form. Here the field stays read-only
- * until it is actually chosen with OK, and only then asks for the keyboard.
+ * you pass a field on your way down a form. So a field stays read-only until it
+ * is actually chosen with OK, and only then asks for the keyboard.
+ *
+ * A modifier rather than a component, because two fields that look nothing alike
+ * need the same behaviour — and a second copy of it is a second thing to forget.
  */
+@Composable
+fun Modifier.opensOnOk(editing: Boolean, setEditing: (Boolean) -> Unit): Modifier {
+    val isTv = LocalIsTv.current
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    return this
+        .onFocusChanged { focus ->
+            if (!focus.isFocused) {
+                setEditing(false)
+            } else if (isTv && !editing) {
+                // Landing on a field is not a request to type: with a remote the
+                // keyboard covers the screen, so it waits for OK.
+                keyboard?.hide()
+            }
+        }
+        .onKeyEvent { event ->
+            if (!isTv || editing) return@onKeyEvent false
+            val opens = event.key == Key.Enter ||
+                event.key == Key.NumPadEnter ||
+                event.key == Key.DirectionCenter
+            if (event.type == KeyEventType.KeyUp && opens) {
+                setEditing(true)
+                true
+            } else {
+                false
+            }
+        }
+}
+
+/**
+ * The search box, at the height the Tizen build draws it.
+ *
+ * Material's outlined field is 56dp tall whatever it is asked for — two and a
+ * half times the Tizen box — which turned the top of every screen into a form.
+ * This is the same field at the same measurements, under the same remote rule.
+ */
+@Composable
+fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) {
+    val isTv = LocalIsTv.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var editing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editing) {
+        if (editing) keyboard?.show()
+    }
+
+    val shape = RoundedCornerShape(tz(12))
+    Box(
+        modifier = modifier
+            .height(tz(60))
+            .clip(shape)
+            .background(Ink.Surface)
+            .border(1.dp, Ink.Line, shape)
+            .focusHighlight(shape, border = false)
+            .padding(horizontal = tz(20)),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            readOnly = isTv && !editing,
+            textStyle = TextStyle(color = Ink.Bright, fontSize = tzSp(21)),
+            cursorBrush = SolidColor(Ink.Accent),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    editing = false
+                    keyboard?.hide()
+                },
+            ),
+            decorationBox = { field ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) {
+                        Text(placeholder, fontSize = tzSp(21), color = Ink.Faint, maxLines = 1)
+                    }
+                    field()
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .opensOnOk(editing) { editing = it },
+        )
+    }
+}
+
+/** A labelled field for a form, where the height is not the point. */
 @Composable
 fun FormTextField(
     value: String,
@@ -165,26 +268,6 @@ fun FormTextField(
         ),
         modifier = modifier
             .focusHighlight(shape, border = false)
-            .onFocusChanged { focus ->
-                if (!focus.isFocused) {
-                    editing = false
-                } else if (isTv && !editing) {
-                    // Landing on a field is not a request to type: with a remote
-                    // the keyboard covers the screen, so it waits for OK.
-                    keyboard?.hide()
-                }
-            }
-            .onKeyEvent { event ->
-                if (!isTv || editing) return@onKeyEvent false
-                val opens = event.key == Key.Enter ||
-                    event.key == Key.NumPadEnter ||
-                    event.key == Key.DirectionCenter
-                if (event.type == KeyEventType.KeyUp && opens) {
-                    editing = true
-                    true
-                } else {
-                    false
-                }
-            },
+            .opensOnOk(editing) { editing = it },
     )
 }

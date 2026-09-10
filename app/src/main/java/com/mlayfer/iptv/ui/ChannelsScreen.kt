@@ -21,10 +21,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -185,7 +182,11 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
             ) {
                 NavPill("בית", { viewModel.setScreen(Screen.CHOOSE) })
                 NavPill("ערוצים", {}, selected = true)
-                NavPill(labelOf(state.view), { viewModel.setView(nextView(state.view)) })
+                NavPill(
+                    label = "מועדפים",
+                    onClick = { viewModel.setView(nextView(state.view)) },
+                    selected = state.view != ListView.ALL,
+                )
                 NavPill("החלף מקור", { viewModel.setScreen(Screen.SOURCES) })
             }
 
@@ -200,11 +201,10 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                     color = Ink.Bright,
                 )
                 Spacer(Modifier.width(tz(24)))
-                FormTextField(
+                SearchField(
                     value = state.query,
                     onValueChange = viewModel::setQuery,
                     placeholder = "חיפוש ערוץ",
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(tz(20)))
@@ -283,7 +283,10 @@ private fun NowNext(state: UiState) {
     )
 }
 
-/** All, then favourites, then what was on lately — one button rather than three. */
+/**
+ * All, then favourites, then what was on lately — one button rather than three.
+ * The button is lit whenever it is holding something back.
+ */
 private fun nextView(view: ListView): ListView = when (view) {
     ListView.ALL -> ListView.FAVORITES
     ListView.FAVORITES -> ListView.RECENT
@@ -356,10 +359,4 @@ private fun PlayerFor(
         queue = state.episodes,
         onPlayItem = viewModel::select,
     )
-}
-
-private fun labelOf(view: ListView): String = when (view) {
-    ListView.ALL -> "הכל"
-    ListView.FAVORITES -> "מועדפים"
-    ListView.RECENT -> "אחרונים"
 }
