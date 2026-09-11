@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -100,13 +101,9 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            // The cards are a fixed share of the screen rather than all of it —
-            // the room around them is what stops the page shouting.
             val sideBySide = maxWidth > 560.dp
-            val cardWidth = if (sideBySide) (maxWidth - 20.dp) / 2 * 0.82f else maxWidth
-            val cardHeight = if (sideBySide) cardWidth * 0.68f else 150.dp
 
-            val television: @Composable () -> Unit = {
+            val television: @Composable (Modifier) -> Unit = { mod ->
                 WorldCard(
                     title = "טלוויזיה בשידור חי",
                     count = if (counts.live > 0) "${counts.live.grouped()} ערוצים" else "",
@@ -115,10 +112,10 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
                     wash = LiveWash,
                     glowAtX = 0.78f,
                     onClick = { viewModel.enterWorld(Catalog.LIVE) },
-                    modifier = Modifier.width(cardWidth).height(cardHeight),
+                    modifier = mod,
                 )
             }
-            val library: @Composable () -> Unit = {
+            val library: @Composable (Modifier) -> Unit = { mod ->
                 WorldCard(
                     title = "סרטים וסדרות",
                     count = "${counts.movies.grouped()} סרטים · ${counts.series.grouped()} סדרות",
@@ -127,29 +124,45 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
                     wash = VodWash,
                     glowAtX = 0.22f,
                     onClick = { viewModel.enterWorld(Catalog.MOVIES) },
-                    modifier = Modifier.width(cardWidth).height(cardHeight),
+                    modifier = mod,
                 )
             }
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-            ) {
+            val heading: @Composable () -> Unit = {
                 Text(
                     text = "מה בא לך לראות?",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                 )
-                if (sideBySide) {
+            }
+
+            if (sideBySide) {
+                // The cards are a fixed share of the screen rather than all of
+                // it — the room around them is what stops the page shouting.
+                val cardWidth = (maxWidth - 20.dp) / 2 * 0.82f
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    heading()
                     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        television()
-                        library()
+                        television(Modifier.width(cardWidth).height(cardWidth * 0.68f))
+                        library(Modifier.width(cardWidth).height(cardWidth * 0.68f))
                     }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        television()
-                        library()
-                    }
+                }
+            } else {
+                // A phone is tall, and two short bars floating in the middle of
+                // it left a hand's worth of nothing above and below. Here the
+                // two doors share the height instead — which is what they are:
+                // the whole of the choice, not a widget on a page.
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    heading()
+                    television(Modifier.fillMaxWidth().weight(1f).heightIn(max = 260.dp))
+                    library(Modifier.fillMaxWidth().weight(1f).heightIn(max = 260.dp))
                 }
             }
         }
