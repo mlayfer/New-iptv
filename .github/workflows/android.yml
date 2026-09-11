@@ -6,10 +6,21 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A push supersedes the build before it. Two builds of the same branch race for
+# the same Gradle cache and the same `screens` branch, and the older one can
+# only ever publish a picture of code nobody is looking at any more.
+concurrency:
+  group: talohim-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Tizen check, unit tests and debug APK
     runs-on: ubuntu-latest
+    # This job is four minutes' work. A runner that has been sitting on one step
+    # for half an hour is not working, it is stuck — and without a limit it sits
+    # there for six hours before anyone is told.
+    timeout-minutes: 25
     permissions:
       contents: write
 
