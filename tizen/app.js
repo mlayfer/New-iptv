@@ -1453,9 +1453,9 @@ function closeWatchList(){
 }
 
 /** How many programmes ahead the schedule under the picture has room for. */
-const SCHEDULE_AHEAD = 5;
+const SCHEDULE_AHEAD = 3;
 /** And how far back it reaches, where there is an archive to reach into. */
-const SCHEDULE_BEHIND = 3;
+const SCHEDULE_BEHIND = 1;
 /**
  * How much of the channel winding back asks for, and how much more it asks for
  * beyond the live edge so that playing on does not run out of stream.
@@ -1574,12 +1574,22 @@ function renderWatchSchedule(){
     // feature that is simply absent looks like one that is broken. So the
     // screen says which it is.
     const note = $('#watchScheduleNote');
-    if(note) note.classList.toggle('hidden', !!archive);
+    if(note){
+      // A feature that is simply absent looks like one that is broken, so the
+      // screen says which it is.
+      const missing = !rows || !rows.length;
+      note.textContent = missing
+        ? 'הפורטל לא שלח לוח שידורים לערוץ הזה'
+        : 'הפורטל לא שומר את הערוץ הזה — אי אפשר לחזור אחורה';
+      note.classList.toggle('hidden', !missing && !!archive);
+    }
     // What is behind is only worth listing where it can be played back.
     const behind = archive ? Core.alreadyOn(rows, at, SCHEDULE_BEHIND) : [];
     const ahead = Core.upcoming(rows, at, SCHEDULE_AHEAD);
     const all = behind.concat(slot.current ? [slot.current] : []).concat(ahead);
-    if(!all.length){ box.classList.add('hidden'); return; }
+    // An empty schedule is still an answer: the note above says so, and a
+    // corner that simply vanishes says the screen is broken.
+    if(!all.length) return;
 
     list.innerHTML = '';
     all.forEach(function(entry){
@@ -1594,9 +1604,13 @@ function renderWatchSchedule(){
           playCatchUp(archive, entry.title, entry.start, minutesOf(entry));
         });
       }
-      row.innerHTML = '<div class="wsTime"></div><div class="wsName"></div>';
+      // What the programme actually is. The portal sends it and nothing was
+      // drawing it, so a guide of bare titles was all anyone got.
+      row.innerHTML = '<div class="wsLine"><div class="wsTime"></div><div class="wsName"></div></div>' +
+        '<div class="wsDesc"></div>';
       text($('.wsTime', row), entry.start ? clockOfDay(entry.start) : '');
       text($('.wsName', row), entry.title);
+      text($('.wsDesc', row), entry.description || '');
       list.appendChild(row);
     });
   });

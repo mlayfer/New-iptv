@@ -274,7 +274,11 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                 NavPill("החלף מקור", { viewModel.setScreen(Screen.SOURCES) })
             }
 
-            if (!whole) Row(
+            // In video mode the panel beside the picture carries its own
+            // heading and its own categories, and the screen has only so much
+            // height: repeating them here is what pushed the schedule under the
+            // picture off the bottom of the screen.
+            if (!whole && !videoMode) Row(
                 modifier = Modifier.fillMaxWidth().padding(top = tz(12)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -295,7 +299,7 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                 Faint("${visible.size} ערוצים")
             }
 
-            if (!whole) GroupChips(state, viewModel)
+            if (!whole && !videoMode) GroupChips(state, viewModel)
 
             // The strip above the grid says what is on the channel under the
             // cursor; beside the picture every channel already carries its own.
@@ -430,11 +434,15 @@ private fun NowNext(state: UiState, viewModel: AppViewModel, clock: Long) {
     )
 }
 
-/** And how many the schedule under a parked picture has room for. */
-private const val SCHEDULE_AHEAD = 5
+/**
+ * How many the schedule under a parked picture has room for. Each entry carries
+ * a line of summary as well as its name, so a handful is what fits under a
+ * picture on a television that is only so tall.
+ */
+private const val SCHEDULE_AHEAD = 3
 
 /** How far back the same schedule reaches, where there is an archive to reach into. */
-private const val SCHEDULE_BEHIND = 3
+private const val SCHEDULE_BEHIND = 1
 
 /**
  * How much of the channel winding back asks for, and how much more it asks for
@@ -651,7 +659,10 @@ internal fun BoxScope.watchListPlacement(): Modifier = if (isWide) {
  */
 @Composable
 internal fun BoxScope.watchPicturePlacement(): Modifier = if (isWide) {
-    Modifier.align(Alignment.TopEnd).padding(tz(28)).fillMaxWidth(0.45f)
+    // Wide enough to be worth watching, and no wider: the picture is the top of
+    // a column that also holds the controls and the schedule, and a television
+    // is only so tall.
+    Modifier.align(Alignment.TopEnd).padding(tz(28)).fillMaxWidth(0.40f)
 } else {
     Modifier.align(Alignment.TopCenter).padding(top = tz(10))
 }

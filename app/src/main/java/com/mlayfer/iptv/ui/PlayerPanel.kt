@@ -3,6 +3,8 @@ package com.mlayfer.iptv.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
@@ -674,8 +676,16 @@ fun PlayerPanel(
         }
     }
 
+    val overflow = rememberScrollState()
     Column(
-        modifier = modifier.onPreviewKeyEvent { event ->
+        modifier = modifier
+            // Parked beside the list, the column is the picture, its controls
+            // and the schedule, and a television is only so tall. Scrolling
+            // means what does not fit is still reachable rather than simply
+            // absent — which is how the schedule went missing once the screen
+            // above it grew a heading.
+            .then(if (compact) Modifier.verticalScroll(overflow) else Modifier)
+            .onPreviewKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             // Back is not ours to swallow: consuming it here would leave a film
             // with no way out of it. The remote's own keys are the only ones
@@ -837,7 +847,10 @@ fun PlayerPanel(
 
         // Parked beside the list: the picture, its controls, and then what is
         // on this channel for the rest of the evening.
-        if (compact && schedule.isNotEmpty()) {
+        // Drawn whenever the picture is parked, even with nothing to put in it:
+        // a corner that is simply blank says the screen is broken, and "the
+        // portal sent no guide for this channel" says what actually happened.
+        if (compact && channel != null) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -859,7 +872,14 @@ fun PlayerPanel(
                 // Winding back is a thing the portal either keeps or does not,
                 // and a feature that is simply absent looks like one that is
                 // broken. So the screen says which it is.
-                if (onCatchUp == null && channel?.kind == ChannelKind.LIVE) {
+                if (schedule.isEmpty()) {
+                    Text(
+                        text = "הפורטל לא שלח לוח שידורים לערוץ הזה",
+                        fontSize = tzSp(17),
+                        lineHeight = tzSp(21),
+                        color = Ink.Faint,
+                    )
+                } else if (onCatchUp == null && channel.kind == ChannelKind.LIVE) {
                     Text(
                         text = "הפורטל לא שומר את הערוץ הזה — אי אפשר לחזור אחורה",
                         fontSize = tzSp(17),
@@ -872,18 +892,21 @@ fun PlayerPanel(
                     // What has already finished can be played back, if the
                     // portal kept it. What has not happened yet cannot.
                     val past = onCatchUp != null && entry.stop <= System.currentTimeMillis()
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    // The line and its summary move together, so a programme
+                    // you can play back is one thing to land on and not two.
+                    Column(
                         modifier = if (past) {
                             Modifier
+                                .fillMaxWidth()
                                 .clip(RoundedCornerShape(tz(8)))
                                 .focusHighlight(RoundedCornerShape(tz(8)), border = false)
                                 .clickable { onCatchUp?.invoke(entry) }
                                 .padding(horizontal = tz(6), vertical = tz(2))
                         } else {
-                            Modifier
+                            Modifier.fillMaxWidth()
                         },
                     ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = formatTime(entry.start),
                             fontSize = tzSp(18),
@@ -915,6 +938,21 @@ fun PlayerPanel(
                                 maxLines = 1,
                             )
                         }
+                    }
+                    // What the programme actually is. The portal sends it and
+                    // nothing was drawing it, so a guide of bare titles was all
+                    // anyone got.
+                    val summary = entry.desc?.takeIf { it.isNotBlank() }
+                    if (summary != null) {
+                        Text(
+                            text = summary,
+                            fontSize = tzSp(16),
+                            lineHeight = tzSp(20),
+                            color = Ink.Faint,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     }
                 }
             }
