@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mlayfer.iptv.data.Channel
+import com.mlayfer.iptv.data.XtreamClient
 import com.mlayfer.iptv.data.XmltvParser
 
 /**
@@ -187,6 +188,7 @@ fun TitleScreen(state: UiState, viewModel: AppViewModel) {
                                     episode = episode,
                                     number = index + 1,
                                     seen = episode.id in state.seen,
+                                    seriesName = series?.name,
                                     onClick = { viewModel.select(episode); playing = true },
                                 )
                             }
@@ -436,7 +438,13 @@ private fun SeasonPill(label: String, active: Boolean, onClick: () -> Unit) {
  * is what a strip of twenty titles turns into on a television across the room.
  */
 @Composable
-private fun EpisodeCard(episode: Channel, number: Int, seen: Boolean, onClick: () -> Unit) {
+private fun EpisodeCard(
+    episode: Channel,
+    number: Int,
+    seen: Boolean,
+    seriesName: String?,
+    onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(tz(14))
     Column(
         modifier = Modifier
@@ -478,7 +486,10 @@ private fun EpisodeCard(episode: Channel, number: Int, seen: Boolean, onClick: (
             if (seen) SeenTick(Modifier.align(Alignment.TopEnd).padding(tz(8)))
         }
         Text(
-            text = episode.name,
+            // The badge above already says which episode this is, and the page
+            // says which series — so the portal's "Series - S01E02 - " in front
+            // of the title is what pushes the title itself off the line.
+            text = XtreamClient.episodeLabel(episode.name, seriesName),
             fontSize = tzSp(19),
             color = if (seen) Ink.Faint else Ink.Bright,
             maxLines = 1,

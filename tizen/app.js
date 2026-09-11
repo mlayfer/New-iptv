@@ -934,7 +934,8 @@ function renderEpisodes(){
       art.insertBefore(img, num);
     }
     num.textContent = (seen ? '✓ ' : '') + 'פרק ' + (index + 1);
-    $('.episodeName', card).textContent = episode.name;
+    $('.episodeName', card).textContent =
+      Core.episodeLabel(episode.name, state.episodeContext && state.episodeContext.name);
     const entry = state.history.find(x => x.id === episode.id);
     $('.episodeMeta', card).textContent = seen ? 'נצפה'
       : (entry && Core.isResumable(entry) ? 'המשך מ-' + formatClock(entry.position) : episode.group);

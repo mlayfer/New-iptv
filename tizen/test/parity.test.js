@@ -51,6 +51,12 @@ test('builds the same episode list', () => {
   });
 });
 
+test('strips the same noise off an episode name', () => {
+  fixtures.episodeLabels.cases.forEach((c) => {
+    assert.strictEqual(core.episodeLabel(c.name, c.series), c.expected, c.name);
+  });
+});
+
 test('lays out the same home screen', () => {
   const f = fixtures.home;
   const rows = core.buildHomeRows({

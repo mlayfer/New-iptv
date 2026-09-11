@@ -231,6 +231,30 @@
     return r < 0 ? 0 : (r > 1 ? 1 : r);
   }
 
+  /**
+   * What an episode is actually called.
+   *
+   * Portals name an episode by repeating everything you already know: the
+   * series, then the season and number, then — sometimes — the title. Inside a
+   * series, under a card that already says "episode 4", all of that is noise,
+   * and it is what pushes the one useful word off the end of the line.
+   */
+  function episodeLabel(name, seriesName) {
+    let out = String(name || '').trim();
+    if (!out) return out;
+    if (seriesName) {
+      const prefix = String(seriesName).trim();
+      if (prefix && out.toLowerCase().indexOf(prefix.toLowerCase()) === 0) {
+        out = out.slice(prefix.length).replace(/^[\s\-–—·:|]+/, '');
+      }
+    }
+    out = out.replace(/^S\d{1,3}\s*E\d{1,4}\b[\s\-–—·:|]*/i, '');
+    out = out.replace(/^\d{1,3}x\d{1,4}\b[\s\-–—·:|]*/i, '');
+    // Nothing left but the numbering: the number is on the card already, so the
+    // original is better than an empty line.
+    return out.trim() || String(name).trim();
+  }
+
   function topGroups(pool, limit, perRow) {
     const order = [];
     const byGroup = {};
@@ -755,6 +779,7 @@
     streamVariants: streamVariants,
     episodesFromSeriesInfo: episodesFromSeriesInfo,
     episodeName: episodeName,
+    episodeLabel: episodeLabel,
     isResumable: isResumable,
     progressRatio: progressRatio,
     buildHomeRows: buildHomeRows,

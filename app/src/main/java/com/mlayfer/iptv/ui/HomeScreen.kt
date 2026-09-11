@@ -91,11 +91,13 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
             NavPill("בית", { viewModel.setCatalog(Catalog.ALL) }, selected = state.catalog == Catalog.ALL)
             NavPill("סרטים", { viewModel.setCatalog(Catalog.MOVIES) }, selected = state.catalog == Catalog.MOVIES)
             NavPill("סדרות", { viewModel.setCatalog(Catalog.SERIES) }, selected = state.catalog == Catalog.SERIES)
-            NavPill("טלוויזיה", { viewModel.setScreen(Screen.CHOOSE) })
             NavPill("החלף מקור", { viewModel.setScreen(Screen.SOURCES) })
         }
 
-        val focus = highlighted ?: rows.firstOrNull()?.items?.firstOrNull()
+        // The band says what is under the cursor. With a finger there is no
+        // cursor — it simply showed whatever happened to be first, with its name
+        // cut off, and cost a third of a phone screen to do it.
+        val focus = if (isWide) highlighted ?: rows.firstOrNull()?.items?.firstOrNull() else null
         if (focus != null) {
             HeroBand(
                 title = focus.name,

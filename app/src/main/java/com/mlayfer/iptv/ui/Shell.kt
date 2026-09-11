@@ -120,14 +120,20 @@ fun TopChrome(
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = title,
-                    fontSize = tzSp(38),
+                    fontSize = if (isWide) tzSp(38) else tzSp(30),
                     fontWeight = FontWeight.ExtraBold,
                     color = Ink.Bright,
                     maxLines = 1,
                 )
-                Text(text = tagline, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
-                if (counts != null) {
-                    Text(text = counts, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
+                // A television is looked at from a sofa and has the room for a
+                // strapline and a count. A phone has neither: three lines of
+                // grey at the top of a small screen is a third of the screen
+                // spent saying what the screen is already showing.
+                if (isWide) {
+                    Text(text = tagline, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
+                    if (counts != null) {
+                        Text(text = counts, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
+                    }
                 }
             }
             BrandMark()

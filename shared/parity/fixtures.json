@@ -1033,5 +1033,40 @@
         "a7"
       ]
     }
+  },
+  "episodeLabels": {
+    "_comment": "What an episode is called once the series and the numbering in front of it are gone — the card already says which episode it is.",
+    "cases": [
+      {
+        "name": "ניתוק - S01E04 - האתה שאתה",
+        "series": "ניתוק",
+        "expected": "האתה שאתה"
+      },
+      {
+        "name": "S01E02 · חצי לולאה",
+        "series": null,
+        "expected": "חצי לולאה"
+      },
+      {
+        "name": "Severance 1x03 - In Perpetuity",
+        "series": "Severance",
+        "expected": "In Perpetuity"
+      },
+      {
+        "name": "S1E1 · Pilot",
+        "series": "Breaking Bad",
+        "expected": "Pilot"
+      },
+      {
+        "name": "S01E07",
+        "series": "ניתוק",
+        "expected": "S01E07"
+      },
+      {
+        "name": "פרק מיוחד",
+        "series": "ניתוק",
+        "expected": "פרק מיוחד"
+      }
+    ]
   }
 }

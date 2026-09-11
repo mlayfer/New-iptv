@@ -97,6 +97,17 @@ class ParityTest {
     }
 
     @Test
+    fun `strips the same noise off an episode name`() {
+        val cases = fixtures.getJSONObject("episodeLabels").getJSONArray("cases")
+        for (i in 0 until cases.length()) {
+            val case = cases.getJSONObject(i)
+            val name = case.getString("name")
+            val series = if (case.isNull("series")) null else case.getString("series")
+            assertEquals(name, case.getString("expected"), XtreamClient.episodeLabel(name, series))
+        }
+    }
+
+    @Test
     fun `lays out the same home screen`() {
         val spec = fixtures.getJSONObject("home")
         val items = spec.getJSONArray("items").let { array ->
