@@ -380,6 +380,17 @@ fun PlayerPanel(
                 )
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
+            val showing = channel?.name.orEmpty()
+            if (showing.isNotBlank()) {
+                Text(
+                    text = showing,
+                    fontSize = tzSp(19),
+                    color = Ink.Dim,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                )
+            }
             // How far into a film this is — and a way to move it. A line that
             // only reports is half a control. Live television has neither.
             if (duration > 0) {
@@ -389,130 +400,159 @@ fun PlayerPanel(
                     onSeek = { player.seekTo(it) },
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // The button this whole strip exists for, and the one that
-                // was missing: Material's core icon set carries play and not
-                // pause, so the pair is drawn in res/drawable.
-                IconButton(
-                    onClick = { if (player.isPlaying) player.pause() else player.play() },
-                    enabled = channel != null,
-                    modifier = Modifier.focusRequester(transport),
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                // Everything that is not playback keeps to the far side, so the
+                // middle belongs to one button.
+                Row(
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (playing) {
+                    IconButton(onClick = onToggleFavorite, enabled = channel != null) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_pause),
-                            contentDescription = "השהיה",
-                        )
-                    } else {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "הפעלה")
-                    }
-                }
-                // Only a recording can be moved through; live has nowhere to go.
-                if (duration > 0) {
-                    IconButton(onClick = { player.seekBack() }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_rewind),
-                            contentDescription = "אחורה",
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "מועדפים",
+                            tint = if (isFavorite) Ink.Accent else Ink.Dim,
                         )
                     }
-                    IconButton(onClick = { player.seekForward() }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_forward),
-                            contentDescription = "קדימה",
-                        )
+                    IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
+                        Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש", tint = Ink.Dim)
                     }
-                }
-                // The name leads the row, the way the list reads.
-                Text(
-                    text = channel?.name ?: "",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp),
-                )
 
-                IconButton(onClick = onToggleFavorite, enabled = channel != null) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "מועדפים",
-                        tint = if (isFavorite) {
-                            MaterialTheme.colorScheme.secondary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-                IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
-                    Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש")
-                }
-                // These two step through whatever list you are in, so they have to
-                // be named after it: a channel out in the guide, an episode inside
-                // a series.
-                val unit = if (channel?.kind == ChannelKind.LIVE) "הערוץ" else "הפרק"
-                IconButton(onClick = onPrev) {
-                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = "$unit הקודם")
-                }
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "$unit הבא")
-                }
+                    // Offered only when the stream actually carries a choice; a
+                    // button that opens an empty list is worse than no button.
+                    val audio = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_AUDIO) }
+                    val subs = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_TEXT) }
 
-                // Offered only when the stream actually carries a choice; a button
-                // that opens an empty list is worse than no button.
-                val audio = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_AUDIO) }
-                val subs = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_TEXT) }
-
-                if (audio.size > 1) {
-                    Box {
-                        IconButton(onClick = { trackMenu = C.TRACK_TYPE_AUDIO }) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_audio_track),
-                                contentDescription = "שמע",
+                    if (audio.size > 1) {
+                        Box {
+                            IconButton(onClick = { trackMenu = C.TRACK_TYPE_AUDIO }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_audio_track),
+                                    contentDescription = "שמע",
+                                    tint = Ink.Dim,
+                                )
+                            }
+                            TrackMenu(
+                                open = trackMenu == C.TRACK_TYPE_AUDIO,
+                                choices = audio,
+                                offLabel = null,
+                                offSelected = false,
+                                onDismiss = { trackMenu = null },
+                                onPick = { TrackChoices.choose(player, tracks, C.TRACK_TYPE_AUDIO, it); trackMenu = null },
+                                onOff = {},
                             )
                         }
-                        TrackMenu(
-                            open = trackMenu == C.TRACK_TYPE_AUDIO,
-                            choices = audio,
-                            offLabel = null,
-                            offSelected = false,
-                            onDismiss = { trackMenu = null },
-                            onPick = { TrackChoices.choose(player, tracks, C.TRACK_TYPE_AUDIO, it); trackMenu = null },
-                            onOff = {},
-                        )
                     }
-                }
 
-                if (subs.isNotEmpty()) {
-                    Box {
-                        IconButton(onClick = { trackMenu = C.TRACK_TYPE_TEXT }) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_subtitles),
-                                contentDescription = "כתוביות",
-                                tint = if (subsOff) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.primary
+                    if (subs.isNotEmpty()) {
+                        Box {
+                            IconButton(onClick = { trackMenu = C.TRACK_TYPE_TEXT }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_subtitles),
+                                    contentDescription = "כתוביות",
+                                    tint = if (subsOff) Ink.Dim else Ink.Accent,
+                                )
+                            }
+                            TrackMenu(
+                                open = trackMenu == C.TRACK_TYPE_TEXT,
+                                choices = subs,
+                                offLabel = "בלי כתוביות",
+                                offSelected = subsOff,
+                                onDismiss = { trackMenu = null },
+                                onPick = {
+                                    TrackChoices.choose(player, tracks, C.TRACK_TYPE_TEXT, it)
+                                    subsOff = false
+                                    trackMenu = null
+                                },
+                                onOff = {
+                                    TrackChoices.turnOff(player, C.TRACK_TYPE_TEXT)
+                                    subsOff = true
+                                    trackMenu = null
                                 },
                             )
                         }
-                        TrackMenu(
-                            open = trackMenu == C.TRACK_TYPE_TEXT,
-                            choices = subs,
-                            offLabel = "בלי כתוביות",
-                            offSelected = subsOff,
-                            onDismiss = { trackMenu = null },
-                            onPick = {
-                                TrackChoices.choose(player, tracks, C.TRACK_TYPE_TEXT, it)
-                                subsOff = false
-                                trackMenu = null
-                            },
-                            onOff = {
-                                TrackChoices.turnOff(player, C.TRACK_TYPE_TEXT)
-                                subsOff = true
-                                trackMenu = null
-                            },
-                        )
+                    }
+                }
+
+                // Playback in the middle, read left to right like every player
+                // ever made: back, then the big one, then on.
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        // These two step through whatever list you are in, so
+                        // they are named after it: a channel out in the guide, an
+                        // episode inside a series.
+                        val unit = if (channel?.kind == ChannelKind.LIVE) "הערוץ" else "הפרק"
+                        IconButton(onClick = onPrev) {
+                            Icon(
+                                Icons.Default.KeyboardArrowLeft,
+                                contentDescription = "$unit הקודם",
+                                tint = Ink.Bright,
+                            )
+                        }
+                        // Only a recording can be moved through; live has nowhere
+                        // to go.
+                        if (duration > 0) {
+                            IconButton(onClick = { player.seekBack() }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_rewind),
+                                    contentDescription = "אחורה",
+                                    tint = Ink.Bright,
+                                )
+                            }
+                        }
+
+                        // The button this whole strip exists for. It was one icon
+                        // among nine at the end of a row, which is not where
+                        // anybody looks for it: it is the middle, and it is big.
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(if (channel != null) Ink.Accent else Ink.Surface)
+                                .focusRequester(transport)
+                                .focusHighlight(CircleShape, border = false)
+                                .clickable(enabled = channel != null) {
+                                    if (player.isPlaying) player.pause() else player.play()
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (playing) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_pause),
+                                    contentDescription = "השהיה",
+                                    tint = Ink.OnAccent,
+                                    modifier = Modifier.size(30.dp),
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = "הפעלה",
+                                    tint = Ink.OnAccent,
+                                    modifier = Modifier.size(34.dp),
+                                )
+                            }
+                        }
+
+                        if (duration > 0) {
+                            IconButton(onClick = { player.seekForward() }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_forward),
+                                    contentDescription = "קדימה",
+                                    tint = Ink.Bright,
+                                )
+                            }
+                        }
+                        IconButton(onClick = onNext) {
+                            Icon(
+                                Icons.Default.KeyboardArrowRight,
+                                contentDescription = "$unit הבא",
+                                tint = Ink.Bright,
+                            )
+                        }
                     }
                 }
             }
