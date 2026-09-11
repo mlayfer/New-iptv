@@ -1316,14 +1316,16 @@ function channelRow(item, index){
   row.className = 'focusable channelRow' + (state.current && state.current.id === item.id ? ' playing' : '');
   row.dataset.nav = 'item';
   row.dataset.index = String(index);
+  // Three columns — who, what is on, what is next — so the eye can run down
+  // any one of them instead of hunting across a line.
   row.innerHTML =
     '<div class="rowLogo"></div>' +
     '<div class="rowIdentity"><div class="rowName"></div><div class="rowMeta"></div></div>' +
     '<div class="rowGuide">' +
       '<div class="rowNowLine"><div class="rowNow"></div><div class="rowRange"></div></div>' +
       '<div class="rowBar"><div class="rowFill"></div></div>' +
-      '<div class="rowNext"></div>' +
-    '</div>';
+    '</div>' +
+    '<div class="rowAhead"></div>';
   $('.rowName', row).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
   $('.rowMeta', row).textContent = (index + 1) + ' · ' + item.group;
   $('.rowNow', row).textContent = 'טוען לוח שידורים…';
@@ -1359,7 +1361,14 @@ function fillRowGuide(row, item){
     $('.rowBar', row).classList.toggle('hidden', !span);
     $('.rowFill', row).style.width = (done * 100).toFixed(1) + '%';
 
-    text($('.rowNext', row), Core.upcoming(list, at, UPCOMING).map(epgLine).join('   ·   '));
+    const ahead = $('.rowAhead', row);
+    ahead.innerHTML = '';
+    Core.upcoming(list, at, UPCOMING).forEach(function(entry){
+      const line = document.createElement('div');
+      line.className = 'rowNext';
+      line.textContent = epgLine(entry);
+      ahead.appendChild(line);
+    });
   });
 }
 

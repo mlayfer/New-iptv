@@ -195,7 +195,10 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                 counts = "${state.channels.size} ערוצים",
             ) {
                 NavPill("בית", { viewModel.setScreen(Screen.CHOOSE) })
-                NavPill("ערוצים", {}, selected = true)
+                // Five pills and a brand do not fit across a phone, and the row
+                // scrolls rather than shrinks — so the one that says where you
+                // already are is the one a phone can do without.
+                if (isWide) NavPill("ערוצים", {}, selected = true)
                 NavPill(
                     label = "מועדפים",
                     onClick = { viewModel.setView(nextView(state.view)) },
@@ -204,14 +207,7 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                 // Two ways to read the same channels, and the button says which
                 // one it would give you rather than which one you are in.
                 NavPill(
-                    // A fifth pill does not fit across a phone, and the row
-                    // scrolls rather than shrinks — so the phone gets the short
-                    // word for the same thing.
-                    label = when {
-                        list -> "אריחים"
-                        isWide -> "לוח שידורים"
-                        else -> "לוח"
-                    },
+                    label = if (list) "אריחים" else "לוח שידורים",
                     onClick = {
                         viewModel.setGuideLayout(
                             if (list) GuideLayout.GRID else GuideLayout.LIST

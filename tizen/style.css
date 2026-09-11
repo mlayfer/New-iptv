@@ -246,7 +246,9 @@ input::placeholder{color:var(--ink-faint)}
 .rowRange{font-size:17px;color:var(--ink-faint);white-space:nowrap;flex:0 0 auto}
 .rowBar{height:5px;border-radius:4px;background:rgba(255,255,255,.16);margin-top:8px;overflow:hidden}
 .rowFill{height:100%;width:0;background:var(--accent)}
+.rowAhead{width:420px;flex:0 0 auto;min-width:0}
 .rowNext{font-size:17px;color:var(--ink-dim);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowNext:first-child{margin-top:0}
 
 /* Playback takes the whole screen; the bar tells you what you are on and fades. */
 /*

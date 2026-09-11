@@ -689,7 +689,8 @@ fun ChannelLine(
             )
         }
 
-        val schedule: @Composable () -> Unit = {
+        // What is on, and how far in.
+        val onAir: @Composable () -> Unit = {
             if (now == null) {
                 Faint("אין לוח שידורים לערוץ הזה", size = 18)
             } else {
@@ -724,28 +725,39 @@ fun ChannelLine(
                             .background(Ink.Accent)
                     )
                 }
-                for (line in upcoming) {
-                    Text(
-                        text = line,
-                        fontSize = tzSp(17),
-                        color = Ink.Dim,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = tz(6)),
-                    )
-                }
             }
         }
 
+        /** And what follows it. */
+        val ahead: @Composable () -> Unit = {
+            for (line in upcoming) {
+                Text(
+                    text = line,
+                    fontSize = tzSp(17),
+                    color = Ink.Dim,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = tz(6)),
+                )
+            }
+        }
+
+        // Across a television the line reads as three columns — who, what is on,
+        // what is next — so the eye can run down any one of them. A phone has
+        // room for one, so the same pieces stack rather than being squeezed
+        // until none of them can be read.
         if (isWide) {
-            Column(modifier = Modifier.width(tz(340))) { identity() }
-            Spacer(Modifier.width(tz(24)))
-            Column(modifier = Modifier.weight(1f)) { schedule() }
+            Column(modifier = Modifier.width(tz(300))) { identity() }
+            Spacer(Modifier.width(tz(28)))
+            Column(modifier = Modifier.weight(1f)) { onAir() }
+            Spacer(Modifier.width(tz(28)))
+            Column(modifier = Modifier.width(tz(420))) { ahead() }
         } else {
             Column(modifier = Modifier.weight(1f)) {
                 identity()
                 Spacer(Modifier.height(tz(8)))
-                schedule()
+                onAir()
+                ahead()
             }
         }
     }
