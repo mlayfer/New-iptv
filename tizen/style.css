@@ -387,3 +387,38 @@ body.playerOpen #app{padding:0}
 
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:20px}
+
+/* ---- The channel list, over a channel that is still playing ---------------
+ *
+ * The picture moves into a corner rather than disappearing behind the list: the
+ * point of browsing here is that you have not stopped watching. Every size is
+ * written in pixels because the canvas is fixed at 1920x1080 and because the
+ * 2022 sets run a browser that does not know `aspect-ratio` — an unknown
+ * property is dropped in silence, and a picture with no height is no picture.
+ */
+body.watching .playerStage{top:48px;left:48px;right:auto;bottom:auto;width:672px;height:378px;
+  border-radius:16px;overflow:hidden;border:1px solid var(--line-soft)}
+body.watching #liveOverlay .ovBottom{display:none}
+body.watching #liveOverlay .ovTop{top:442px;left:48px;right:auto;width:672px;padding:18px 4px;background:none}
+body.watching #liveOverlay .ovLogo{width:86px;height:52px}
+body.watching #liveOverlay .ovName{font-size:28px}
+body.watching #liveOverlay .ovMeta{font-size:19px}
+body.watching #liveOverlay{opacity:1}
+
+.watchList{position:absolute;top:0;right:0;bottom:auto;left:auto;width:1100px;height:1080px;z-index:3;
+  background:rgba(10,10,11,.96);border-left:1px solid var(--line-soft);
+  padding:32px 40px;display:flex;flex-direction:column;gap:14px}
+.watchHead{display:flex;align-items:baseline;gap:20px}
+.watchTitle{font-size:30px;font-weight:800}
+.watchCount{font-size:19px;color:var(--ink-faint)}
+.watchItems{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px}
+.watchRow{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:14px;padding:0 16px;border-radius:12px;
+  border:1px solid var(--line-soft);background:var(--surface);text-align:right}
+.watchRow.playing{border-color:var(--accent);background:rgba(77,155,255,.18)}
+.watchLogo{width:84px;height:46px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;color:var(--accent);font-size:20px;font-weight:800}
+.watchLogo img{max-width:100%;max-height:100%;object-fit:contain}
+.watchText{flex:1;min-width:0}
+.watchName{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.watchNow{font-size:17px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.watchHint{font-size:17px;color:var(--ink-faint);flex:0 0 auto}

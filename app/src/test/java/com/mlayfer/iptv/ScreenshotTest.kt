@@ -1,5 +1,16 @@
 package com.mlayfer.iptv
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import com.mlayfer.iptv.ui.WhatElseIsOn
+import com.mlayfer.iptv.ui.watchListPlacement
+import com.mlayfer.iptv.ui.watchPicturePlacement
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -262,6 +273,47 @@ class ScreenshotTest {
     @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun `the guide as a list on a phone`() {
         onAPhone("12-phone-guide") { ChannelsScreen(guideState(), viewModel) }
+    }
+
+    /**
+     * The channel list over a channel that is still playing.
+     *
+     * The picture is a stand-in: ExoPlayer does not run on a plain JVM, and it
+     * is not what this is a picture of. Everything else is the real screen —
+     * the panel, and the placement both it and the player are given, read from
+     * the screen itself rather than copied here.
+     */
+    private fun whileWatching(name: String, tv: Boolean) = draw(name, tv) {
+        val watching = guideState()
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            WhatElseIsOn(
+                state = watching,
+                viewModel = viewModel,
+                channels = watching.channels.filter { it.kind == ChannelKind.LIVE },
+                clock = System.currentTimeMillis(),
+                onPlay = {},
+                modifier = watchListPlacement(),
+            )
+            Box(
+                modifier = watchPicturePlacement()
+                    .aspectRatio(16f / 9f)
+                    .background(Color(0xFF1B1B1F)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("התמונה", color = Color(0xFF6E7A8F))
+            }
+        }
+    }
+
+    @Test
+    fun `the channel list over the picture`() {
+        whileWatching("13-while-watching", tv = true)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `the channel list over the picture on a phone`() {
+        whileWatching("14-phone-while-watching", tv = false)
     }
 
     @Test

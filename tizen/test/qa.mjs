@@ -208,6 +208,34 @@ check("a channel has no timeline to scrub", !(await shown("#scrubRow")));
 check("the picture is captioned with the programme, not the group",
   (await page.textContent("#itemMeta")).includes("עכשיו · מהדורת החדשות"),
   await page.textContent("#itemMeta"));
+
+// Looking for the next thing while the current thing carries on.
+await page.keyboard.press("ArrowLeft");
+await page.waitForTimeout(700);
+check("sideways over a channel opens the list of what else is on",
+  await shown("#watchList"));
+check("the picture moves aside rather than away",
+  await page.evaluate(() => document.body.classList.contains("watching")) &&
+    await shown("#playerScreen"));
+const watchRows = await page.locator('[data-nav="watchItem"]').count();
+check("the list beside the picture has channels in it", watchRows > 0, `${watchRows} rows`);
+check("each channel says what is on it",
+  (await page.textContent('[data-nav="watchItem"] .watchNow')).length > 0,
+  await page.textContent('[data-nav="watchItem"] .watchNow'));
+
+await page.keyboard.press("ArrowDown");
+await page.keyboard.press("Enter");
+await page.waitForTimeout(900);
+check("choosing from the list changes channel and leaves the list up",
+  await shown("#watchList") && await shown("#playerScreen"));
+
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(500);
+check("Back closes the list before it leaves the picture",
+  !(await shown("#watchList")) && await shown("#playerScreen"));
+check("the picture goes back to filling the screen",
+  !(await page.evaluate(() => document.body.classList.contains("watching"))));
+
 await page.keyboard.press("Backspace");
 await page.waitForTimeout(500);
 check("Back returns to the guide", await shown("#liveScreen") && !(await shown("#playerScreen")));

@@ -228,6 +228,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5.5 5.5 0 1 1-5.5 5.5H4.5A7.5 7.5 0 1 0 12 5z"/></svg>
               <span class="ctrlName" aria-hidden="true">מהתחלה</span>
             </button>
+            <button class="focusable ctrlBtn" data-act="channels" aria-label="ערוצים">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="3" height="2.4" rx="1"/><rect x="8" y="5" width="13" height="2.4" rx="1.2"/><rect x="3" y="10.8" width="3" height="2.4" rx="1"/><rect x="8" y="10.8" width="13" height="2.4" rx="1.2"/><rect x="3" y="16.6" width="3" height="2.4" rx="1"/><rect x="8" y="16.6" width="13" height="2.4" rx="1.2"/></svg>
+              <span class="ctrlName" aria-hidden="true">ערוצים</span>
+            </button>
             <button class="focusable ctrlBtn" data-act="audio" aria-label="שמע">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               <span class="ctrlName" aria-hidden="true">שמע</span>
@@ -245,6 +249,19 @@
           <div class="trackTitle" id="trackTitle">שמע</div>
           <div class="trackList" id="trackList"></div>
         </div>
+      </div>
+
+      <!-- The channel list, over a channel that is still playing: looking for
+           the next thing while the current thing carries on is the one thing a
+           television does that a streaming app forgot. -->
+      <div id="watchList" class="watchList hidden">
+        <div class="watchHead">
+          <div class="watchTitle">מה עוד משודר</div>
+          <div class="watchCount" id="watchCount"></div>
+        </div>
+        <div id="watchGroups" class="groupStrip"></div>
+        <div id="watchItems" class="watchItems"></div>
+        <div class="watchHint">מעלה/מטה — ערוץ · ימין/שמאל — קטגוריה · אישור — צפייה · Back — סגירה</div>
       </div>
     </div>
   </div>

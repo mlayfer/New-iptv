@@ -27,6 +27,10 @@ const state = {
   liveStart: 0,
   // Tiles, or one channel per line with its schedule beside it.
   guideLayout: 'grid',
+  // The channel list, open over a channel that is still playing.
+  watchOpen: false,
+  watchIndex: 0,
+  watchStart: 0,
   vodRow: 0,
   vodCol: 0,
   vodRowStart: 0,
@@ -543,6 +547,7 @@ function applyFilter(){
   } else {
     renderItems();
   }
+  if(state.watchOpen) renderWatchList();
 }
 
 // ---- Home: rows of content, the way a streaming app opens -----------------
@@ -1392,6 +1397,162 @@ function focusChannel(){
   renderNowNext();
 }
 
+// ---- The channel list, over a channel that is still playing ---------------
+//
+// Looking for the next thing while the current thing carries on is the one
+// thing a television does that a streaming app forgot. Choosing here changes
+// the channel and leaves the list up, because nobody finds what they want on
+// the first try; Back is what closes it.
+
+/** How many channels fit beside the picture. */
+const WATCH_ROWS = 10;
+
+/**
+ * Where the picture goes. The set draws the video on a plane of its own, so
+ * moving it is an API call and not a stylesheet — the CSS only follows along
+ * for the HTML video element used where avplay is not available.
+ */
+function pictureRect(){
+  return state.watchOpen ? [48, 48, 672, 378] : [0, 0, 1920, 1080];
+}
+
+function applyPictureRect(){
+  const rect = pictureRect();
+  try {
+    if(window.webapis && webapis.avplay && webapis.avplay.getState() !== 'NONE'){
+      webapis.avplay.setDisplayRect(rect[0], rect[1], rect[2], rect[3]);
+    }
+  } catch(e) {}
+}
+
+function openWatchList(){
+  if(!state.filtered.length) return;
+  state.watchOpen = true;
+  closeControls();
+  document.body.classList.add('watching');
+  $('#watchList').classList.remove('hidden');
+  applyPictureRect();
+
+  const at = state.filtered.findIndex(x => state.current && x.id === state.current.id);
+  state.watchIndex = at >= 0 ? at : 0;
+  state.watchStart = 0;
+  renderWatchGroups();
+  renderWatchList();
+  focusWatchRow();
+  showOverlay();
+}
+
+function closeWatchList(){
+  if(!state.watchOpen) return;
+  state.watchOpen = false;
+  document.body.classList.remove('watching');
+  $('#watchList').classList.add('hidden');
+  applyPictureRect();
+  // setFocus ignores a null, so the highlight has to be taken off by hand or it
+  // stays lit on a row that is no longer on the screen.
+  if(state.focusEl){
+    state.focusEl.classList.remove('focused');
+    state.focusEl = null;
+  }
+  showOverlay();
+}
+
+/** The categories, as one line the arrows step through rather than a second
+ *  thing to move focus into: four arrows have to reach thirteen thousand
+ *  channels, and a focus axis that only holds chips is one axis too many. */
+function renderWatchGroups(){
+  const box = $('#watchGroups');
+  if(!box) return;
+  box.innerHTML = '';
+  groupList().slice(0, 40).forEach(g => {
+    const chip = document.createElement('div');
+    chip.className = 'groupChip' + (g === state.group ? ' active' : '');
+    chip.textContent = g;
+    box.appendChild(chip);
+  });
+}
+
+function stepWatchGroup(delta){
+  const groups = groupList();
+  if(groups.length < 2) return;
+  const at = Math.max(0, groups.indexOf(state.group));
+  const next = groups[(at + delta + groups.length) % groups.length];
+  state.group = next;
+  state.watchIndex = 0;
+  state.watchStart = 0;
+  renderWatchGroups();
+  applyFilter();
+  focusWatchRow();
+}
+
+function renderWatchList(){
+  const box = $('#watchItems');
+  if(!box) return;
+  box.innerHTML = '';
+  text($('#watchCount'), state.filtered.length ? state.filtered.length + ' ערוצים' : '');
+
+  const start = Math.max(0, Math.min(state.watchStart, Math.max(0, state.filtered.length - WATCH_ROWS)));
+  state.watchStart = start;
+  state.filtered.slice(start, start + WATCH_ROWS).forEach((item, offset) => {
+    const index = start + offset;
+    const row = document.createElement('button');
+    row.className = 'focusable watchRow' + (state.current && state.current.id === item.id ? ' playing' : '');
+    row.dataset.nav = 'watchItem';
+    row.dataset.index = String(index);
+    row.innerHTML = '<div class="watchLogo"></div>' +
+      '<div class="watchText"><div class="watchName"></div><div class="watchNow"></div></div>';
+    $('.watchName', row).textContent = (index + 1) + ' · ' + (isFavorite(item) ? '★ ' : '') + item.name;
+    $('.watchNow', row).textContent = item.group || '';
+    fillArt($('.watchLogo', row), item);
+    row.addEventListener('click', () => {
+      state.watchIndex = index;
+      state.liveIndex = index;
+      // The list stays up: changing channel is not the same as being finished
+      // with the list.
+      activateItem(item);
+      renderWatchList();
+      focusWatchRow();
+    });
+    box.appendChild(row);
+
+    epgFor(item).then(function(list){
+      if(!row.isConnected) return;
+      const slot = Core.nowOn(list, Date.now());
+      if(slot.current) text($('.watchNow', row), slot.current.title);
+    });
+  });
+}
+
+function focusWatchRow(){
+  if(!state.filtered.length) return;
+  const index = Math.max(0, Math.min(state.watchIndex, state.filtered.length - 1));
+  state.watchIndex = index;
+  if(index < state.watchStart || index >= state.watchStart + WATCH_ROWS){
+    // Keep the highlight one row inside the window, so there is always context.
+    state.watchStart = Math.max(0, index - (index < state.watchStart ? 1 : WATCH_ROWS - 2));
+    renderWatchList();
+  }
+  const el = $('[data-nav="watchItem"][data-index="' + index + '"]');
+  if(el) setFocus(el);
+}
+
+function moveWatch(delta){
+  if(!state.filtered.length) return;
+  state.watchIndex = Math.max(0, Math.min(state.watchIndex + delta, state.filtered.length - 1));
+  focusWatchRow();
+}
+
+function navWatch(active, dir){
+  wakePlayerUi();
+  if(dir === 'up'){ moveWatch(-1); return null; }
+  if(dir === 'down'){ moveWatch(1); return null; }
+  // Right moves back through the categories, left moves forward: the chips read
+  // the way the rest of the app does.
+  if(dir === 'right'){ stepWatchGroup(-1); return null; }
+  if(dir === 'left'){ stepWatchGroup(1); return null; }
+  return active;
+}
+
 function moveChannel(dRow, dCol){
   if(!state.filtered.length) return;
   const last = state.filtered.length - 1;
@@ -1416,8 +1577,10 @@ function showOverlay(){
   if(!bar) return;
   bar.classList.remove('faded');
   if(state.overlayTimer) clearTimeout(state.overlayTimer);
-  // Nothing fades while it is being used, or while playback is stopped.
-  if(state.controlsOpen || state.trackType || state.paused) return;
+  // Nothing fades while it is being used, or while playback is stopped — and
+  // the name of what is playing has to stay put while the list beside it is
+  // being read.
+  if(state.controlsOpen || state.trackType || state.paused || state.watchOpen) return;
   state.overlayTimer = setTimeout(() => bar.classList.add('faded'), OVERLAY_MS);
 }
 
@@ -1447,7 +1610,7 @@ function describePlayer(item){
   $('#ovBadge').classList.toggle('hidden', !live);
   $('#scrubRow').classList.toggle('hidden', live);
   text($('#ovHint'), live
-    ? 'מעלה/מטה — ערוץ · אישור — הפקדים · צהוב — מועדפים · Back — יציאה'
+    ? 'מעלה/מטה — ערוץ · ימין/שמאל — מה עוד משודר · אישור — הפקדים · Back — יציאה'
     : 'ימין/שמאל — דילוג · מטה — הפקדים · אישור — נגן/השהה · Back — יציאה');
   if(live) describeLiveNow(item);
   renderProgress();
@@ -1509,6 +1672,8 @@ function renderControls(){
   show('restart', !live);
   show('back10', !live);
   show('fwd10', !live);
+  // A film has no other channels to flick through.
+  show('channels', live);
   show('prevEp', !!episodeNeighbour(-1));
   show('nextEp', !!episodeNeighbour(1));
   setToggleIcon(state.paused);
@@ -1623,6 +1788,7 @@ function runControl(act){
   if(act === 'fwd10'){ nudgeSeek(Core.SEEK_STEP); return; }
   if(act === 'prevEp'){ playNeighbourEpisode(-1); return; }
   if(act === 'nextEp'){ playNeighbourEpisode(1); return; }
+  if(act === 'channels'){ closeControls(); openWatchList(); return; }
   if(act === 'audio'){ openTrackPanel('AUDIO'); return; }
   if(act === 'subs'){ openTrackPanel('TEXT'); return; }
 }
@@ -1698,6 +1864,7 @@ function closePlayer(){
   state.controlsOpen = false;
   state.paused = false;
   closeTrackPanel();
+  closeWatchList();
   document.body.classList.remove('playerOpen');
   rememberPosition();
   stopPlayback();
@@ -2040,7 +2207,8 @@ function playCandidate(){
       // The page must stop painting where the video plane is, or the viewer
       // gets sound and a black screen.
       document.documentElement.classList.add('avplayOn');
-      webapis.avplay.setDisplayRect(0, 0, 1920, 1080);
+      const rect = pictureRect();
+      webapis.avplay.setDisplayRect(rect[0], rect[1], rect[2], rect[3]);
       try { webapis.avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX'); } catch(e) {}
       webapis.avplay.setListener({
         onbufferingstart: () => playerMessage('טוען...'),
@@ -2215,6 +2383,8 @@ function navPlayer(active, dir){
   wakePlayerUi();
   const live = !onDemand();
 
+  if(state.watchOpen) return navWatch(active, dir);
+
   if(state.trackType){
     const tracks = visible('[data-nav="track"]');
     if(dir === 'up' || dir === 'down'){
@@ -2245,6 +2415,8 @@ function navPlayer(active, dir){
     // on the bar in front of you; OK reaches them.
     if(dir === 'up') zap(-1);
     if(dir === 'down') zap(1);
+    // Sideways is what every set-top box means by "what else is on".
+    if(dir === 'left' || dir === 'right') openWatchList();
     return null;
   }
   if(dir === 'down'){ openControls(); return null; }
@@ -2403,7 +2575,7 @@ function afterKeyboardClosed(el){
 
 function onEnter(){
   // In the player, OK is play/pause until the controls are open.
-  if(currentNavMode() === 'player' && !state.controlsOpen && !state.trackType){
+  if(currentNavMode() === 'player' && !state.controlsOpen && !state.trackType && !state.watchOpen){
     if(onDemand()) togglePlay(); else openControls();
     return;
   }
@@ -2419,6 +2591,7 @@ function handleBack(){
     // Back closes what is open on top of the picture before leaving it.
     if(state.trackType){ closeTrackPanel(); openControls(); return; }
     if(state.controlsOpen){ closeControls(); return; }
+    if(state.watchOpen){ closeWatchList(); return; }
     closePlayer();
     return;
   }

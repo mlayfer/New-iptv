@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -124,6 +125,19 @@ fun PlayerPanel(
     next: Programme?,
     isFavorite: Boolean,
     fullscreen: Boolean,
+    /**
+     * Parked beside a channel list rather than filling the screen. The strip of
+     * controls stays — it is how the picture is paused — but the guide under it
+     * goes, because the list beside it is already saying what is on.
+     */
+    compact: Boolean = false,
+    /**
+     * Opens the channel list beside the picture. Null where there is nothing to
+     * browse — a film has no other channels. A phone has no D-pad to open it
+     * with, so this button is the only way in there, and it is the discoverable
+     * way in on a television too.
+     */
+    onBrowse: (() -> Unit)? = null,
     onToggleFullscreen: () -> Unit,
     onToggleFavorite: () -> Unit,
     onPrev: () -> Unit,
@@ -374,6 +388,15 @@ fun PlayerPanel(
     /** Everything that is not playback: it keeps out of the transport's way. */
     val extras: @Composable () -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onBrowse != null) {
+                IconButton(onClick = onBrowse, enabled = channel != null) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.List,
+                        contentDescription = "ערוצים",
+                        tint = if (compact) Ink.Accent else Ink.Dim,
+                    )
+                }
+            }
             IconButton(onClick = onToggleFavorite, enabled = channel != null) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -761,7 +784,7 @@ fun PlayerPanel(
 
         if (!fullscreen) controlRow()
 
-        if (!fullscreen && now != null) {
+        if (!fullscreen && !compact && now != null) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
