@@ -6,18 +6,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-# One build of a branch at a time. Two at once race for the same Gradle cache
-# and the same `screens` branch, and the older one can only ever publish a
-# picture of code nobody is looking at any more.
-#
-# Queued, not cancelled. Cancelling took a build out mid-way through writing the
-# Gradle cache, and the next build restored what was left of it and sat in
-# `testDebugUnitTest` for the best part of an hour. A redundant build costs four
-# minutes; a poisoned cache costs the afternoon.
-concurrency:
-  group: talohim-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   build:
     name: Tizen check, unit tests and debug APK
