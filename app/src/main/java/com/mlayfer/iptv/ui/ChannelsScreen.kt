@@ -567,7 +567,7 @@ private fun PlayerFor(
  */
 @Composable
 internal fun BoxScope.watchListPlacement(): Modifier = if (isWide) {
-    Modifier.align(Alignment.CenterStart).fillMaxWidth(0.60f).fillMaxHeight()
+    Modifier.align(Alignment.CenterStart).fillMaxWidth(0.49f).fillMaxHeight()
 } else {
     Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.60f)
 }
@@ -578,7 +578,7 @@ internal fun BoxScope.watchListPlacement(): Modifier = if (isWide) {
  */
 @Composable
 internal fun BoxScope.watchPicturePlacement(): Modifier = if (isWide) {
-    Modifier.align(Alignment.TopEnd).padding(tz(28)).fillMaxWidth(0.36f)
+    Modifier.align(Alignment.TopEnd).padding(tz(28)).fillMaxWidth(0.45f)
 } else {
     Modifier.align(Alignment.TopCenter).padding(top = tz(10))
 }
@@ -653,6 +653,7 @@ internal fun WhatElseIsOn(
                     number = index + 1,
                     logo = channel.logo,
                     now = onNow?.title,
+                    range = onNow?.let { "${hhmm(it.start)}–${hhmm(it.stop)}" },
                     playing = channel.id == state.selectedId,
                     onClick = { onPlay(channel) },
                     modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
@@ -672,6 +673,7 @@ private fun WatchRow(
     number: Int,
     logo: String?,
     now: String?,
+    range: String?,
     playing: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -681,7 +683,7 @@ private fun WatchRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(if (playing) Ink.Accent.copy(alpha = 0.18f) else Ink.Surface)
+            .background(Ink.Surface)
             .border(1.dp, if (playing) Ink.Accent else Ink.LineSoft, shape)
             .focusHighlight(shape, border = false)
             .clickable(onClick = onClick)
@@ -725,6 +727,30 @@ private fun WatchRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        if (range != null) {
+            Spacer(Modifier.width(tz(14)))
+            Faint(range, size = 17)
+        }
+        // Which one is playing has to be readable next to which one is
+        // highlighted, and two shades of the same blue are not: the mark says
+        // it in a word instead.
+        if (playing) {
+            Spacer(Modifier.width(tz(14)))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(tz(999)))
+                    .background(Ink.Accent)
+                    .padding(horizontal = tz(12), vertical = tz(4)),
+            ) {
+                Text(
+                    text = "משודר",
+                    fontSize = tzSp(15),
+                    fontWeight = FontWeight.Bold,
+                    color = Ink.OnAccent,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

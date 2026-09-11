@@ -4,6 +4,7 @@
  * it actually saw, so a failure is a report and not a mystery.
  */
 import { chromium } from "playwright-core";
+import fs from "node:fs/promises";
 
 const results = [];
 const check = (name, ok, detail = "") => {
@@ -109,6 +110,22 @@ await page.route("**/live/**", (r) => r.abort());
 await page.route("**/movie/**", (r) => r.abort());
 await page.route("**/series/**", (r) => r.abort());
 
+/**
+ * A picture of whatever is on the screen, when asked for one.
+ *
+ * The Tizen app has the same problem the Android one had: it is looked at on a
+ * television in someone's front room and nowhere else, so a screen that comes
+ * out wrong stays wrong until a photograph arrives. This walk already drives
+ * every screen; saving what it sees costs nothing and makes them visible.
+ * Set QA_SHOTS to a directory to collect them.
+ */
+const SHOTS = process.env.QA_SHOTS || "";
+if (SHOTS) await fs.mkdir(SHOTS, { recursive: true });
+const shot = async (name) => {
+  if (!SHOTS) return;
+  await page.screenshot({ path: `${SHOTS}/${name}.png` });
+};
+
 const id = () => page.evaluate(() => (document.activeElement && document.activeElement.id) || "");
 const shown = (sel) => page.evaluate((s) => {
   const el = document.querySelector(s);
@@ -184,6 +201,7 @@ check("the guide says what is on now", await shown("#nowNext") &&
   await page.textContent("#nnNow"));
 check("and what follows it", (await page.textContent("#nnNext")).includes("סרט הערב"),
   await page.textContent("#nnNext"));
+await shot("1-guide");
 check("how far into the programme is drawn",
   parseFloat(await page.evaluate(() => document.querySelector("#nnFill").style.width)) > 10);
 await page.keyboard.press("ArrowLeft");
@@ -201,6 +219,7 @@ await page.waitForTimeout(400);
 await page.locator('[data-nav="item"]').first().click();
 await page.waitForTimeout(1200);
 check("a channel plays at once, without a page in between", await shown("#playerScreen"));
+await shot("2-player");
 check("nothing of the app is left over the picture",
   !(await shown(".topbar")) && !(await shown("#browseScreen")));
 check("a channel says it is live", await shown("#ovBadge"));
@@ -219,6 +238,7 @@ check("the picture moves aside rather than away",
     await shown("#playerScreen"));
 const watchRows = await page.locator('[data-nav="watchItem"]').count();
 check("the list beside the picture has channels in it", watchRows > 0, `${watchRows} rows`);
+await shot("3-while-watching");
 check("each channel says what is on it",
   (await page.textContent('[data-nav="watchItem"] .watchNow')).length > 0,
   await page.textContent('[data-nav="watchItem"] .watchNow'));

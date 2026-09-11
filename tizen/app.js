@@ -1413,7 +1413,7 @@ const WATCH_ROWS = 10;
  * for the HTML video element used where avplay is not available.
  */
 function pictureRect(){
-  return state.watchOpen ? [48, 48, 672, 378] : [0, 0, 1920, 1080];
+  return state.watchOpen ? [48, 48, 860, 484] : [0, 0, 1920, 1080];
 }
 
 function applyPictureRect(){
@@ -1500,7 +1500,9 @@ function renderWatchList(){
     row.dataset.nav = 'watchItem';
     row.dataset.index = String(index);
     row.innerHTML = '<div class="watchLogo"></div>' +
-      '<div class="watchText"><div class="watchName"></div><div class="watchNow"></div></div>';
+      '<div class="watchText"><div class="watchName"></div><div class="watchNow"></div></div>' +
+      '<div class="watchTime"></div>' +
+      '<div class="watchOn">משודר</div>';
     $('.watchName', row).textContent = (index + 1) + ' · ' + (isFavorite(item) ? '★ ' : '') + item.name;
     $('.watchNow', row).textContent = item.group || '';
     fillArt($('.watchLogo', row), item);
@@ -1518,7 +1520,10 @@ function renderWatchList(){
     epgFor(item).then(function(list){
       if(!row.isConnected) return;
       const slot = Core.nowOn(list, Date.now());
-      if(slot.current) text($('.watchNow', row), slot.current.title);
+      if(!slot.current) return;
+      text($('.watchNow', row), slot.current.title);
+      text($('.watchTime', row), slot.current.start
+        ? clockOfDay(slot.current.start) + '–' + clockOfDay(slot.current.stop) : '');
     });
   });
 }
