@@ -64,12 +64,26 @@ class ScreenshotTest {
     private val viewModel by lazy { AppViewModel(RuntimeEnvironment.getApplication()) }
 
     /** Everything the app wraps itself in: the theme, right-to-left, and a TV. */
-    private fun shoot(name: String, content: @Composable () -> Unit) {
+    private fun shoot(name: String, content: @Composable () -> Unit) =
+        draw(name, tv = true, content)
+
+    /**
+     * The same screen in a hand.
+     *
+     * Every one of these screens was drawn for a 960dp television, and the phone
+     * versions were shipped unseen — which is how a title page reached someone
+     * with its episode cards at seventy dp and two of its three buttons drawn off
+     * the edge of the glass. A picture of the phone costs one more test.
+     */
+    private fun onAPhone(name: String, content: @Composable () -> Unit) =
+        draw(name, tv = false, content)
+
+    private fun draw(name: String, tv: Boolean, content: @Composable () -> Unit) {
         compose.setContent {
             TelohimTheme {
                 CompositionLocalProvider(
                     LocalLayoutDirection provides LayoutDirection.Rtl,
-                    LocalIsTv provides true,
+                    LocalIsTv provides tv,
                 ) {
                     content()
                 }
@@ -160,8 +174,37 @@ class ScreenshotTest {
         }
     }
 
+    // ---- and the same app in a hand ------------------------------------------
+
     @Test
-    fun `a series page`() {
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `the door on a phone`() {
+        onAPhone("7-phone-door") { ChooseScreen(catalogue(), viewModel) }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `the sources form on a phone`() {
+        onAPhone("8-phone-sources") { SourcesScreen(UiState(), viewModel) }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `a series page on a phone`() {
+        onAPhone("9-phone-title") {
+            TitleScreen(seriesState(), viewModel)
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `the home rows on a phone`() {
+        onAPhone("10-phone-home") {
+            HomeScreen(catalogue().copy(screen = Screen.HOME), viewModel)
+        }
+    }
+
+    private fun seriesState(): UiState {
         val episodes = (1..10).map { i ->
             Channel(
                 id = "e$i",
@@ -171,15 +214,15 @@ class ScreenshotTest {
                 group = "עונה 1",
             )
         }
-        shoot("6-title") {
-            TitleScreen(
-                catalogue().copy(
-                    screen = Screen.TITLE,
-                    openSeries = Series(id = "s1", name = "ניתוק (2022)", group = "דרמה"),
-                    episodes = episodes,
-                ),
-                viewModel,
-            )
-        }
+        return catalogue().copy(
+            screen = Screen.TITLE,
+            openSeries = Series(id = "s1", name = "ניתוק (2022)", group = "דרמה"),
+            episodes = episodes,
+        )
+    }
+
+    @Test
+    fun `a series page`() {
+        shoot("6-title") { TitleScreen(seriesState(), viewModel) }
     }
 }
