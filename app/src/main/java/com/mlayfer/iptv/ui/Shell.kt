@@ -138,7 +138,9 @@ fun TopChrome(
             ) { name() }
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(tz(12)),
-                contentPadding = PaddingValues(vertical = tz(16)),
+                // The row scrolls, but a pill cut off flat against the edge of
+                // the glass reads as broken rather than as "there is more".
+                contentPadding = PaddingValues(top = tz(8), bottom = tz(6), start = tz(10)),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 item { Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) { actions() } }
@@ -211,11 +213,14 @@ fun NavPill(
             .border(1.dp, if (selected) Ink.Accent else Ink.Line, shape)
             .focusHighlight(shape, border = false)
             .clickable(onClick = onClick)
-            .padding(horizontal = tz(24), vertical = tz(14)),
+            .padding(
+                horizontal = if (isWide) tz(24) else tz(18),
+                vertical = if (isWide) tz(14) else tz(10),
+            ),
     ) {
         Text(
             text = label,
-            fontSize = tzSp(22),
+            fontSize = if (isWide) tzSp(22) else tzSp(19),
             color = if (selected) Ink.OnAccent else Ink.Bright,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,

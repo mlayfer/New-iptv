@@ -155,14 +155,18 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
                 // it left a hand's worth of nothing above and below. Here the
                 // two doors share the height instead — which is what they are:
                 // the whole of the choice, not a widget on a page.
+                // A weighted child is stretched to its share of the height, and
+                // heightIn beside it does nothing — which is why these grew to
+                // half a screen each. A door is a door; it gets a door's height,
+                // and the block sits in the middle of what is left.
+                val doorHeight = (maxHeight * 0.28f).coerceIn(150.dp, 220.dp)
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     heading()
-                    television(Modifier.fillMaxWidth().weight(1f).heightIn(max = 260.dp))
-                    library(Modifier.fillMaxWidth().weight(1f).heightIn(max = 260.dp))
+                    television(Modifier.fillMaxWidth().height(doorHeight))
+                    library(Modifier.fillMaxWidth().height(doorHeight))
                 }
             }
         }

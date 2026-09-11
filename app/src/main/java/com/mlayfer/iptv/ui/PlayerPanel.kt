@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
@@ -31,10 +32,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,12 +45,17 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -372,14 +380,13 @@ fun PlayerPanel(
                 )
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
-            // How far into a film this is. Live television has no such place.
+            // How far into a film this is — and a way to move it. A line that
+            // only reports is half a control. Live television has neither.
             if (duration > 0) {
-                LinearProgressIndicator(
-                    progress = { (position.toFloat() / duration).coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .padding(bottom = 4.dp),
+                Scrubber(
+                    position = position,
+                    duration = duration,
+                    onSeek = { player.seekTo(it) },
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -800,6 +807,104 @@ private fun describe(e: PlaybackException): String = when (e.errorCode) {
     PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
     -> "המכשיר לא הצליח לפענח את השידור."
     else -> "לא ניתן להפעיל את הערוץ הזה."
+}
+
+/**
+ * Where the film is, and where you want it.
+ *
+ * This was a progress line: it said how far in you were and offered no way to
+ * change it, which on a phone is the one thing a finger is for. Now it is the
+ * bar itself — drag it, or touch a point in it.
+ *
+ * Drawn left to right whatever the page does. A timeline is read as a timeline
+ * rather than as a sentence, and the Tizen build flips its control row to LTR
+ * for exactly this reason.
+ */
+@Composable
+private fun Scrubber(position: Long, duration: Long, onSeek: (Long) -> Unit) {
+    var dragging by remember { mutableStateOf(false) }
+    var held by remember { mutableFloatStateOf(0f) }
+    val playhead = (position.toFloat() / duration).coerceIn(0f, 1f)
+    val shown = if (dragging) held else playhead
+
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+        ) {
+            Text(
+                text = clockOf((shown * duration).toLong()),
+                fontSize = tzSp(17),
+                color = Ink.Dim,
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(28.dp)
+                    .padding(horizontal = 10.dp)
+                    // A four-dp line is a hard thing to hit with a thumb, so the
+                    // whole height of this box takes the touch.
+                    .pointerInput(duration) {
+                        detectTapGestures { at ->
+                            onSeek(((at.x / size.width).coerceIn(0f, 1f) * duration).toLong())
+                        }
+                    }
+                    .pointerInput(duration) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { at ->
+                                dragging = true
+                                held = (at.x / size.width).coerceIn(0f, 1f)
+                            },
+                            onDragEnd = {
+                                onSeek((held * duration).toLong())
+                                dragging = false
+                            },
+                            onDragCancel = { dragging = false },
+                        ) { change, _ ->
+                            held = (change.position.x / size.width).coerceIn(0f, 1f)
+                        }
+                    },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.25f))
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(shown)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(Ink.Accent)
+                )
+                // The handle, so it reads as something you may take hold of.
+                Box(
+                    modifier = Modifier.fillMaxWidth(shown),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(if (dragging) 18.dp else 14.dp)
+                            .clip(CircleShape)
+                            .background(Ink.Accent)
+                    )
+                }
+            }
+            Text(text = clockOf(duration), fontSize = tzSp(17), color = Ink.Dim)
+        }
+    }
+}
+
+/** Hours only when there are hours. */
+private fun clockOf(millis: Long): String {
+    val total = (millis / 1000).coerceAtLeast(0)
+    val h = total / 3600
+    val m = (total % 3600) / 60
+    val sec = total % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
 }
 
 private fun formatTime(millis: Long): String =
