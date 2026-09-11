@@ -72,7 +72,7 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var kind by remember { mutableStateOf(SourceKind.URL) }
+    var kind by remember { mutableStateOf(SourceKind.XTREAM) }
     var name by remember { mutableStateOf("") }
     var epgUrl by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
@@ -186,15 +186,17 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                     SavedPlaylists(state, viewModel)
                 }
 
+                // Xtream first, and open: it is the kind of subscription anyone
+                // setting this up actually has. M3U and a file are the fallbacks.
                 Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) {
+                    SourceTab("Xtream Codes", kind == SourceKind.XTREAM, Modifier.weight(1f)) {
+                        kind = SourceKind.XTREAM
+                    }
                     SourceTab("קישור M3U", kind == SourceKind.URL, Modifier.weight(1f)) {
                         kind = SourceKind.URL
                     }
                     SourceTab("קובץ", kind == SourceKind.FILE, Modifier.weight(1f)) {
                         kind = SourceKind.FILE
-                    }
-                    SourceTab("Xtream Codes", kind == SourceKind.XTREAM, Modifier.weight(1f)) {
-                        kind = SourceKind.XTREAM
                     }
                 }
 

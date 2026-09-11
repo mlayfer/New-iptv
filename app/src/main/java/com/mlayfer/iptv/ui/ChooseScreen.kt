@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,35 +70,15 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
             .windowInsetsPadding(WindowInsets.statusBars)
             .tvSafeArea(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
+        // The same bar as every other screen, rather than one of its own written
+        // the other way round: the name on the right, where a Hebrew page starts,
+        // and what you can do on the left.
+        TopChrome(
+            title = "טלוהים",
+            tagline = "טלוויזיה בלייב • סרטים • סדרות",
+            counts = "גרסה ${BuildConfig.VERSION_NAME}",
         ) {
-            TextButton(
-                onClick = { viewModel.setScreen(Screen.SOURCES) },
-                modifier = Modifier.focusHighlight(),
-            ) { Text("החלף מקור") }
-
-            Spacer(Modifier.weight(1f))
-
-            // The brand block sits in the corner, the way it does on the TV.
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "טלוהים",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "טלוויזיה בלייב • סרטים • סדרות",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = "גרסה ${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            NavPill("החלף מקור", { viewModel.setScreen(Screen.SOURCES) })
         }
 
         if (state.channels.isEmpty() && state.series.isEmpty()) {

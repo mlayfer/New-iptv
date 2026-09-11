@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -166,34 +169,62 @@ fun TitleScreen(state: UiState, viewModel: AppViewModel) {
 
                 episodes.isEmpty() -> Spacer(Modifier.fillMaxSize())
 
-                // Seasons stand on the right, where a hand reaches first with a
-                // remote in it, and the episodes fill the rest.
-                else -> Row(modifier = Modifier.fillMaxSize().padding(top = tz(16))) {
-                    if (seasons.size > 1) {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(tz(10)),
-                            modifier = Modifier.width(tz(220)).fillMaxHeight(),
+                else -> {
+                    val grid: @Composable (Modifier) -> Unit = { mod ->
+                        LazyVerticalGrid(
+                            // Five across is a television. Two is a phone. The
+                            // same five squeezed into a hand is what turned an
+                            // episode card into a stamp with "נ..." on it.
+                            columns = GridCells.Fixed(if (isWide) 5 else 2),
+                            horizontalArrangement = Arrangement.spacedBy(tz(14)),
+                            verticalArrangement = Arrangement.spacedBy(tz(14)),
+                            contentPadding = PaddingValues(bottom = tz(28)),
+                            modifier = mod,
                         ) {
-                            items(seasons, key = { it }) { name ->
-                                SeasonPill(name, name == season) { season = name }
+                            itemsIndexed(episodes, key = { _, e -> e.id }) { index, episode ->
+                                EpisodeCard(
+                                    episode = episode,
+                                    number = index + 1,
+                                    seen = episode.id in state.seen,
+                                    onClick = { viewModel.select(episode); playing = true },
+                                )
                             }
                         }
-                        Spacer(Modifier.width(tz(20)))
                     }
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(5),
-                        horizontalArrangement = Arrangement.spacedBy(tz(14)),
-                        verticalArrangement = Arrangement.spacedBy(tz(14)),
-                        contentPadding = PaddingValues(bottom = tz(28)),
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    ) {
-                        itemsIndexed(episodes, key = { _, e -> e.id }) { index, episode ->
-                            EpisodeCard(
-                                episode = episode,
-                                number = index + 1,
-                                seen = episode.id in state.seen,
-                                onClick = { viewModel.select(episode); playing = true },
-                            )
+
+                    if (isWide) {
+                        // Seasons stand on the right, where a hand reaches first
+                        // with a remote in it, and the episodes fill the rest.
+                        Row(modifier = Modifier.fillMaxSize().padding(top = tz(16))) {
+                            if (seasons.size > 1) {
+                                LazyColumn(
+                                    verticalArrangement = Arrangement.spacedBy(tz(10)),
+                                    modifier = Modifier.width(tz(220)).fillMaxHeight(),
+                                ) {
+                                    items(seasons, key = { it }) { name ->
+                                        SeasonPill(name, name == season) { season = name }
+                                    }
+                                }
+                                Spacer(Modifier.width(tz(20)))
+                            }
+                            grid(Modifier.weight(1f).fillMaxHeight())
+                        }
+                    } else {
+                        // A phone has no width to give away to a sidebar, so the
+                        // seasons become a row above the episodes.
+                        Column(modifier = Modifier.fillMaxSize().padding(top = tz(16))) {
+                            if (seasons.size > 1) {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(tz(10)),
+                                    contentPadding = PaddingValues(bottom = tz(14)),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    items(seasons, key = { it }) { name ->
+                                        CategoryChip(name, name == season) { season = name }
+                                    }
+                                }
+                            }
+                            grid(Modifier.fillMaxSize())
                         }
                     }
                 }
@@ -233,6 +264,7 @@ private fun playLabel(state: UiState, viewModel: AppViewModel, isSeries: Boolean
  * The band a title arrives on: its artwork washed across the back, its name
  * said large, and the two or three things worth doing with it.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Banner(
     title: String,
@@ -245,7 +277,10 @@ private fun Banner(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(tz(400))
+            // A phone gets a shorter band: the poster is the same shape either
+            // way, and at four hundred it took the screen and left the episodes
+            // below the fold.
+            .height(if (isWide) tz(400) else tz(300))
             .padding(top = tz(12))
             .clip(shape)
             .background(Ink.SurfaceLow)
@@ -277,7 +312,7 @@ private fun Banner(
             // is where the eye starts.
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
+                    .fillMaxHeight(if (isWide) 1f else 0.8f)
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(tz(12)))
                     .background(Brush.linearGradient(listOf(Color(0xFF232327), Color(0xFF111113))))
@@ -309,7 +344,7 @@ private fun Banner(
             ) {
                 Text(
                     text = title,
-                    fontSize = tzSp(48),
+                    fontSize = if (isWide) tzSp(48) else tzSp(38),
                     fontWeight = FontWeight.ExtraBold,
                     color = Ink.Bright,
                     maxLines = 2,
@@ -321,12 +356,17 @@ private fun Banner(
                     fontSize = tzSp(22),
                     color = Ink.Dim,
                     modifier = Modifier.padding(top = tz(10)),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.End,
                 )
-                Row(
+                // Three pills do not fit across a phone, and a Row does not care:
+                // it simply draws the last two off the edge of the screen, which
+                // is how "add to favourites" stopped existing there.
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(tz(14)),
-                    modifier = Modifier.padding(top = tz(26)),
+                    verticalArrangement = Arrangement.spacedBy(tz(10)),
+                    modifier = Modifier.padding(top = tz(20)),
                 ) { actions() }
             }
         }

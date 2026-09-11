@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -28,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +71,19 @@ fun tz(px: Int): Dp = (px * LocalTzScale.current).dp
 @ReadOnlyComposable
 fun tzSp(px: Int): TextUnit = (px * LocalTzScale.current).sp
 
+/**
+ * Whether there is room for the layout this app was designed around.
+ *
+ * Every screen here was drawn for a 960dp television: five channels across, a
+ * poster beside its description, a column of seasons next to a grid of episodes.
+ * On a phone held in one hand none of that fits, and squeezing it in is what
+ * turned the episode cards into seventy-dp stamps with "נ..." written on them.
+ */
+val isWide: Boolean
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalConfiguration.current.screenWidthDp >= 600
+
 /** The palette, by the names the stylesheet gives them. */
 object Ink {
     val Surface = Color(0xFF18181B)
@@ -93,13 +109,10 @@ fun TopChrome(
     counts: String?,
     actions: @Composable () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(tz(88)),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) { actions() }
-
+    // The name comes first, so it lands on the right — where a Hebrew page
+    // starts — and what you can do lands on the left. It was the other way
+    // round, which read as somebody else's app.
+    val name: @Composable () -> Unit = {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(tz(16)),
@@ -110,13 +123,43 @@ fun TopChrome(
                     fontSize = tzSp(38),
                     fontWeight = FontWeight.ExtraBold,
                     color = Ink.Bright,
+                    maxLines = 1,
                 )
-                Text(text = tagline, fontSize = tzSp(18), color = Ink.Faint)
+                Text(text = tagline, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
                 if (counts != null) {
-                    Text(text = counts, fontSize = tzSp(18), color = Ink.Faint)
+                    Text(text = counts, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
                 }
             }
             BrandMark()
+        }
+    }
+
+    if (isWide) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = tz(88)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            name()
+            Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) { actions() }
+        }
+    } else {
+        // Five pills and a name do not fit across a phone, and a Row does not
+        // say so — it draws the overflow past the edge of the glass, which is
+        // how the name ended up sliced in half. Here they get a line of their
+        // own, and one that scrolls.
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+            ) { name() }
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(tz(12)),
+                contentPadding = PaddingValues(vertical = tz(16)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                item { Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) { actions() } }
+            }
         }
     }
 }

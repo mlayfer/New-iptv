@@ -33,17 +33,17 @@
         <div class="formHint">אישור פותח את המקלדת · "סיום" או Back סוגרים אותה וממשיכים לשדה הבא</div>
 
         <div class="toggleRow" id="sourceTabs">
-          <button class="focusable sourceTab active" data-source="m3u">M3U</button>
-          <button class="focusable sourceTab" data-source="xtream">Xtream Codes</button>
+          <button class="focusable sourceTab active" data-source="xtream">Xtream Codes</button>
+          <button class="focusable sourceTab" data-source="m3u">M3U</button>
         </div>
 
-        <div id="m3uForm" class="formBlock">
+        <div id="m3uForm" class="formBlock hidden">
           <label>כתובת M3U</label>
           <input id="m3uUrl" class="focusable" type="text" placeholder="http://.../playlist.m3u"/>
           <button id="loadM3u" class="focusable primary bigBtn">טען רשימה</button>
         </div>
 
-        <div id="xtreamForm" class="formBlock hidden">
+        <div id="xtreamForm" class="formBlock">
           <label>שרת</label>
           <input id="xtServer" class="focusable" type="text" list="xtServerOptions" placeholder="בחר שרת או הקלד כתובת" autocomplete="off"/>
           <datalist id="xtServerOptions">

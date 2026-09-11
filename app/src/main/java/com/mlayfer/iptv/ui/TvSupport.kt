@@ -86,7 +86,10 @@ fun Modifier.tvSafeArea(): Modifier {
     return if (LocalIsTv.current || wide) {
         this.padding(horizontal = 48.dp, vertical = 27.dp)
     } else {
-        this
+        // A phone has no overscan to allow for, which is why this returned
+        // nothing at all — and left every screen pressed flat against the edges
+        // of the glass. Overscan is not the only reason for a margin.
+        this.padding(horizontal = 16.dp, vertical = 10.dp)
     }
 }
 

@@ -233,9 +233,10 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                 }
 
                 // Five across is what the Tizen guide draws, and it is what
-                // leaves a channel's logo big enough to know from the sofa.
+                // leaves a channel's logo big enough to know from the sofa. A
+                // phone gets two, for the same reason.
                 else -> LazyVerticalGrid(
-                    columns = GridCells.Fixed(5),
+                    columns = GridCells.Fixed(if (isWide) 5 else 2),
                     horizontalArrangement = Arrangement.spacedBy(tz(14)),
                     verticalArrangement = Arrangement.spacedBy(tz(14)),
                     contentPadding = PaddingValues(top = tz(12), bottom = tz(28)),

@@ -4,7 +4,7 @@
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => Array.from(root.querySelectorAll(s));
 const state = {
-  sourceTab: 'm3u',
+  sourceTab: 'xtream',
   source: null,
   items: [],
   mode: null,
