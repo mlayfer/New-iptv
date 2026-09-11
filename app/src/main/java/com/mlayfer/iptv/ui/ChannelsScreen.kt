@@ -569,7 +569,9 @@ private fun PlayerFor(
 internal fun BoxScope.watchListPlacement(): Modifier = if (isWide) {
     Modifier.align(Alignment.CenterStart).fillMaxWidth(0.49f).fillMaxHeight()
 } else {
-    Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.60f)
+    // The picture and its strip of controls come to a little under a third of a
+    // phone; the list has the rest.
+    Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.68f)
 }
 
 /**
@@ -638,8 +640,10 @@ internal fun WhatElseIsOn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(tz(8)),
             contentPadding = PaddingValues(bottom = tz(16)),
+            // A weight, not fillMaxSize: a child that fills takes every pixel it
+            // is offered and leaves the hint below it nowhere to be drawn.
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .windowInsetsPadding(WindowInsets.navigationBars),
         ) {
             columnItemsIndexed(channels, key = { _, c -> c.id }) { index, channel ->
@@ -659,6 +663,16 @@ internal fun WhatElseIsOn(
                     modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
                 )
             }
+        }
+
+        // With a remote there is no way to discover what the arrows do except
+        // to be told.
+        if (LocalIsTv.current) {
+            Faint(
+                text = "מעלה/מטה — ערוץ · אישור — צפייה · Back — סגירה",
+                size = 17,
+                modifier = Modifier.padding(top = tz(10)),
+            )
         }
     }
 }
@@ -712,9 +726,12 @@ private fun WatchRow(
         }
         Spacer(Modifier.width(tz(14)))
         Column(modifier = Modifier.weight(1f)) {
+            // Named line heights, or the two lines of a row sit a whole blank
+            // line apart and the list reads as twice as long as it is.
             Text(
                 text = "$number · $name",
                 fontSize = tzSp(20),
+                lineHeight = tzSp(24),
                 fontWeight = FontWeight.Bold,
                 color = Ink.Bright,
                 maxLines = 1,
@@ -723,6 +740,7 @@ private fun WatchRow(
             Text(
                 text = now ?: "אין לוח שידורים לערוץ הזה",
                 fontSize = tzSp(17),
+                lineHeight = tzSp(21),
                 color = if (now == null) Ink.Faint else Ink.Dim,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
