@@ -136,13 +136,14 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                     color = Ink.Bright,
                 )
                 Text("טלוויזיה בלייב • סרטים • סדרות", fontSize = tzSp(18), color = Ink.Faint)
-                Text(
-                    text = if (LocalIsTv.current) "Android TV" else "Android",
-                    fontSize = tzSp(18),
-                    color = Ink.Faint,
-                )
+                // Which box this is, said where there is room to say it. On a
+                // phone it is a third line of grey that tells you nothing you
+                // could not work out by looking at your hand.
+                if (isWide) {
+                    Text("Android TV", fontSize = tzSp(18), color = Ink.Faint)
+                }
             }
-            Spacer(Modifier.height(tz(40)))
+            Spacer(Modifier.height(if (isWide) tz(40) else tz(24)))
 
             val panel = RoundedCornerShape(tz(26))
             Column(
@@ -154,12 +155,12 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                         Brush.verticalGradient(listOf(Color(0xFF1A1A1D), Color(0xFF0E0E10)))
                     )
                     .border(1.dp, Ink.Line, panel)
-                    .padding(horizontal = tz(40), vertical = tz(26)),
+                    .padding(horizontal = if (isWide) tz(40) else tz(24), vertical = tz(26)),
                 verticalArrangement = Arrangement.spacedBy(tz(14)),
             ) {
                 Text(
                     text = if (state.playlists.isEmpty()) "ברוכים הבאים לטלוהים" else "מקורות",
-                    fontSize = tzSp(38),
+                    fontSize = if (isWide) tzSp(38) else tzSp(30),
                     fontWeight = FontWeight.ExtraBold,
                     color = Ink.Bright,
                     textAlign = TextAlign.Center,
@@ -189,10 +190,21 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 // Xtream first, and open: it is the kind of subscription anyone
                 // setting this up actually has. M3U and a file are the fallbacks.
                 Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) {
-                    SourceTab("Xtream Codes", kind == SourceKind.XTREAM, Modifier.weight(1f)) {
+                    // Three equal tabs across a phone leave no room for a name
+                    // and a surname, so on a phone each keeps only the half that
+                    // identifies it. Clipped labels are worse than short ones.
+                    SourceTab(
+                        if (isWide) "Xtream Codes" else "Xtream",
+                        kind == SourceKind.XTREAM,
+                        Modifier.weight(1f),
+                    ) {
                         kind = SourceKind.XTREAM
                     }
-                    SourceTab("קישור M3U", kind == SourceKind.URL, Modifier.weight(1f)) {
+                    SourceTab(
+                        if (isWide) "קישור M3U" else "M3U",
+                        kind == SourceKind.URL,
+                        Modifier.weight(1f),
+                    ) {
                         kind = SourceKind.URL
                     }
                     SourceTab("קובץ", kind == SourceKind.FILE, Modifier.weight(1f)) {
@@ -259,21 +271,25 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                             }
                         }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) {
-                            LabeledField(
-                                label = "שם משתמש",
-                                value = username,
-                                onValueChange = { username = it },
-                                modifier = Modifier.weight(1f),
-                            )
-                            LabeledField(
-                                label = "סיסמה",
-                                value = password,
-                                onValueChange = { password = it },
-                                password = true,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                        FieldPair(
+                            first = {
+                                LabeledField(
+                                    label = "שם משתמש",
+                                    value = username,
+                                    onValueChange = { username = it },
+                                    modifier = it,
+                                )
+                            },
+                            second = {
+                                LabeledField(
+                                    label = "סיסמה",
+                                    value = password,
+                                    onValueChange = { password = it },
+                                    password = true,
+                                    modifier = it,
+                                )
+                            },
+                        )
 
                         Row(
                             modifier = Modifier
@@ -286,13 +302,23 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                         ) {
                             Tick(includeVod)
                             Spacer(Modifier.width(tz(10)))
-                            Text(
-                                text = "לכלול סרטים וסדרות · טעינה איטית יותר במנויים גדולים",
-                                fontSize = tzSp(19),
-                                color = Ink.Dim,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            // Two lines rather than one with an ellipsis: the
+                            // second half is the part that says what it costs.
+                            Column {
+                                Text(
+                                    text = "לכלול סרטים וסדרות",
+                                    fontSize = tzSp(19),
+                                    color = Ink.Bright,
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    text = "טעינה איטית יותר במנויים גדולים",
+                                    fontSize = tzSp(17),
+                                    color = Ink.Faint,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
 
                         BigButton(
@@ -350,19 +376,45 @@ private fun Optionals(
     epgUrl: String,
     onEpgUrl: (String) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) {
-        LabeledField(
-            label = "שם לרשימה (רשות)",
-            value = name,
-            onValueChange = onName,
-            modifier = Modifier.weight(1f),
-        )
-        LabeledField(
-            label = "מדריך שידורים (רשות)",
-            value = epgUrl,
-            onValueChange = onEpgUrl,
-            modifier = Modifier.weight(1f),
-        )
+    FieldPair(
+        first = {
+            LabeledField(
+                label = "שם לרשימה (רשות)",
+                value = name,
+                onValueChange = onName,
+                modifier = it,
+            )
+        },
+        second = {
+            LabeledField(
+                label = "מדריך שידורים (רשות)",
+                value = epgUrl,
+                onValueChange = onEpgUrl,
+                modifier = it,
+            )
+        },
+    )
+}
+
+/**
+ * Two fields that stand side by side where there is room, and one above the
+ * other where there is not. Half a phone's width is not a field, it is a hint.
+ */
+@Composable
+private fun FieldPair(
+    first: @Composable (Modifier) -> Unit,
+    second: @Composable (Modifier) -> Unit,
+) {
+    if (isWide) {
+        Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) {
+            first(Modifier.weight(1f))
+            second(Modifier.weight(1f))
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(tz(14))) {
+            first(Modifier.fillMaxWidth())
+            second(Modifier.fillMaxWidth())
+        }
     }
 }
 
