@@ -56,6 +56,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import androidx.compose.ui.res.painterResource
+import com.mlayfer.iptv.R
 import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Filtering
@@ -250,18 +252,20 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                     onClick = { viewModel.setView(nextView(state.view)) },
                     selected = state.view != ListView.ALL,
                 )
-                // Two ways to read the same channels, side by side, each lit
-                // when it is the one you are in. One button that changed its own
-                // name said what it would do next but never where you were.
-                NavPill(
-                    label = "אריחים",
-                    onClick = { viewModel.setGuideLayout(GuideLayout.GRID) },
-                    selected = !videoMode,
-                )
-                NavPill(
-                    label = "וידאו",
-                    onClick = { viewModel.setGuideLayout(GuideLayout.VIDEO) },
-                    selected = videoMode,
+                // Two ways to read the same channels, as one switch. Two words
+                // took two pills and said the same thing twice; a picture of
+                // each says it once and leaves room for the rest of the bar.
+                ModeSwitch(
+                    first = painterResource(R.drawable.ic_grid),
+                    firstLabel = "אריחים",
+                    second = painterResource(R.drawable.ic_video_list),
+                    secondLabel = "וידאו",
+                    onFirst = !videoMode,
+                    onPick = { grid ->
+                        viewModel.setGuideLayout(
+                            if (grid) GuideLayout.GRID else GuideLayout.VIDEO
+                        )
+                    },
                 )
                 NavPill("החלף מקור", { viewModel.setScreen(Screen.SOURCES) })
             }

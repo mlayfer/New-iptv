@@ -17,8 +17,18 @@
       <div class="topActions" id="topNav">
         <button id="goHome" class="focusable pill hidden">בית</button>
         <button id="navLive" class="focusable pill hidden">ערוצים</button>
-        <button id="navGrid" class="focusable pill hidden">אריחים</button>
-        <button id="navVideo" class="focusable pill hidden">וידאו</button>
+        <!-- Two ways of reading the same channels, as one switch: a picture of
+             each says it once, where two words took two pills and said the same
+             thing twice. Each half stays its own focusable button, so the
+             remote walks into and out of it like any other row. -->
+        <div id="modeSwitch" class="modeSwitch hidden">
+          <button id="navGrid" class="focusable modeHalf" aria-label="אריחים">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.4"/><rect x="13" y="4" width="7" height="7" rx="1.4"/><rect x="4" y="13" width="7" height="7" rx="1.4"/><rect x="13" y="13" width="7" height="7" rx="1.4"/></svg>
+          </button>
+          <button id="navVideo" class="focusable modeHalf" aria-label="וידאו">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="11" height="9" rx="1.4"/><rect x="3" y="16.5" width="11" height="2.5" rx="1.2"/><rect x="16" y="5" width="5" height="2.6" rx="1.2"/><rect x="16" y="9.1" width="5" height="2.6" rx="1.2"/><rect x="16" y="13.2" width="5" height="2.6" rx="1.2"/><rect x="16" y="17.3" width="5" height="2.6" rx="1.2"/></svg>
+          </button>
+        </div>
         <button id="navVod" class="focusable pill hidden">סרטים</button>
         <button id="navSeries" class="focusable pill hidden">סדרות</button>
         <button id="navSearch" class="focusable pill hidden">חיפוש</button>

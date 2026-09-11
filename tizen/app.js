@@ -722,7 +722,7 @@ function showChooser(){
     .forEach(sel => $(sel).classList.add('hidden'));
   $('#chooseScreen').classList.remove('hidden');
   $('#goHome').classList.add('hidden');
-  ['#navLive', '#navGrid', '#navVideo', '#navVod', '#navSeries', '#navSearch'].forEach(sel => $(sel).classList.add('hidden'));
+  ['#navLive', '#modeSwitch', '#navVod', '#navSeries', '#navSearch'].forEach(sel => $(sel).classList.add('hidden'));
 
   const live = state.items.filter(x => x.kind === 'LIVE').length;
   const series = state.items.filter(x => x.contentType === 'SERIES').length;
@@ -742,8 +742,7 @@ function enterWorld(world){
   $('#navSearch').classList.remove('hidden');
   if(world === 'LIVE'){
     $('#navLive').classList.remove('hidden');
-    $('#navGrid').classList.remove('hidden');
-    $('#navVideo').classList.remove('hidden');
+    $('#modeSwitch').classList.remove('hidden');
     renderLayoutPills();
     $('#navVod').classList.add('hidden');
     $('#navSeries').classList.add('hidden');
@@ -751,8 +750,7 @@ function enterWorld(world){
     return;
   }
   $('#navLive').classList.add('hidden');
-  $('#navGrid').classList.add('hidden');
-  $('#navVideo').classList.add('hidden');
+  $('#modeSwitch').classList.add('hidden');
   $('#navVod').classList.remove('hidden');
   $('#navSeries').classList.remove('hidden');
   showHome();
@@ -766,8 +764,7 @@ function showHome(){
   $('#searchScreen').classList.add('hidden');
   $('#detailScreen').classList.add('hidden');
   $('#homeScreen').classList.remove('hidden');
-  $('#navGrid').classList.add('hidden');
-  $('#navVideo').classList.add('hidden');
+  $('#modeSwitch').classList.add('hidden');
   renderNotes();
   buildHome();
   state.home.row = 0; state.home.col = 0; state.home.rowStart = 0;
@@ -1140,8 +1137,7 @@ function showSearch(){
   $('#vodScreen').classList.add('hidden');
   $('#searchScreen').classList.remove('hidden');
   $('#goHome').classList.remove('hidden');
-  $('#navGrid').classList.add('hidden');
-  $('#navVideo').classList.add('hidden');
+  $('#modeSwitch').classList.add('hidden');
   state.search.row = 0; state.search.col = 0; state.search.rowStart = 0;
   renderSearch();
   setTimeout(() => setFocus($('#globalSearch')), 60);
@@ -1306,8 +1302,8 @@ function setGuideLayout(layout){
 function renderLayoutPills(){
   const grid = $('#navGrid');
   const video = $('#navVideo');
-  // Each is lit when it is the one you are in — a single button that renamed
-  // itself said what it would do next but never where you were.
+  // The filled half is the one you are in — a single button that renamed itself
+  // said what it would do next but never where you were.
   if(grid) grid.classList.toggle('active', !videoMode());
   if(video) video.classList.toggle('active', videoMode());
 }
@@ -2206,8 +2202,7 @@ function showMode(mode){
     $('#vodScreen').classList.add('hidden');
     $('#liveScreen').classList.remove('hidden');
     text($('#modeHeader'), 'טלוויזיה בלייב');
-    $('#navGrid').classList.remove('hidden');
-    $('#navVideo').classList.remove('hidden');
+    $('#modeSwitch').classList.remove('hidden');
     renderLayoutPills();
     $('#search').value = '';
     renderGroups();
@@ -2221,8 +2216,7 @@ function showMode(mode){
 
   $('#liveScreen').classList.add('hidden');
   $('#vodScreen').classList.remove('hidden');
-  $('#navGrid').classList.add('hidden');
-  $('#navVideo').classList.add('hidden');
+  $('#modeSwitch').classList.add('hidden');
   const isSeries = mode === 'SERIES';
   text($('#vodHeroTitle'), isSeries ? 'סדרות' : 'סרטים');
   text($('#vodHeroMeta'), isSeries ? 'בחר סדרה כדי לראות את הפרקים' : 'בחר שורה ופריט');
@@ -2258,8 +2252,7 @@ function resetToSetup(){
   document.body.classList.remove('playerOpen');
   $('#playerScreen').classList.add('hidden');
   $('#navLive').classList.add('hidden');
-  $('#navGrid').classList.add('hidden');
-  $('#navVideo').classList.add('hidden');
+  $('#modeSwitch').classList.add('hidden');
   $('#navVod').classList.add('hidden');
   $('#navSeries').classList.add('hidden');
   $('#navSearch').classList.add('hidden');
@@ -2813,6 +2806,8 @@ function wireStatic(){
 
   $('#search').dataset.nav = 'search';
   $('#vodSearch').dataset.nav = 'vodSearch';
+  // The switch is one object to look at and two buttons to walk along, so it
+  // is the halves that the remote knows about, not the box around them.
   ['#goHome', '#navLive', '#navGrid', '#navVideo', '#navVod', '#navSeries', '#navSearch', '#backToSetup']
     .forEach(sel => { $(sel).dataset.nav = 'topAction'; });
   $('#worldLive').dataset.nav = 'world';

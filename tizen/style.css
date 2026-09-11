@@ -36,6 +36,18 @@ button,input{font-family:inherit;color:inherit}
 .brandSub.warn{color:#ffb4a8}
 .topActions{display:flex;gap:12px}
 .pill{border:1px solid var(--line);border-radius:14px;padding:14px 24px;background:var(--surface);font-size:22px}
+/* Two ways of doing the same thing, as one object: the filled half is where
+   you are. */
+.modeSwitch{display:flex;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.modeHalf{background:var(--surface);border:none;padding:14px 24px;display:flex;align-items:center;
+  justify-content:center;border-radius:0}
+.modeHalf + .modeHalf{border-right:1px solid var(--line)}
+.modeHalf svg{width:28px;height:28px;fill:var(--ink-dim)}
+.modeHalf.active{background:var(--accent)}
+.modeHalf.active svg{fill:#04142e}
+.modeHalf.focused{box-shadow:inset 0 0 0 3px var(--accent);background-color:var(--accent-soft)!important}
+.modeHalf.active.focused{background-color:var(--accent)!important;box-shadow:inset 0 0 0 3px #fff}
+
 /* A pill that says where you are, not only where you could go. */
 .pill.active{background:var(--accent);color:#04142e;border-color:var(--accent);font-weight:700}
 .pill.active.focused{background:var(--accent)!important;color:#04142e;border-color:#fff!important;

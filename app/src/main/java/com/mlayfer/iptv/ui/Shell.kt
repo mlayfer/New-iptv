@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -694,4 +696,57 @@ fun Faint(text: String, modifier: Modifier = Modifier, size: Int = 19) {
         overflow = TextOverflow.Ellipsis,
         modifier = modifier,
     )
+}
+
+/**
+ * Two ways of doing the same thing, as one control.
+ *
+ * Words cost a pill each and say the same thing twice; a switch is one object
+ * with two halves, and the filled half is where you are. Each half stays its
+ * own focusable button, so the remote walks into and out of it the way it walks
+ * along any other row — a single control with its own inner navigation is a
+ * thing to learn, and nobody learns a television.
+ */
+@Composable
+fun ModeSwitch(
+    first: Painter,
+    firstLabel: String,
+    second: Painter,
+    secondLabel: String,
+    /** True when the first of the two is the one in use. */
+    onFirst: Boolean,
+    onPick: (first: Boolean) -> Unit,
+) {
+    val shape = RoundedCornerShape(tz(14))
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .border(1.dp, Ink.Line, shape),
+    ) {
+        ModeHalf(first, firstLabel, onFirst) { onPick(true) }
+        Box(modifier = Modifier.width(1.dp).height(if (isWide) tz(56) else tz(44)).background(Ink.Line))
+        ModeHalf(second, secondLabel, !onFirst) { onPick(false) }
+    }
+}
+
+@Composable
+private fun ModeHalf(icon: Painter, label: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .background(if (active) Ink.Accent else Ink.Surface)
+            .focusHighlight(RoundedCornerShape(0.dp), border = false)
+            .clickable(onClick = onClick)
+            .padding(
+                horizontal = if (isWide) tz(24) else tz(16),
+                vertical = if (isWide) tz(15) else tz(11),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = icon,
+            contentDescription = label,
+            tint = if (active) Ink.OnAccent else Ink.Dim,
+            modifier = Modifier.size(if (isWide) tz(28) else tz(24)),
+        )
+    }
 }
