@@ -297,14 +297,15 @@ fun HeroBand(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 alpha = 0.35f,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.matchParentSize(),
             )
         }
         // The words sit on the right, so a wash of artwork on the left never
-        // gets underneath them.
+        // gets underneath them. Both washes match the band rather than fill it,
+        // so neither has a say in how tall it is.
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color.Transparent, Ink.SurfaceLow.copy(alpha = 0.92f))

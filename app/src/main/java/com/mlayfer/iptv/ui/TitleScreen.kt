@@ -288,18 +288,22 @@ private fun Banner(
             .background(Ink.SurfaceLow)
             .border(1.dp, Ink.LineSoft, shape),
     ) {
+            // matchParentSize, not fillMaxSize: a child that fills takes the
+            // whole height it is offered and drags the band with it, which on a
+            // phone — where the band has no fixed height — swallowed the screen.
+            // This one measures after the others and never votes on the size.
         if (art != null) {
             AsyncImage(
                 model = art,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 alpha = 0.30f,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.matchParentSize(),
             )
         }
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .background(
                     Brush.horizontalGradient(
                         listOf(Ink.SurfaceLow.copy(alpha = 0.55f), Ink.SurfaceLow.copy(alpha = 0.96f))
