@@ -78,7 +78,8 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
-    val list = state.guideLayout == GuideLayout.LIST
+    // Watching while you look, rather than a wall of logos.
+    val videoMode = state.guideLayout == GuideLayout.VIDEO
     // A schedule is only true for as long as the minute it was drawn in.
     val clock by rememberClock()
     var fullscreen by remember { mutableStateOf(false) }
@@ -207,61 +208,34 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
         onDispose { RemoteKeys.setHandler(null) }
     }
 
+    // Filling the screen, or parked in a corner beside the list. The player is
+    // called from one place whatever the answer — moving the call somewhere
+    // else in the tree would throw the player away and build a new one, which
+    // on a live stream means several seconds of black every time.
+    val whole = fullscreen && !browsing
+    val goFullScreen = {
+        browsing = false
+        fullscreen = true
+    }
+
     Surface(modifier = Modifier.fillMaxSize(), color = Ink.SurfaceLow) {
-        // The player takes the whole screen and no inset padding at all: video
-        // uses every pixel, and the system bars are told to get out of the way.
-        if (fullscreen) {
-            // One Box, and the player is called from one place in it whether it
-            // is filling the screen or parked in a corner — only its modifier
-            // changes. Moving the call somewhere else in the tree would throw
-            // the player away and build a new one, which on a live stream means
-            // several seconds of black every time the list is opened.
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (browsing) {
-                    WhatElseIsOn(
-                        state = state,
-                        viewModel = viewModel,
-                        channels = visible,
-                        clock = clock,
-                        onPlay = viewModel::select,
-                        onFullScreen = { browsing = false },
-                        modifier = watchListPlacement(),
-                    )
-                }
-
-                PlayerFor(
-                    state = state,
-                    viewModel = viewModel,
-                    fullscreen = !browsing,
-                    compact = browsing,
-                    // A film has no other channels to flick through; live
-                    // television is the only place the list means anything —
-                    // including while a stretch of a channel's archive is
-                    // playing, which is a recording but still television.
-                    onBrowse = if (state.catalog == Catalog.LIVE) {
-                        { browsing = !browsing }
-                    } else {
-                        null
-                    },
-                    onLeaveList = { browsing = false },
-                    onToggleFullscreen = {
-                        if (browsing) browsing = false else fullscreen = false
-                    },
-                    onPrev = { step(-1) },
-                    onNext = { step(1) },
-                    modifier = if (browsing) watchPicturePlacement() else Modifier.fillMaxSize(),
-                )
-            }
-            return@Surface
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .tvSafeArea()
+                // Full screen the video uses every pixel and the system bars are
+                // told to get out of the way; anywhere else the screen keeps its
+                // margins.
+                .then(
+                    if (whole) {
+                        Modifier
+                    } else {
+                        Modifier
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                            .tvSafeArea()
+                    }
+                )
         ) {
-            TopChrome(
+            if (!whole) TopChrome(
                 title = "טלוהים",
                 tagline = "טלוויזיה בלייב • סרטים • סדרות",
                 counts = "${state.channels.size} ערוצים",
@@ -276,21 +250,23 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                     onClick = { viewModel.setView(nextView(state.view)) },
                     selected = state.view != ListView.ALL,
                 )
-                // Two ways to read the same channels, and the button says which
-                // one it would give you rather than which one you are in.
+                // Two ways to read the same channels, side by side, each lit
+                // when it is the one you are in. One button that changed its own
+                // name said what it would do next but never where you were.
                 NavPill(
-                    label = if (list) "אריחים" else "לוח שידורים",
-                    onClick = {
-                        viewModel.setGuideLayout(
-                            if (list) GuideLayout.GRID else GuideLayout.LIST
-                        )
-                    },
-                    selected = list,
+                    label = "אריחים",
+                    onClick = { viewModel.setGuideLayout(GuideLayout.GRID) },
+                    selected = !videoMode,
+                )
+                NavPill(
+                    label = "וידאו",
+                    onClick = { viewModel.setGuideLayout(GuideLayout.VIDEO) },
+                    selected = videoMode,
                 )
                 NavPill("החלף מקור", { viewModel.setScreen(Screen.SOURCES) })
             }
 
-            Row(
+            if (!whole) Row(
                 modifier = Modifier.fillMaxWidth().padding(top = tz(12)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -311,13 +287,16 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                 Faint("${visible.size} ערוצים")
             }
 
-            GroupChips(state, viewModel)
+            if (!whole) GroupChips(state, viewModel)
 
             // The strip above the grid says what is on the channel under the
-            // cursor; in list form every channel already carries its own.
-            if (!list) NowNext(state, viewModel, clock)
+            // cursor; beside the picture every channel already carries its own.
+            if (!whole && !videoMode) NowNext(state, viewModel, clock)
 
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when {
+                videoMode || whole || browsing -> Unit
+
                 state.loading && visible.isEmpty() -> Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
@@ -332,28 +311,6 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                         fontSize = tzSp(22),
                         color = Ink.Dim,
                     )
-                }
-
-                list -> LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(tz(10)),
-                    contentPadding = PaddingValues(top = tz(12), bottom = tz(28)),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(WindowInsets.navigationBars),
-                ) {
-                    columnItemsIndexed(visible, key = { _, c -> c.id }) { index, channel ->
-                        GuideRow(
-                            channel = channel,
-                            number = index + 1,
-                            state = state,
-                            viewModel = viewModel,
-                            clock = clock,
-                            onOpen = {
-                                viewModel.select(channel)
-                                fullscreen = true
-                            },
-                        )
-                    }
                 }
 
                 // Five across is what the Tizen guide draws, and it is what
@@ -399,6 +356,46 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                     }
                 }
             }
+
+            // The other mode, and the same thing the full-screen player opens
+            // over itself: the picture kept in a corner, the channels beside it.
+            if (videoMode || whole || browsing) {
+                if (!whole) {
+                    WhatElseIsOn(
+                        state = state,
+                        viewModel = viewModel,
+                        channels = visible,
+                        clock = clock,
+                        onPlay = viewModel::select,
+                        onFullScreen = goFullScreen,
+                        modifier = watchListPlacement(),
+                    )
+                }
+
+                PlayerFor(
+                    state = state,
+                    viewModel = viewModel,
+                    fullscreen = whole,
+                    compact = !whole,
+                    // A film has no other channels to flick through; live
+                    // television is the only place the list means anything —
+                    // including while a stretch of a channel's archive is
+                    // playing, which is a recording but still television.
+                    onBrowse = if (state.catalog == Catalog.LIVE && fullscreen) {
+                        { browsing = !browsing }
+                    } else {
+                        null
+                    },
+                    onLeaveList = goFullScreen,
+                    onToggleFullscreen = {
+                        if (whole) fullscreen = false else goFullScreen()
+                    },
+                    onPrev = { step(-1) },
+                    onNext = { step(1) },
+                    modifier = if (whole) Modifier.fillMaxSize() else watchPicturePlacement(),
+                )
+            }
+            }
         }
     }
 }
@@ -423,61 +420,17 @@ private fun NowNext(state: UiState, viewModel: AppViewModel, clock: Long) {
     )
 }
 
-/**
- * One line of the guide: the channel, and the next few things on it.
- *
- * The schedule is asked for from here rather than up front, because a lazy list
- * only builds the rows it is showing — which makes "fetch what is on screen"
- * fall out of the layout instead of needing to be tracked.
- */
-@Composable
-private fun GuideRow(
-    channel: Channel,
-    number: Int,
-    state: UiState,
-    viewModel: AppViewModel,
-    clock: Long,
-    onOpen: () -> Unit,
-) {
-    LaunchedEffect(channel.id) {
-        // A list being scrolled fast composes rows it never shows; a moment's
-        // wait means the portal is only asked about the ones that settle.
-        delay(250)
-        viewModel.loadGuide(channel)
-    }
-
-    val programmes = state.programmes(channel)
-    val onNow = XmltvParser.programmeAt(programmes, clock)
-    val upcoming = XmltvParser.upcoming(programmes, clock, UPCOMING)
-        .map { "${hhmm(it.start)} · ${it.title}" }
-
-    ChannelLine(
-        name = channel.name,
-        meta = listOfNotNull(
-            number.toString(),
-            channel.group?.takeIf { it.isNotBlank() },
-        ).joinToString(" · "),
-        logo = channel.logo,
-        playing = channel.id == state.selectedId,
-        now = onNow?.title,
-        nowRange = onNow?.let { "${hhmm(it.start)}–${hhmm(it.stop)}" },
-        progress = onNow?.let { progressOf(it.start, it.stop, clock) } ?: 0f,
-        upcoming = upcoming,
-        onClick = onOpen,
-    )
-}
-
-/** How many programmes ahead a line of the guide carries. */
-private const val UPCOMING = 2
-
 /** And how many the schedule under a parked picture has room for. */
 private const val SCHEDULE_AHEAD = 5
 
 /** How far back the same schedule reaches, where there is an archive to reach into. */
 private const val SCHEDULE_BEHIND = 3
 
-/** How far the rewind button winds back, and how much it asks for after that. */
-private const val REWIND_MINUTES = 10
+/**
+ * How much of the channel winding back asks for, and how much more it asks for
+ * beyond the live edge so that playing on does not run out of stream.
+ */
+private const val ARCHIVE_WINDOW = 30
 private const val ARCHIVE_RUN_ON = 240
 
 /** How long to ask the archive for. A programme with no end gets an hour. */
@@ -614,15 +567,18 @@ private fun PlayerFor(
         onRewindLive = archive?.let { channel ->
             {
                 onLeaveList()
-                // Ten minutes back, and then enough of the archive to keep
-                // going: winding back is not the same as watching ten minutes
-                // and stopping.
-                val from = System.currentTimeMillis() - REWIND_MINUTES * 60_000L
+                // Half an hour of the channel, and the playhead dropped just
+                // behind the live edge. So the first press is a rewind of a few
+                // seconds — which is what a rewind is — and every press after
+                // it is an ordinary seek inside an ordinary recording.
+                val at = System.currentTimeMillis()
+                val from = at - ARCHIVE_WINDOW * 60_000L
                 viewModel.playCatchUp(
                     channel = channel,
-                    title = XmltvParser.programmeAt(programmes, from)?.title.orEmpty(),
+                    title = XmltvParser.programmeAt(programmes, at)?.title.orEmpty(),
                     startMillis = from,
-                    minutes = REWIND_MINUTES + ARCHIVE_RUN_ON,
+                    minutes = ARCHIVE_WINDOW + ARCHIVE_RUN_ON,
+                    resumeAt = ARCHIVE_WINDOW * 60L - Playback.SEEK_STEP,
                 )
             }
         },
@@ -635,7 +591,11 @@ private fun PlayerFor(
         onPrev = onPrev,
         onNext = onNext,
         modifier = modifier,
-        resumeAt = selected?.let { viewModel.resumeFor(it.id) } ?: 0,
+        // A stretch of archive is not in the history the resume store keeps; it
+        // carries where to start with it.
+        resumeAt = selected?.let {
+            if (it.id == state.adHoc?.id) state.adHocResumeAt else viewModel.resumeFor(it.id)
+        } ?: 0,
         onProgress = { position, duration ->
             selected?.let { viewModel.noteProgress(it, position, duration) }
         },

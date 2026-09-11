@@ -205,6 +205,7 @@ fun PlayerPanel(
     var playing by remember { mutableStateOf(true) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
+    var seekable by remember { mutableStateOf(false) }
     // The controls come and go the way they do on a television: any press brings
     // them back, and a few seconds of stillness takes them away again. A strip
     // of buttons parked across the bottom of a film is not a control, it is a
@@ -361,6 +362,11 @@ fun PlayerPanel(
         while (controlsShown) {
             position = player.currentPosition
             duration = player.duration.takeIf { it > 0 } ?: 0L
+            // A stretch of archive is seekable long before it admits to having
+            // a duration, and while it was silent about that the rewind and the
+            // skip were simply not drawn — which left "the previous one" where
+            // the hand expected "back a bit".
+            seekable = runCatching { player.isCurrentMediaItemSeekable }.getOrDefault(false)
             delay(500)
         }
     }
@@ -587,7 +593,7 @@ fun PlayerPanel(
                         // — but a channel the portal keeps can be wound back
                         // into what it already broadcast, which is the same
                         // button meaning the same thing.
-                        if (duration > 0) {
+                        if (duration > 0 || seekable) {
                             IconButton(onClick = { player.seekBack() }) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_rewind),
@@ -637,7 +643,7 @@ fun PlayerPanel(
                             }
                         }
 
-                        if (duration > 0) {
+                        if (duration > 0 || seekable) {
                             IconButton(onClick = { player.seekForward() }) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_forward),
@@ -843,6 +849,17 @@ fun PlayerPanel(
                     lineHeight = tzSp(24),
                     color = Ink.Bright,
                 )
+                // Winding back is a thing the portal either keeps or does not,
+                // and a feature that is simply absent looks like one that is
+                // broken. So the screen says which it is.
+                if (onCatchUp == null && channel?.kind == ChannelKind.LIVE) {
+                    Text(
+                        text = "הפורטל לא שומר את הערוץ הזה — אי אפשר לחזור אחורה",
+                        fontSize = tzSp(17),
+                        lineHeight = tzSp(21),
+                        color = Ink.Faint,
+                    )
+                }
                 for (entry in schedule) {
                     val onAir = entry === now
                     // What has already finished can be played back, if the

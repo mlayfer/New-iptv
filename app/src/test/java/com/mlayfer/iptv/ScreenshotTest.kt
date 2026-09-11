@@ -258,21 +258,10 @@ class ScreenshotTest {
         return catalogue().copy(
             screen = Screen.CHANNELS,
             catalog = Catalog.LIVE,
-            guideLayout = GuideLayout.LIST,
+            guideLayout = GuideLayout.VIDEO,
             guide = guide,
             selectedId = "l1",
         )
-    }
-
-    @Test
-    fun `the guide as a list`() {
-        shoot("11-guide") { ChannelsScreen(guideState(), viewModel) }
-    }
-
-    @Test
-    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun `the guide as a list on a phone`() {
-        onAPhone("12-phone-guide") { ChannelsScreen(guideState(), viewModel) }
     }
 
     /**

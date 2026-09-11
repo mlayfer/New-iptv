@@ -24,11 +24,14 @@ import kotlinx.coroutines.withContext
 enum class ListView { ALL, FAVORITES, RECENT }
 
 /**
- * How the live channels are laid out. A wall of tiles is the fastest way to
- * find a logo you know; a list is the only way to read what is actually on,
- * because a schedule needs a line of its own.
+ * How the live channels are laid out.
+ *
+ * A wall of tiles is the fastest way to find a logo you already know. The other
+ * way is to keep watching while you look: the picture stays in the corner and
+ * the channels run down the side, each saying what is on it. Two ways of doing
+ * the same thing, so the screen offers both and remembers which was chosen.
  */
-enum class GuideLayout { GRID, LIST }
+enum class GuideLayout { GRID, VIDEO }
 
 /** What the list is showing: everything, live TV, films, or series. */
 enum class Catalog { ALL, LIVE, MOVIES, SERIES }
@@ -61,6 +64,8 @@ data class UiState(
      * nowhere else for it to live.
      */
     val adHoc: Channel? = null,
+    /** Where to drop the playhead in it, in seconds. */
+    val adHocResumeAt: Long = 0,
     val favorites: Set<String> = emptySet(),
     val recent: List<RecentEntry> = emptyList(),
     /** Ticked off by hand; newest last, so the order says which was last. */
@@ -442,7 +447,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
      *
      * @param minutes how much of the archive to ask for, from [startMillis].
      */
-    fun playCatchUp(channel: Channel, title: String, startMillis: Long, minutes: Int) {
+    fun playCatchUp(
+        channel: Channel,
+        title: String,
+        startMillis: Long,
+        minutes: Int,
+        /**
+         * Where to start inside the stretch, in seconds. Winding back from live
+         * asks for a long stretch and then lands near the end of it, so the
+         * first press is a rewind and not a jump into the middle of an hour ago
+         * — and every press after it is an ordinary seek, because by then this
+         * is an ordinary recording.
+         */
+        resumeAt: Long = 0,
+    ) {
         val source = _state.value.activePlaylist?.source as? PlaylistSource.Xtream ?: return
         val streamId = channel.streamId ?: return
         val url = XtreamClient
@@ -455,8 +473,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             url = url,
             kind = ChannelKind.VOD,
         )
-        remember(item, position = 0, duration = 0)
-        _state.value = _state.value.copy(selectedId = item.id, adHoc = item)
+        remember(item, position = resumeAt, duration = 0)
+        _state.value = _state.value.copy(
+            selectedId = item.id,
+            adHoc = item,
+            adHocResumeAt = resumeAt,
+        )
     }
 
     /**

@@ -210,6 +210,9 @@ check("the library's sections are not offered here",
 check("the guide draws a window, not the catalogue",
   (await page.locator('[data-nav="item"]').count()) === 15,
   `${await page.locator('[data-nav="item"]').count()} tiles for ${N_LIVE} channels`);
+check("both ways of reading the channels are offered, and one is lit",
+  await shown("#navGrid") && await shown("#navVideo") &&
+    await page.evaluate(() => document.querySelector("#navGrid").classList.contains("active")));
 check("a tile says what is on the channel, not only its name",
   (await page.textContent('[data-nav="item"] .tileNow')).length > 0,
   await page.textContent('[data-nav="item"] .tileNow'));
@@ -225,6 +228,23 @@ await page.keyboard.press("ArrowLeft");
 await page.waitForTimeout(600);
 check("moving across the guide keeps the strip filled",
   (await page.textContent("#nnNow")).includes("מהדורת החדשות"));
+
+// Video mode: the picture in the corner, the channels beside it, and the bar
+// that switches between the two still up.
+await page.locator("#navVideo").click();
+await page.waitForTimeout(1400);
+check("video mode plays a channel and puts the list beside it",
+  await shown("#watchList") && await shown("#playerScreen"));
+check("and the bar that switches modes is still reachable",
+  await shown("#navGrid") && await shown("#navVideo") &&
+    await page.evaluate(() => document.querySelector("#navVideo").classList.contains("active")));
+await shot("5-video-mode");
+
+await page.locator("#navGrid").click();
+await page.waitForTimeout(1000);
+check("and tiles brings the wall of logos back",
+  await shown("#liveScreen") && !(await shown("#watchList")) &&
+    (await page.locator('[data-nav="item"]').count()) > 0);
 
 await fill("#search", "ספורט");
 await page.waitForTimeout(500);

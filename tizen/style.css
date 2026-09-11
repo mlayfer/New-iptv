@@ -36,6 +36,10 @@ button,input{font-family:inherit;color:inherit}
 .brandSub.warn{color:#ffb4a8}
 .topActions{display:flex;gap:12px}
 .pill{border:1px solid var(--line);border-radius:14px;padding:14px 24px;background:var(--surface);font-size:22px}
+/* A pill that says where you are, not only where you could go. */
+.pill.active{background:var(--accent);color:#04142e;border-color:var(--accent);font-weight:700}
+.pill.active.focused{background:var(--accent)!important;color:#04142e;border-color:#fff!important;
+  box-shadow:0 0 0 4px #ffffff, 0 0 40px rgba(77,155,255,.55)}
 .screen{height:922px}
 
 /* ---- focus: the single most important state on a TV ---- */
@@ -229,28 +233,6 @@ input::placeholder{color:var(--ink-faint)}
 .channelTile.playing{border-color:var(--accent)}
 .channelTile .tileNumber{position:absolute}
 
-/* The other way to read the same channels: one per line, with its schedule
-   beside it. A guide is what a television has instead of a wall of logos. */
-.channelList{display:flex;flex-direction:column;gap:10px;align-content:start;overflow:hidden;min-height:0}
-.channelRow{flex:0 0 auto;height:104px;border:1px solid var(--line-soft);background:var(--surface);
-  border-radius:14px;padding:0 18px;display:flex;align-items:center;gap:18px;text-align:right}
-.channelRow.playing{border-color:var(--accent)}
-.rowLogo{width:120px;height:68px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
-  overflow:hidden;color:var(--accent);font-size:26px;font-weight:800}
-.rowLogo img{max-width:100%;max-height:100%;object-fit:contain}
-.rowIdentity{width:340px;flex:0 0 auto;min-width:0}
-.rowName{font-size:23px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rowMeta{font-size:17px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rowGuide{flex:1;min-width:0}
-.rowNowLine{display:flex;align-items:baseline;gap:12px;min-width:0}
-.rowNow{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rowRange{font-size:17px;color:var(--ink-faint);white-space:nowrap;flex:0 0 auto}
-.rowBar{height:5px;border-radius:4px;background:rgba(255,255,255,.16);margin-top:8px;overflow:hidden}
-.rowFill{height:100%;width:0;background:var(--accent)}
-.rowAhead{width:420px;flex:0 0 auto;min-width:0}
-.rowNext{font-size:17px;color:var(--ink-dim);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rowNext:first-child{margin-top:0}
-
 /* Playback takes the whole screen; the bar tells you what you are on and fades. */
 /*
  * Everything below is written for the browser a television actually has. The
@@ -401,6 +383,16 @@ body.watching .playerStage{top:48px;left:48px;right:auto;bottom:auto;width:860px
   border-radius:16px;overflow:hidden;border:1px solid var(--line-soft)}
 body.watching #liveOverlay .ovBottom{display:none}
 body.watching #liveOverlay .ovTop{top:548px;left:48px;right:auto;width:860px;padding:18px 4px;background:none}
+
+/* Video mode is one of two ways of reading the same channels, so the bar that
+   switches between them stays up — and everything under it starts below it. */
+body.videoMode.playerOpen .topbar{display:flex;position:relative;z-index:600}
+body.videoMode.playerOpen #app{padding:26px 34px 28px}
+body.videoMode.watching .playerStage{top:166px}
+body.videoMode.watching #liveOverlay .ovTop{top:666px}
+body.videoMode.watching .watchPicture{top:166px}
+body.videoMode .watchSchedule{top:758px}
+body.videoMode .watchList{top:150px;height:930px}
 body.watching #liveOverlay .ovLogo{width:86px;height:52px}
 body.watching #liveOverlay .ovName{font-size:28px}
 body.watching #liveOverlay .ovMeta{font-size:19px}
@@ -417,6 +409,7 @@ body.watching .watchPicture{display:block;position:absolute;top:48px;left:48px;r
    and has the corner to itself. */
 .watchSchedule{position:absolute;top:640px;left:48px;right:auto;bottom:auto;width:860px;z-index:3}
 .watchScheduleTitle{font-size:24px;font-weight:800;margin-bottom:12px}
+.watchScheduleNote{font-size:19px;color:var(--ink-faint);margin-bottom:10px}
 .watchScheduleRow{display:flex;gap:16px;align-items:baseline;padding:7px 0}
 .wsTime{flex:0 0 auto;width:74px;font-size:19px;color:var(--ink-faint)}
 .wsName{flex:1;min-width:0;font-size:19px;color:var(--ink-dim);
