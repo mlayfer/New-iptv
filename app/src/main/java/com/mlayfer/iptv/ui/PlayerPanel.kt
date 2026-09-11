@@ -368,6 +368,77 @@ fun PlayerPanel(
 
     // The same strip in both places: parked under the picture when the player
     // shares the screen, laid over the bottom of it when it has the lot.
+    /** Everything that is not playback: it keeps out of the transport's way. */
+    val extras: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onToggleFavorite, enabled = channel != null) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "מועדפים",
+                    tint = if (isFavorite) Ink.Accent else Ink.Dim,
+                )
+            }
+            IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
+                Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש", tint = Ink.Dim)
+            }
+
+            // Offered only when the stream actually carries a choice; a button
+            // that opens an empty list is worse than no button.
+            val audio = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_AUDIO) }
+            val subs = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_TEXT) }
+
+            if (audio.size > 1) {
+                Box {
+                    IconButton(onClick = { trackMenu = C.TRACK_TYPE_AUDIO }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_audio_track),
+                            contentDescription = "שמע",
+                            tint = Ink.Dim,
+                        )
+                    }
+                    TrackMenu(
+                        open = trackMenu == C.TRACK_TYPE_AUDIO,
+                        choices = audio,
+                        offLabel = null,
+                        offSelected = false,
+                        onDismiss = { trackMenu = null },
+                        onPick = { TrackChoices.choose(player, tracks, C.TRACK_TYPE_AUDIO, it); trackMenu = null },
+                        onOff = {},
+                    )
+                }
+            }
+
+            if (subs.isNotEmpty()) {
+                Box {
+                    IconButton(onClick = { trackMenu = C.TRACK_TYPE_TEXT }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_subtitles),
+                            contentDescription = "כתוביות",
+                            tint = if (subsOff) Ink.Dim else Ink.Accent,
+                        )
+                    }
+                    TrackMenu(
+                        open = trackMenu == C.TRACK_TYPE_TEXT,
+                        choices = subs,
+                        offLabel = "בלי כתוביות",
+                        offSelected = subsOff,
+                        onDismiss = { trackMenu = null },
+                        onPick = {
+                            TrackChoices.choose(player, tracks, C.TRACK_TYPE_TEXT, it)
+                            subsOff = false
+                            trackMenu = null
+                        },
+                        onOff = {
+                            TrackChoices.turnOff(player, C.TRACK_TYPE_TEXT)
+                            subsOff = true
+                            trackMenu = null
+                        },
+                    )
+                }
+            }
+        }
+    }
+
     val controlRow: @Composable () -> Unit = {
         Column(
             modifier = Modifier
@@ -381,16 +452,22 @@ fun PlayerPanel(
                 )
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
-            val showing = channel?.name.orEmpty()
-            if (showing.isNotBlank()) {
+            // The name, and beside it everything that is not playback. On a
+            // phone these used to sit at the end of the same row the transport
+            // was centred in, and the two drew straight over each other.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = showing,
+                    text = channel?.name.orEmpty(),
                     fontSize = tzSp(19),
                     color = Ink.Dim,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                    modifier = Modifier.weight(1f),
                 )
+                extras()
             }
             // How far into a film this is — and a way to move it. A line that
             // only reports is half a control. Live television has neither.
@@ -401,88 +478,14 @@ fun PlayerPanel(
                     onSeek = { player.seekTo(it) },
                 )
             }
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                // Everything that is not playback keeps to the far side, so the
-                // middle belongs to one button.
+            // Playback on its own line, read left to right like every player
+            // ever made: back, then the big one, then on.
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Row(
-                    modifier = Modifier.align(Alignment.CenterEnd),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                 ) {
-                    IconButton(onClick = onToggleFavorite, enabled = channel != null) {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "מועדפים",
-                            tint = if (isFavorite) Ink.Accent else Ink.Dim,
-                        )
-                    }
-                    IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
-                        Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש", tint = Ink.Dim)
-                    }
-
-                    // Offered only when the stream actually carries a choice; a
-                    // button that opens an empty list is worse than no button.
-                    val audio = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_AUDIO) }
-                    val subs = remember(tracks) { TrackChoices.choicesFor(tracks, C.TRACK_TYPE_TEXT) }
-
-                    if (audio.size > 1) {
-                        Box {
-                            IconButton(onClick = { trackMenu = C.TRACK_TYPE_AUDIO }) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_audio_track),
-                                    contentDescription = "שמע",
-                                    tint = Ink.Dim,
-                                )
-                            }
-                            TrackMenu(
-                                open = trackMenu == C.TRACK_TYPE_AUDIO,
-                                choices = audio,
-                                offLabel = null,
-                                offSelected = false,
-                                onDismiss = { trackMenu = null },
-                                onPick = { TrackChoices.choose(player, tracks, C.TRACK_TYPE_AUDIO, it); trackMenu = null },
-                                onOff = {},
-                            )
-                        }
-                    }
-
-                    if (subs.isNotEmpty()) {
-                        Box {
-                            IconButton(onClick = { trackMenu = C.TRACK_TYPE_TEXT }) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_subtitles),
-                                    contentDescription = "כתוביות",
-                                    tint = if (subsOff) Ink.Dim else Ink.Accent,
-                                )
-                            }
-                            TrackMenu(
-                                open = trackMenu == C.TRACK_TYPE_TEXT,
-                                choices = subs,
-                                offLabel = "בלי כתוביות",
-                                offSelected = subsOff,
-                                onDismiss = { trackMenu = null },
-                                onPick = {
-                                    TrackChoices.choose(player, tracks, C.TRACK_TYPE_TEXT, it)
-                                    subsOff = false
-                                    trackMenu = null
-                                },
-                                onOff = {
-                                    TrackChoices.turnOff(player, C.TRACK_TYPE_TEXT)
-                                    subsOff = true
-                                    trackMenu = null
-                                },
-                            )
-                        }
-                    }
-                }
-
-                // Playback in the middle, read left to right like every player
-                // ever made: back, then the big one, then on.
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
                         // These two step through whatever list you are in, so
                         // they are named after it: a channel out in the guide, an
                         // episode inside a series.
@@ -554,7 +557,6 @@ fun PlayerPanel(
                                 tint = Ink.Bright,
                             )
                         }
-                    }
                 }
             }
         }
