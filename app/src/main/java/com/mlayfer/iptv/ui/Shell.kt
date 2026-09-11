@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -115,36 +116,23 @@ fun TopChrome(
     // The name comes first, so it lands on the right — where a Hebrew page
     // starts — and what you can do lands on the left. It was the other way
     // round, which read as somebody else's app.
-    val name: @Composable () -> Unit = { BrandBlock(title, tagline, counts) }
-
-    if (isWide) {
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = tz(88)),
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = if (isWide) tz(88) else tz(72)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BrandBlock(title, tagline, counts)
+        Spacer(Modifier.width(tz(16)))
+        // One row on every screen. The phone used to get a second line of its
+        // own because five pills and a name do not fit across it — but a Row
+        // that scrolls holds as many as it likes and keeps them all on the far
+        // side, which is where they belong whatever the width.
+        LazyRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(tz(12), Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            contentPadding = PaddingValues(vertical = tz(8)),
         ) {
-            name()
-            Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) { actions() }
-        }
-    } else {
-        // Five pills and a name do not fit across a phone, and a Row does not
-        // say so — it draws the overflow past the edge of the glass, which is
-        // how the name ended up sliced in half. Here they get a line of their
-        // own, and one that scrolls.
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Start,
-            ) { name() }
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(tz(12)),
-                // The row scrolls, but a pill cut off flat against the edge of
-                // the glass reads as broken rather than as "there is more".
-                contentPadding = PaddingValues(top = tz(8), bottom = tz(6), start = tz(10)),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                item { Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) { actions() } }
-            }
+            item { Row(horizontalArrangement = Arrangement.spacedBy(tz(12))) { actions() } }
         }
     }
 }
