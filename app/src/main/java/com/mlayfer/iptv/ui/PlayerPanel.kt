@@ -48,11 +48,13 @@ import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -582,6 +584,21 @@ fun PlayerPanel(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
+
+            // A finger has no D-pad. The strip hides itself after a few seconds
+            // and the only thing that brought it back was a key press, so on a
+            // phone it hid in the middle of an episode and stayed hidden. The
+            // picture is the button there: a tap shows the strip, another hides
+            // it. Keyed on the flag so the tap always reads the current one.
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .pointerInput(controlsShown) {
+                        detectTapGestures {
+                            if (controlsShown) controlsShown = false else wake += 1
+                        }
+                    }
+            )
 
             if (fullscreen && !controlsShown) {
                 Box(
