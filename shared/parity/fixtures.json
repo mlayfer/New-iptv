@@ -1038,6 +1038,11 @@
     "_comment": "What an episode is called once the series and the numbering in front of it are gone — the card already says which episode it is.",
     "cases": [
       {
+        "name": "ניתוק - S01E02 - חצי לולאה",
+        "series": "ניתוק (2022)",
+        "expected": "חצי לולאה"
+      },
+      {
         "name": "ניתוק - S01E04 - האתה שאתה",
         "series": "ניתוק",
         "expected": "האתה שאתה"
@@ -1061,6 +1066,11 @@
         "name": "S01E07",
         "series": "ניתוק",
         "expected": "S01E07"
+      },
+      {
+        "name": "ניתוק - פרק מיוחד",
+        "series": "ניתוק",
+        "expected": "פרק מיוחד"
       },
       {
         "name": "פרק מיוחד",

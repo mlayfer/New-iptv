@@ -180,26 +180,37 @@ object XtreamClient {
      * What an episode is actually called.
      *
      * Portals name an episode by repeating everything you already know: the
-     * series, then the season and number, then — sometimes — the title. Inside a
-     * series, under a card that already says "episode 4", all of that is noise,
-     * and it is what pushes the one useful word off the end of the line.
+     * series, then the season and number, then — sometimes — the title. Under a
+     * card that already says "episode 4", inside a page that already says which
+     * series, all of that is noise, and it is what pushes the one useful word
+     * off the end of the line.
+     *
+     * The numbering is the landmark, not the name: a portal that lists
+     * "Severance (2022)" happily calls its episodes "Severance - S01E01 - ...",
+     * so matching the series title never fires. Whatever sits before S01E01 is
+     * the series in some spelling; whatever follows it is the episode.
      */
-    private val LEADING_SXXEXX = Regex("^S\\d{1,3}\\s*E\\d{1,4}\\b[\\s\\-–—·:|]*", RegexOption.IGNORE_CASE)
-    private val LEADING_NxN = Regex("^\\d{1,3}x\\d{1,4}\\b[\\s\\-–—·:|]*", RegexOption.IGNORE_CASE)
-    private val LEADING_JOIN = Regex("^[\\s\\-–—·:|]+")
+    private val NUMBERING = Regex("""S\s?\d{1,3}\s?E\s?\d{1,4}|\b\d{1,3}x\d{1,4}\b""", RegexOption.IGNORE_CASE)
+    private val LEADING_JOIN = Regex("""^[\s\-–—·:|]+""")
 
     fun episodeLabel(name: String, seriesName: String?): String {
-        var out = name.trim()
+        val out = name.trim()
         if (out.isEmpty()) return out
+
+        val mark = NUMBERING.find(out)
+        if (mark != null) {
+            val after = LEADING_JOIN.replace(out.substring(mark.range.last + 1), "").trim()
+            // Nothing after the numbering: the number is on the card already,
+            // but an empty line is worse than a repeated one.
+            return after.ifEmpty { out }
+        }
+
         val series = seriesName?.trim().orEmpty()
         if (series.isNotEmpty() && out.startsWith(series, ignoreCase = true)) {
-            out = LEADING_JOIN.replace(out.substring(series.length), "")
+            val rest = LEADING_JOIN.replace(out.substring(series.length), "").trim()
+            if (rest.isNotEmpty()) return rest
         }
-        out = LEADING_SXXEXX.replace(out, "")
-        out = LEADING_NxN.replace(out, "")
-        // Nothing left but the numbering: the number is on the card already, so
-        // the original is better than an empty line.
-        return out.trim().ifEmpty { name.trim() }
+        return out
     }
 
     fun episodeName(title: String, season: String, number: String, seriesName: String?): String {

@@ -235,24 +235,37 @@
    * What an episode is actually called.
    *
    * Portals name an episode by repeating everything you already know: the
-   * series, then the season and number, then — sometimes — the title. Inside a
-   * series, under a card that already says "episode 4", all of that is noise,
-   * and it is what pushes the one useful word off the end of the line.
+   * series, then the season and number, then — sometimes — the title. Under a
+   * card that already says "episode 4", inside a page that already says which
+   * series, all of that is noise, and it is what pushes the one useful word off
+   * the end of the line.
+   *
+   * The numbering is the landmark, not the name: a portal that lists "Severance
+   * (2022)" happily calls its episodes "Severance - S01E01 - ...", so matching
+   * the series title never fires. Whatever sits before S01E01 is the series in
+   * some spelling; whatever follows it is the episode.
    */
   function episodeLabel(name, seriesName) {
-    let out = String(name || '').trim();
+    const out = String(name || '').trim();
     if (!out) return out;
+
+    const mark = /S\s?\d{1,3}\s?E\s?\d{1,4}|\b\d{1,3}x\d{1,4}\b/i.exec(out);
+    if (mark) {
+      const after = out.slice(mark.index + mark[0].length).replace(/^[\s\-–—·:|]+/, '').trim();
+      // Nothing after the numbering: the number is on the card already, but an
+      // empty line is worse than a repeated one.
+      if (after) return after;
+      return out;
+    }
+
     if (seriesName) {
       const prefix = String(seriesName).trim();
       if (prefix && out.toLowerCase().indexOf(prefix.toLowerCase()) === 0) {
-        out = out.slice(prefix.length).replace(/^[\s\-–—·:|]+/, '');
+        const rest = out.slice(prefix.length).replace(/^[\s\-–—·:|]+/, '').trim();
+        if (rest) return rest;
       }
     }
-    out = out.replace(/^S\d{1,3}\s*E\d{1,4}\b[\s\-–—·:|]*/i, '');
-    out = out.replace(/^\d{1,3}x\d{1,4}\b[\s\-–—·:|]*/i, '');
-    // Nothing left but the numbering: the number is on the card already, so the
-    // original is better than an empty line.
-    return out.trim() || String(name).trim();
+    return out;
   }
 
   function topGroups(pool, limit, perRow) {
