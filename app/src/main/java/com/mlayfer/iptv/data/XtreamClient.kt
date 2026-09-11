@@ -27,7 +27,14 @@ object XtreamClient {
     private const val MAX_PER_CATEGORY = 25_000
     private const val MAX_SERIES = 10_000
 
-    fun load(source: PlaylistSource.Xtream): ParsedPlaylist {
+    /**
+     * @param onStage told which part of the catalogue is being fetched. A real
+     *   subscription is twenty thousand items over three calls and takes the
+     *   better part of a minute, and a screen that says nothing for that long is
+     *   indistinguishable from one that has hung.
+     */
+    fun load(source: PlaylistSource.Xtream, onStage: (String) -> Unit = {}): ParsedPlaylist {
+        onStage("מתחבר לפורטל…")
         val server = normalizeServer(source.server)
         val user = source.username
         val password = source.password
@@ -47,6 +54,7 @@ object XtreamClient {
         val series = ArrayList<Series>()
         val notes = ArrayList<String>()
 
+        onStage("טוען ערוצים…")
         val liveCategories = categoryNames(server, user, password, "get_live_categories")
         val liveStreams = readArray(api(server, user, password, "get_live_streams"))
         for (i in 0 until liveStreams.length()) {
@@ -75,6 +83,7 @@ object XtreamClient {
             // A portal that refuses one catalogue must not look like a portal that
             // has none: say what failed instead of returning quietly.
             try {
+                onStage("טוען סרטים…")
                 val vodCategories = categoryNames(server, user, password, "get_vod_categories")
                 val vodStreams = readArray(api(server, user, password, "get_vod_streams"))
                 var added = 0
@@ -107,6 +116,7 @@ object XtreamClient {
             }
 
             try {
+                onStage("טוען סדרות…")
                 val seriesCategories = categoryNames(server, user, password, "get_series_categories")
                 val seriesList = readArray(api(server, user, password, "get_series"))
                 for (i in 0 until seriesList.length()) {

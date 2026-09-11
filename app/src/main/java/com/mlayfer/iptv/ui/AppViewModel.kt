@@ -58,6 +58,8 @@ data class UiState(
     val selectedId: String? = null,
     val screen: Screen = Screen.CHOOSE,
     val addBusy: Boolean = false,
+    /** Which part of the catalogue is on its way, while adding a source. */
+    val addStage: String? = null,
     val addError: String? = null,
 ) {
     val activePlaylist: Playlist? get() = playlists.firstOrNull { it.id == activeId }
@@ -268,10 +270,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Loads the playlist first: a source that doesn't work never gets saved. */
     fun addPlaylist(playlist: Playlist) {
-        _state.value = _state.value.copy(addBusy = true, addError = null)
+        _state.value = _state.value.copy(addBusy = true, addStage = null, addError = null)
         viewModelScope.launch {
             try {
-                val parsed = withContext(Dispatchers.IO) { repository.loadPlaylist(playlist) }
+                val parsed = withContext(Dispatchers.IO) {
+                    repository.loadPlaylist(playlist) { stage ->
+                        _state.value = _state.value.copy(addStage = stage)
+                    }
+                }
                 val playlists = _state.value.playlists + playlist
                 store.playlists = playlists
                 store.activeId = playlist.id
@@ -285,6 +291,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     group = null,
                     epg = emptyMap(),
                     addBusy = false,
+                    addStage = null,
                     addError = null,
                     error = null,
                     // Connecting a portal ends at the door, the same place a
@@ -298,6 +305,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     addBusy = false,
+                    addStage = null,
                     addError = e.message ?: "טעינת הרשימה נכשלה",
                 )
             }

@@ -314,7 +314,7 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                         }
 
                         BigButton(
-                            label = "התחברות לפורטל",
+                            label = if (state.addBusy) "מתחבר…" else "התחברות לפורטל",
                             enabled = server.isNotBlank() && username.isNotBlank() &&
                                 password.isNotBlank() && !state.addBusy,
                             busy = state.addBusy,
@@ -329,6 +329,21 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                             )
                         }
                     }
+                }
+
+                // Twenty thousand items over three calls takes the better part
+                // of a minute. A screen that says nothing for that long is
+                // indistinguishable from one that has hung, so it says which
+                // part is on its way.
+                val stage = state.addStage
+                if (state.addBusy && stage != null) {
+                    Text(
+                        text = stage,
+                        fontSize = tzSp(18),
+                        color = Ink.Accent,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
                 val addError = state.addError
@@ -496,11 +511,14 @@ private fun BigButton(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (busy) {
+            // The padding was inside the size, so the ring had almost nothing
+            // left to be drawn in and came out as a speck beside the words.
             CircularProgressIndicator(
-                strokeWidth = tz(4),
-                color = Ink.OnAccent,
-                modifier = Modifier.size(tz(34)).padding(end = tz(8)),
+                strokeWidth = 2.5.dp,
+                color = if (enabled) Ink.OnAccent else Ink.Dim,
+                modifier = Modifier.size(20.dp),
             )
+            Spacer(Modifier.width(tz(14)))
         }
         Text(
             text = label,

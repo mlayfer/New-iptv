@@ -8,7 +8,7 @@ class Repository {
     private val episodeCache = HashMap<String, List<Channel>>()
 
     /** Blocking: call from a background dispatcher. */
-    fun loadPlaylist(playlist: Playlist, force: Boolean = false): ParsedPlaylist {
+    fun loadPlaylist(playlist: Playlist, force: Boolean = false, onStage: (String) -> Unit = {}): ParsedPlaylist {
         if (!force) playlistCache[playlist.id]?.let { return it }
 
         val parsed = when (val source = playlist.source) {
@@ -20,7 +20,7 @@ class Repository {
                 }
                 M3uParser.parse(body)
             }
-            is PlaylistSource.Xtream -> XtreamClient.load(source)
+            is PlaylistSource.Xtream -> XtreamClient.load(source, onStage)
         }
 
         if (parsed.channels.isEmpty()) throw Http.HttpException("לא נמצאו ערוצים ברשימה")

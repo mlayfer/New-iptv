@@ -99,7 +99,10 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
+            // Centred in what is left under the bar puts a hand's worth of
+            // nothing between the bar and the question. On a television that
+            // space is what keeps the page calm; on a phone it is just a gap.
+            contentAlignment = if (isWide) Alignment.Center else Alignment.TopCenter,
         ) {
             val sideBySide = maxWidth > 560.dp
 
@@ -161,6 +164,7 @@ fun ChooseScreen(state: UiState, viewModel: AppViewModel) {
                 // and the block sits in the middle of what is left.
                 val doorHeight = (maxHeight * 0.28f).coerceIn(150.dp, 220.dp)
                 Column(
+                    modifier = Modifier.padding(top = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
