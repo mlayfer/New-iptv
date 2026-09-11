@@ -163,9 +163,21 @@ fun BrandBlock(title: String, tagline: String, counts: String?) {
             // the top of a small screen is a third of the screen spent saying
             // what the screen is already showing.
             if (isWide) {
-                Text(text = tagline, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
+                Text(
+                    text = tagline,
+                    fontSize = tzSp(18),
+                    color = Ink.Faint,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 if (counts != null) {
-                    Text(text = counts, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
+                    Text(
+                        text = counts,
+                        fontSize = tzSp(18),
+                        color = Ink.Faint,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -355,7 +367,16 @@ fun HeroBand(
             horizontalAlignment = Alignment.Start,
         ) {
             if (kicker != null) {
-                Text(text = kicker, fontSize = tzSp(20), color = Ink.Accent, maxLines = 1)
+                // Ellipsis, not the default clip: a portal's category names run
+                // long, and a line that simply stops mid-word reads as a screen
+                // that is cut off rather than a name that is.
+                Text(
+                    text = kicker,
+                    fontSize = tzSp(20),
+                    color = Ink.Accent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Text(
                 text = title,

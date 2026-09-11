@@ -82,9 +82,22 @@ fun Modifier.tvSafeArea(): Modifier {
     // tell from here. A wide screen therefore gets the gutter either way: on a
     // television it is what keeps the edges on screen, and anywhere else it is
     // margins, which never hurt anyone.
-    val wide = LocalConfiguration.current.screenWidthDp >= 600
+    val config = LocalConfiguration.current
+    val wide = config.screenWidthDp >= 600
     return if (LocalIsTv.current || wide) {
-        this.padding(horizontal = 48.dp, vertical = 27.dp)
+        // A share of the screen, not a number of dp. A box that reports its
+        // 1080p panel as 1920dp wide rather than 960 would otherwise get half
+        // the gutter it needs, and there is no way to tell from in here which
+        // kind of box this is.
+        //
+        // And more than the five per cent Leanback suggests: five per cent is
+        // the guideline for the picture, and this screen is mostly words. Two
+        // televisions in this house crop more than that, and a title with its
+        // first syllable missing is worse than a slightly narrower screen.
+        this.padding(
+            horizontal = (config.screenWidthDp * 0.065f).dp,
+            vertical = (config.screenHeightDp * 0.055f).dp,
+        )
     } else {
         // A phone has no overscan to allow for, which is why this returned
         // nothing at all — and left every screen pressed flat against the edges
