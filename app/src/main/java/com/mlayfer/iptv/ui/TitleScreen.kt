@@ -463,7 +463,7 @@ private fun EpisodeCard(
             .focusHighlight(shape, border = false)
             .clickable(onClick = onClick)
             .padding(tz(10)),
-        horizontalAlignment = Alignment.End,
+        horizontalAlignment = Alignment.Start,
     ) {
         Box(
             modifier = Modifier
@@ -504,8 +504,18 @@ private fun EpisodeCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = tz(10)).fillMaxWidth(),
+            // Start, not End: in this direction End is the left-hand edge, so
+            // the name and the season had swapped sides.
+            textAlign = TextAlign.Start,
+        )
+        Text(
+            text = episode.group.orEmpty(),
+            fontSize = tzSp(17),
+            color = Ink.Faint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.End,
         )
-        Faint(episode.group.orEmpty(), Modifier.fillMaxWidth(), size = 17)
     }
 }
