@@ -736,15 +736,20 @@ fun PlayerPanel(
             // phone it hid in the middle of an episode and stayed hidden. The
             // picture is the button there: a tap shows the strip, another hides
             // it. Keyed on the flag so the tap always reads the current one.
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .pointerInput(controlsShown) {
-                        detectTapGestures {
-                            if (controlsShown) controlsShown = false else wake += 1
+            // Full screen a tap on the picture shows and hides the controls.
+            // Parked beside the list it means something else entirely — the
+            // layer below handles it — so this one stays out of the way.
+            if (!compact) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .pointerInput(controlsShown) {
+                            detectTapGestures {
+                                if (controlsShown) controlsShown = false else wake += 1
+                            }
                         }
-                    }
-            )
+                )
+            }
 
             if (fullscreen && !controlsShown) {
                 Box(
@@ -752,6 +757,19 @@ fun PlayerPanel(
                         .matchParentSize()
                         .focusRequester(picture)
                         .focusable()
+                )
+            }
+
+            // Parked beside the list, the picture is a way back to the whole
+            // screen — the other one being pressing the channel you are already
+            // watching. It has to be somewhere the remote can land, which means
+            // focusable, and it has to say when it is landed on.
+            if (compact) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .focusHighlight(RoundedCornerShape(tz(10)))
+                        .clickable(onClick = onToggleFullscreen)
                 )
             }
 

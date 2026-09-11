@@ -224,6 +224,7 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                         channels = visible,
                         clock = clock,
                         onPlay = viewModel::select,
+                        onFullScreen = { browsing = false },
                         modifier = watchListPlacement(),
                     )
                 }
@@ -688,6 +689,8 @@ internal fun WhatElseIsOn(
     channels: List<Channel>,
     clock: Long,
     onPlay: (Channel) -> Unit,
+    /** Give the picture the whole screen and put the list away. */
+    onFullScreen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val first = remember { FocusRequester() }
@@ -736,14 +739,18 @@ internal fun WhatElseIsOn(
                     viewModel.loadGuide(channel)
                 }
                 val onNow = XmltvParser.programmeAt(state.programmes(channel), clock)
+                val playing = channel.id == state.selectedId
                 WatchRow(
                     name = channel.name,
                     number = index + 1,
                     logo = channel.logo,
                     now = onNow?.title,
                     range = onNow?.let { "${hhmm(it.start)}–${hhmm(it.stop)}" },
-                    playing = channel.id == state.selectedId,
-                    onClick = { onPlay(channel) },
+                    playing = playing,
+                    // Pressing the one you are already watching is not "watch
+                    // it again" — there is nothing else it could mean but
+                    // "give it the whole screen".
+                    onClick = { if (playing) onFullScreen() else onPlay(channel) },
                     modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
                 )
             }

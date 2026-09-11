@@ -313,6 +313,29 @@ await page.waitForTimeout(900);
 check("choosing from the list changes channel and leaves the list up",
   await shown("#watchList") && await shown("#playerScreen"));
 
+// Two ways out to the whole screen: press the channel you are already on, or
+// go left to the picture and press that.
+await page.keyboard.press("Enter");
+await page.waitForTimeout(700);
+check("pressing the channel you are already on gives it the whole screen",
+  !(await shown("#watchList")) &&
+    !(await page.evaluate(() => document.body.classList.contains("watching"))));
+
+await page.keyboard.press("ArrowLeft");
+await page.waitForTimeout(700);
+await page.keyboard.press("ArrowLeft");
+await page.waitForTimeout(500);
+check("going left from the list reaches the picture",
+  await page.evaluate(() => (document.activeElement || {}).id === "watchPicture"));
+await page.keyboard.press("Enter");
+await page.waitForTimeout(700);
+check("and pressing the picture gives it the whole screen too",
+  !(await shown("#watchList")) &&
+    !(await page.evaluate(() => document.body.classList.contains("watching"))));
+
+await page.keyboard.press("ArrowLeft");
+await page.waitForTimeout(700);
+
 await page.keyboard.press("Backspace");
 await page.waitForTimeout(500);
 check("Back closes the list before it leaves the picture",

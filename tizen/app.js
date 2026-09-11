@@ -1649,6 +1649,12 @@ function renderWatchList(){
     $('.watchNow', row).textContent = item.group || '';
     fillArt($('.watchLogo', row), item);
     row.addEventListener('click', () => {
+      // Pressing the one you are already watching is not "watch it again" —
+      // there is nothing else it could mean but "give it the whole screen".
+      if(state.current && state.current.id === item.id){
+        closeWatchList();
+        return;
+      }
       state.watchIndex = index;
       state.liveIndex = index;
       // The list stays up: changing channel is not the same as being finished
@@ -1709,10 +1715,21 @@ function navWatch(active, dir){
     return active;
   }
 
+  if(type === 'watchPicture'){
+    // The schedule is drawn under the picture, so it is what is below it.
+    if(dir === 'down') return past[0] || active;
+    if(dir === 'right'){ focusWatchRow(); return null; }
+    return active;
+  }
+
   if(type === 'watchPast'){
-    if(dir === 'up' || dir === 'down'){
+    if(dir === 'up'){
       const at = past.indexOf(active);
-      return past[at + (dir === 'down' ? 1 : -1)] || active;
+      return at > 0 ? past[at - 1] : ($('#watchPicture') || active);
+    }
+    if(dir === 'down'){
+      const at = past.indexOf(active);
+      return past[at + 1] || active;
     }
     if(dir === 'right'){ focusWatchRow(); return null; }
     return active;
@@ -1724,8 +1741,8 @@ function navWatch(active, dir){
     return null;
   }
   if(dir === 'down'){ moveWatch(1); return null; }
-  // The schedule is drawn under the picture, which is on the left.
-  if(dir === 'left') return past[past.length - 1] || active;
+  // The picture is on the left, with its schedule under it.
+  if(dir === 'left') return $('#watchPicture') || past[0] || active;
   return active;
 }
 
@@ -2849,6 +2866,8 @@ function wireStatic(){
   $('#vodSearch').addEventListener('input', applyFilter);
   $('#navLive').addEventListener('click', () => showMode('LIVE'));
   $('#navLayout').addEventListener('click', () => setGuideLayout(listMode() ? 'grid' : 'list'));
+  $('#watchPicture').dataset.nav = 'watchPicture';
+  $('#watchPicture').addEventListener('click', closeWatchList);
   $('#navVod').addEventListener('click', () => showMode('MOVIES'));
   $('#navSeries').addEventListener('click', () => showMode('SERIES'));
   $('#navSearch').addEventListener('click', showSearch);

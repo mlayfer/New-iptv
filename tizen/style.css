@@ -406,6 +406,13 @@ body.watching #liveOverlay .ovName{font-size:28px}
 body.watching #liveOverlay .ovMeta{font-size:19px}
 body.watching #liveOverlay{opacity:1}
 
+/* The picture as a focus target. It sits exactly over the stage, which on a
+   television is drawn on a plane of its own behind the page — so a button on
+   top of it costs nothing and gives the remote somewhere to land. */
+.watchPicture{display:none}
+body.watching .watchPicture{display:block;position:absolute;top:48px;left:48px;right:auto;bottom:auto;
+  width:860px;height:484px;border-radius:16px;background:none;border:1px solid transparent;z-index:4}
+
 /* The rest of the evening, under the picture. It starts below the name block
    and has the corner to itself. */
 .watchSchedule{position:absolute;top:640px;left:48px;right:auto;bottom:auto;width:860px;z-index:3}

@@ -292,6 +292,7 @@ class ScreenshotTest {
                 channels = watching.channels.filter { it.kind == ChannelKind.LIVE },
                 clock = System.currentTimeMillis(),
                 onPlay = {},
+                onFullScreen = {},
                 modifier = watchListPlacement(),
             )
             Box(
