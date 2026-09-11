@@ -138,6 +138,8 @@ fun PlayerPanel(
      * the natural place for it, and it is otherwise black.
      */
     schedule: List<Programme> = emptyList(),
+    /** Whose schedule it is. Usually what is playing, and not always. */
+    scheduleFor: String? = null,
     /**
      * Play a stretch of the channel's archive. Null where there is no archive —
      * most channels have none, and an offer that does nothing is worse than no
@@ -843,11 +845,16 @@ fun PlayerPanel(
                 verticalArrangement = Arrangement.spacedBy(tz(8)),
             ) {
                 Text(
-                    text = "לוח השידורים",
+                    // Named, because the cursor can be on a channel other than
+                    // the one playing and an unattributed schedule would then be
+                    // a list of programmes belonging to nothing.
+                    text = listOfNotNull("לוח השידורים", scheduleFor).joinToString(" · "),
                     fontSize = tzSp(20),
                     fontWeight = FontWeight.Bold,
                     lineHeight = tzSp(24),
                     color = Ink.Bright,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 // Winding back is a thing the portal either keeps or does not,
                 // and a feature that is simply absent looks like one that is

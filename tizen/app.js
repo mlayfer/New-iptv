@@ -31,6 +31,8 @@ const state = {
   watchOpen: false,
   watchIndex: 0,
   watchStart: 0,
+  // Which channel the schedule under the picture is currently drawn for.
+  scheduleFor: null,
   vodRow: 0,
   vodCol: 0,
   vodRowStart: 0,
@@ -1421,8 +1423,9 @@ function openWatchList(){
   document.body.classList.add('watching');
   $('#watchList').classList.remove('hidden');
   applyPictureRect();
-  renderWatchSchedule();
 
+  // The schedule is drawn by focusWatchRow below, once there is a cursor for it
+  // to follow; drawing it here would draw it for wherever the cursor was last.
   const at = state.filtered.findIndex(x => state.current && x.id === state.current.id);
   state.watchIndex = at >= 0 ? at : 0;
   state.watchStart = 0;
@@ -1435,6 +1438,7 @@ function openWatchList(){
 function closeWatchList(){
   if(!state.watchOpen) return;
   state.watchOpen = false;
+  state.scheduleFor = null;
   document.body.classList.remove('watching');
   $('#watchList').classList.add('hidden');
   $('#watchSchedule').classList.add('hidden');
@@ -1459,11 +1463,25 @@ const SCHEDULE_BEHIND = 3;
 const ARCHIVE_WINDOW = 30;
 const ARCHIVE_RUN_ON = 240;
 
-/** The channel being watched, if the portal keeps it. */
-function archiveChannel(){
-  const item = state.current;
+/** A channel the portal keeps, or null. */
+function archiveOf(item){
   if(!item || item.kind !== 'LIVE') return null;
   return item.archiveDays > 0 ? item : null;
+}
+
+/** The channel being watched, if the portal keeps it. Winding the picture back
+ *  is about the picture, so this is the one the rewind acts on. */
+function archiveChannel(){ return archiveOf(state.current); }
+
+/**
+ * The channel the schedule is drawn for: the one under the cursor.
+ *
+ * It used to be whatever was playing, so moving through the list told you
+ * nothing about what you were moving towards — which is the whole question the
+ * list is there to answer.
+ */
+function scheduleChannel(){
+  return state.filtered[state.watchIndex] || state.current;
 }
 
 /** How long to ask the archive for. A programme with no end gets an hour. */
@@ -1536,18 +1554,22 @@ function renderWatchSchedule(){
   const box = $('#watchSchedule');
   const list = $('#watchScheduleList');
   if(!box || !list) return;
-  const item = state.current;
+  const item = scheduleChannel();
   if(!state.watchOpen || !item){ box.classList.add('hidden'); return; }
 
+  // The cursor moves faster than the portal answers, so an answer that arrives
+  // for a channel nobody is looking at any more is dropped.
   const token = item.id;
+  state.scheduleFor = token;
+  text($('#watchScheduleFor'), item.name);
   list.innerHTML = '';
   box.classList.remove('hidden');
 
   epgFor(item).then(function(rows){
-    if(!state.watchOpen || !state.current || state.current.id !== token) return;
+    if(!state.watchOpen || state.scheduleFor !== token) return;
     const at = Date.now();
     const slot = Core.nowOn(rows, at);
-    const archive = archiveChannel();
+    const archive = archiveOf(item);
     // Winding back is a thing the portal either keeps or does not, and a
     // feature that is simply absent looks like one that is broken. So the
     // screen says which it is.
@@ -1665,6 +1687,7 @@ function focusWatchRow(){
   }
   const el = $('[data-nav="watchItem"][data-index="' + index + '"]');
   if(el) setFocus(el);
+  renderWatchSchedule();
 }
 
 function moveWatch(delta){

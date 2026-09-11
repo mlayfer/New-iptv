@@ -282,6 +282,7 @@ class ScreenshotTest {
                 clock = System.currentTimeMillis(),
                 onPlay = {},
                 onFullScreen = {},
+                onHighlight = {},
                 modifier = watchListPlacement(),
             )
             Box(

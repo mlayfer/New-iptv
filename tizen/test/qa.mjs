@@ -280,6 +280,20 @@ check("each channel says what is on it",
   (await page.textContent('[data-nav="watchItem"] .watchNow')).length > 0,
   await page.textContent('[data-nav="watchItem"] .watchNow'));
 
+// The schedule under the picture follows the cursor, not the picture: moving
+// through the list is how you find out what is on the next channel along.
+const scheduleFor = () => page.textContent("#watchScheduleFor");
+const firstChannel = await scheduleFor();
+await page.keyboard.press("ArrowDown");
+await page.waitForTimeout(700);
+const secondChannel = await scheduleFor();
+check("the schedule follows the cursor down the list",
+  firstChannel !== secondChannel && secondChannel.length > 0,
+  `${firstChannel} -> ${secondChannel}`);
+await page.keyboard.press("ArrowUp");
+await page.waitForTimeout(700);
+check("and back up again", (await scheduleFor()) === firstChannel, await scheduleFor());
+
 // Catching up. This channel is one the portal keeps, so its schedule offers
 // what has already been on as something to play.
 check("the schedule under the picture lists what has already been on",

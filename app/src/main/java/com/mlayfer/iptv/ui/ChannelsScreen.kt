@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,6 +91,9 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
     // an app that can only do one at a time makes you leave what you are
     // watching in order to find out what else is on.
     var browsing by remember { mutableStateOf(false) }
+    // The channel the cursor is on in that list, which is the one the schedule
+    // under the picture is drawn for.
+    var highlighted by remember { mutableStateOf<Channel?>(null) }
     // Leaving the player takes the list with it.
     LaunchedEffect(fullscreen) { if (!fullscreen) browsing = false }
 
@@ -372,6 +376,7 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                         clock = clock,
                         onPlay = viewModel::select,
                         onFullScreen = goFullScreen,
+                        onHighlight = { highlighted = it },
                         modifier = watchListPlacement(),
                     )
                 }
@@ -397,6 +402,7 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                     onPrev = { step(-1) },
                     onNext = { step(1) },
                     modifier = if (whole) Modifier.fillMaxSize() else watchPicturePlacement(),
+                    guideChannel = if (whole) null else highlighted,
                 )
             }
             }
@@ -520,6 +526,12 @@ private fun PlayerFor(
     onPrev: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier,
+    /**
+     * The channel the schedule is drawn for. The cursor in the list beside the
+     * picture, where there is one — what is on the next channel along is the
+     * question a list of channels exists to answer.
+     */
+    guideChannel: Channel? = null,
 ) {
     val selected = state.selectedChannel
     // Watching a channel is the moment the programme name matters most, so the
@@ -527,33 +539,43 @@ private fun PlayerFor(
     LaunchedEffect(selected?.id) { selected?.let(viewModel::loadGuide) }
 
     val clock by rememberClock()
-    val programmes = state.programmes(selected)
+    // The line under the picture says what is playing; the schedule says what is
+    // on the channel the cursor is on. They are usually the same channel and
+    // sometimes not, and each is answering its own question.
+    val watching = state.programmes(selected)
+    val guideOf = guideChannel ?: selected
+    val programmes = state.programmes(guideOf)
 
-    val onNow = XmltvParser.programmeAt(programmes, clock)
+    val onNow = XmltvParser.programmeAt(watching, clock)
     // A channel the portal keeps can be wound back. Most cannot, and the offer
     // is only made where it would work.
     val archive = selected?.takeIf { it.kind == ChannelKind.LIVE && it.archiveDays > 0 }
+    val guideArchive = guideOf?.takeIf { it.kind == ChannelKind.LIVE && it.archiveDays > 0 }
 
     PlayerPanel(
         channel = selected,
         now = onNow,
-        next = XmltvParser.nextProgramme(programmes, clock),
+        next = XmltvParser.nextProgramme(watching, clock),
+        scheduleFor = guideOf?.name,
         // What has already been on, what is on now, and the rest of the evening
         // — the same list the guide draws, so the two never disagree. What is
         // behind is only worth listing where it can be played back.
         // Only where there is room for it: a phone's picture already reaches
         // the top of the list, and the list says what is on each channel anyway.
         schedule = if (compact && isWide) {
-            val behind = if (archive != null) {
+            val behind = if (guideArchive != null) {
                 XmltvParser.alreadyOn(programmes, clock, SCHEDULE_BEHIND)
             } else {
                 emptyList()
             }
-            behind + listOfNotNull(onNow) + XmltvParser.upcoming(programmes, clock, SCHEDULE_AHEAD)
+            behind + listOfNotNull(XmltvParser.programmeAt(programmes, clock)) +
+                XmltvParser.upcoming(programmes, clock, SCHEDULE_AHEAD)
         } else {
             emptyList()
         },
-        onCatchUp = archive?.let { channel ->
+        // Catching up acts on the channel whose schedule is being read, which is
+        // the one the cursor is on; winding back acts on the picture.
+        onCatchUp = guideArchive?.let { channel ->
             { programme: Programme ->
                 // Choosing a programme is choosing what to watch, not more
                 // browsing: the list goes and the picture comes back to the
@@ -655,6 +677,13 @@ internal fun WhatElseIsOn(
     onPlay: (Channel) -> Unit,
     /** Give the picture the whole screen and put the list away. */
     onFullScreen: () -> Unit,
+    /**
+     * Landed on with the remote. The schedule under the picture is drawn for
+     * this one rather than for whatever is playing — moving through the list
+     * otherwise told you nothing about what you were moving towards, which is
+     * the whole question the list is there to answer.
+     */
+    onHighlight: (Channel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val first = remember { FocusRequester() }
@@ -715,6 +744,7 @@ internal fun WhatElseIsOn(
                     // it again" — there is nothing else it could mean but
                     // "give it the whole screen".
                     onClick = { if (playing) onFullScreen() else onPlay(channel) },
+                    onFocus = { onHighlight(channel) },
                     modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
                 )
             }
@@ -745,6 +775,7 @@ private fun WatchRow(
     range: String?,
     playing: Boolean,
     onClick: () -> Unit,
+    onFocus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(tz(12))
@@ -752,6 +783,7 @@ private fun WatchRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
+            .onFocusChanged { if (it.isFocused) onFocus() }
             .background(Ink.Surface)
             .border(1.dp, if (playing) Ink.Accent else Ink.LineSoft, shape)
             .focusHighlight(shape, border = false)
