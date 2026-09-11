@@ -121,7 +121,7 @@ fun TopChrome(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BrandBlock(title, tagline, counts)
-        Spacer(Modifier.width(tz(16)))
+        Spacer(Modifier.width(if (isWide) tz(16) else tz(8)))
         // One row on every screen. The phone used to get a second line of its
         // own because five pills and a name do not fit across it — but a Row
         // that scrolls holds as many as it likes and keeps them all on the far
@@ -148,12 +148,12 @@ fun TopChrome(
 fun BrandBlock(title: String, tagline: String, counts: String?) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(tz(16)),
+        horizontalArrangement = Arrangement.spacedBy(if (isWide) tz(16) else tz(10)),
     ) {
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = title,
-                fontSize = if (isWide) tzSp(38) else tzSp(28),
+                fontSize = if (isWide) tzSp(38) else tzSp(26),
                 fontWeight = FontWeight.ExtraBold,
                 color = Ink.Bright,
                 maxLines = 1,
@@ -180,7 +180,7 @@ private fun BrandMark() {
         painter = painterResource(R.mipmap.ic_launcher),
         contentDescription = null,
         modifier = Modifier
-            .size(if (isWide) tz(60) else tz(52))
+            .size(if (isWide) tz(60) else tz(46))
             .clip(RoundedCornerShape(tz(14))),
     )
 }
@@ -201,14 +201,18 @@ fun NavPill(
             .border(1.dp, if (selected) Ink.Accent else Ink.Line, shape)
             .focusHighlight(shape, border = false)
             .clickable(onClick = onClick)
+            // A phone fits four of these and the app's name across it, and the
+            // row scrolls rather than shrinks — so the last one was drawn half
+            // off the glass. Narrower pills are what makes them all fit; they
+            // are pressed with a finger here, not aimed at from a sofa.
             .padding(
-                horizontal = if (isWide) tz(24) else tz(18),
+                horizontal = if (isWide) tz(24) else tz(13),
                 vertical = if (isWide) tz(14) else tz(10),
             ),
     ) {
         Text(
             text = label,
-            fontSize = if (isWide) tzSp(22) else tzSp(19),
+            fontSize = if (isWide) tzSp(22) else tzSp(18),
             color = if (selected) Ink.OnAccent else Ink.Bright,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
