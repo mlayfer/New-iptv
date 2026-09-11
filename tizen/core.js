@@ -126,7 +126,49 @@
    * like a dead channel — the panel answers with an HTML page and HTTP 200.
    * Only numeric stream ids are rewritten, so a real playlist name is left be.
    */
+  /**
+   * The two shapes a panel serves its archive at.
+   *
+   * One is a script with a query, the other a path; a panel enables one of them
+   * and answers the other with an error page, so the one we built the address in
+   * is a guess until it plays.
+   */
+  function timeshiftAlternatives(url) {
+    const php = /^(.*?)\/streaming\/timeshift\.php\?(.*)$/.exec(url);
+    if (php) {
+      const q = {};
+      php[2].split('&').forEach(function (pair) {
+        const at = pair.indexOf('=');
+        if (at > 0) q[pair.slice(0, at)] = pair.slice(at + 1);
+      });
+      if (!q.stream || !q.start || !q.duration) return [];
+      const stamp = decodeURIComponent(q.start);
+      const stem = php[1] + '/timeshift/' + (q.username || '') + '/' + (q.password || '') +
+        '/' + q.duration + '/' + stamp + '/' + q.stream;
+      return [stem + '.m3u8', stem + '.ts'];
+    }
+
+    const path = /^(.*?)\/timeshift\/([^/]+)\/([^/]+)\/(\d+)\/([^/]+)\/(\d+)(\.\w+)?$/.exec(url);
+    if (path) {
+      const stem = path[1] + '/timeshift/' + path[2] + '/' + path[3] + '/' + path[4] +
+        '/' + path[5] + '/' + path[6];
+      const other = path[7] === '.ts' ? stem + '.m3u8' : stem + '.ts';
+      return [
+        other,
+        path[1] + '/streaming/timeshift.php?username=' + path[2] + '&password=' + path[3] +
+          '&stream=' + path[6] + '&start=' + encodeURIComponent(path[5]) +
+          '&duration=' + path[4],
+      ];
+    }
+    return [];
+  }
+
   function streamVariants(url) {
+    // An archive address is not a stream id with an extension on it, so the
+    // rewriting below would leave it alone; its alternatives are their own shape.
+    const shifted = timeshiftAlternatives(url);
+    if (shifted.length) return [url].concat(shifted).slice(0, 4);
+
     const out = [url];
     const cut = url.search(/[?#]/);
     const base = cut === -1 ? url : url.slice(0, cut);
@@ -595,6 +637,43 @@
     }
   }
 
+  // ---- catch up ---------------------------------------------------------------
+  //
+  // A live channel with an archive can be wound back: the panel will serve any
+  // stretch of what it already broadcast. Which endpoint it serves it from is
+  // another matter — panels disagree, so these are alternatives to try in the
+  // order worth trying, the same way an ordinary stream has an endpoint ladder.
+
+  /** `2026-09-11:14-25`, in the set's own time — which is the portal's. */
+  function timeshiftStamp(millis) {
+    const when = new Date(millis);
+    const pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return when.getFullYear() + '-' + pad(when.getMonth() + 1) + '-' + pad(when.getDate()) +
+      ':' + pad(when.getHours()) + '-' + pad(when.getMinutes());
+  }
+
+  /**
+   * @param source {server, user, pass}
+   * @param minutes how much of the archive to serve from `startMillis`
+   */
+  function catchupVariants(source, streamId, startMillis, minutes) {
+    const server = String((source && source.server) || '').replace(/\/+$/, '');
+    const user = encodeURIComponent((source && source.user) || '');
+    const pass = encodeURIComponent((source && source.pass) || '');
+    const id = String(streamId || '');
+    if (!server || !id) return [];
+
+    const stamp = timeshiftStamp(startMillis);
+    const span = Math.max(1, Math.round(minutes || 0));
+    return [
+      server + '/streaming/timeshift.php?username=' + user + '&password=' + pass +
+        '&stream=' + encodeURIComponent(id) + '&start=' + encodeURIComponent(stamp) +
+        '&duration=' + span,
+      server + '/timeshift/' + user + '/' + pass + '/' + span + '/' + stamp + '/' + id + '.m3u8',
+      server + '/timeshift/' + user + '/' + pass + '/' + span + '/' + stamp + '/' + id + '.ts',
+    ];
+  }
+
   // ---- the guide ------------------------------------------------------------
   //
   // Which of a channel's programmes is the one you are watching, and which come
@@ -615,6 +694,18 @@
       }
     });
     return { current: current, next: next };
+  }
+
+  /**
+   * The last few things that were on, oldest first. Only useful where the
+   * portal kept them: a guide that lists what has already finished and cannot
+   * be played back is a list of regrets.
+   */
+  function alreadyOn(list, at, limit) {
+    const when = at || Date.now();
+    const behind = (list || []).filter(function (row) { return row.stop <= when; });
+    behind.sort(function (a, b) { return a.start - b.start; });
+    return limit == null ? behind : behind.slice(Math.max(0, behind.length - limit));
   }
 
   /** The next few things on, in the order they will be on. */
@@ -873,8 +964,12 @@
     formatClock: formatClock,
     stepInList: stepInList,
     decodeMaybeBase64: decodeMaybeBase64,
+    timeshiftStamp: timeshiftStamp,
+    catchupVariants: catchupVariants,
+    timeshiftAlternatives: timeshiftAlternatives,
     nowOn: nowOn,
     upcoming: upcoming,
+    alreadyOn: alreadyOn,
     SEEK_STEP: SEEK_STEP,
     SEEK_STEP_LONG: SEEK_STEP_LONG,
     mergeHistory: mergeHistory

@@ -76,6 +76,11 @@ object XtreamClient {
                     logo = item.optString("stream_icon").ifBlank { null },
                     tvgId = item.optString("epg_channel_id").ifBlank { null },
                     streamId = streamId,
+                    archiveDays = if (item.optInt("tv_archive", 0) == 1) {
+                        item.optInt("tv_archive_duration", 0).coerceAtLeast(1)
+                    } else {
+                        0
+                    },
                 )
             )
         }
@@ -291,10 +296,40 @@ object XtreamClient {
      */
     fun shortEpg(source: PlaylistSource.Xtream, streamId: String, limit: Int = 6): List<Programme> {
         val server = normalizeServer(source.server)
-        val url = api(server, source.username, source.password, "get_short_epg") +
-            "&stream_id=${encode(streamId)}&limit=$limit"
+        val creds = api(server, source.username, source.password, null)
+
+        // The whole table, not the next few: catching up needs what has already
+        // been broadcast, and `get_short_epg` starts at now. A panel that will
+        // not answer for the table still answers for the short one, so that is
+        // the fallback rather than an empty guide.
+        val table = try {
+            parseShortEpg(
+                Http.fetchText("$creds&action=get_simple_data_table&stream_id=${encode(streamId)}")
+            )
+        } catch (e: Exception) {
+            emptyList()
+        }
+        if (table.isNotEmpty()) return window(table)
+
+        val url = "$creds&action=get_short_epg&stream_id=${encode(streamId)}&limit=$limit"
         return parseShortEpg(Http.fetchText(url))
     }
+
+    /**
+     * The whole table can be a week in both directions and no screen shows that
+     * much. A few days back is more archive than any panel keeps, and two days
+     * forward is more schedule than anyone reads at once.
+     */
+    private fun window(
+        programmes: List<Programme>,
+        now: Long = System.currentTimeMillis(),
+    ): List<Programme> {
+        val from = now - 4 * 24 * 3_600_000L
+        val to = now + 2 * 24 * 3_600_000L
+        return programmes.filter { it.stop > from && it.start < to }.take(MAX_LISTINGS)
+    }
+
+    private const val MAX_LISTINGS = 300
 
     /** Split out from the request so a portal's shape can be tested without one. */
     fun parseShortEpg(body: String): List<Programme> {
@@ -406,6 +441,53 @@ object XtreamClient {
         return out.toByteArray()
     }
 
+    // ---- catch up -----------------------------------------------------------
+    //
+    // A live channel with an archive can be wound back: the panel will serve any
+    // stretch of what it already broadcast. Which endpoint it serves it from is
+    // another matter — panels disagree, so these are alternatives to try in the
+    // order worth trying, the same way an ordinary stream has an endpoint ladder.
+    // The JS twin in core.js builds the same list, and the parity fixtures hold
+    // the two to it.
+
+    /** `2026-09-11:14-25`, in the set's own time — which is the portal's. */
+    fun timeshiftStamp(millis: Long): String {
+        val when_ = java.util.Calendar.getInstance()
+        when_.timeInMillis = millis
+        return "%04d-%02d-%02d:%02d-%02d".format(
+            when_.get(java.util.Calendar.YEAR),
+            when_.get(java.util.Calendar.MONTH) + 1,
+            when_.get(java.util.Calendar.DAY_OF_MONTH),
+            when_.get(java.util.Calendar.HOUR_OF_DAY),
+            when_.get(java.util.Calendar.MINUTE),
+        )
+    }
+
+    /** @param minutes how much of the archive to serve from [startMillis]. */
+    fun catchupVariants(
+        source: PlaylistSource.Xtream,
+        streamId: String,
+        startMillis: Long,
+        minutes: Int,
+    ): List<String> {
+        val server = normalizeServer(source.server).trimEnd('/')
+        if (server.isEmpty() || streamId.isBlank()) return emptyList()
+
+        // uriEncode, not the form encoder used elsewhere: the JS twin builds
+        // these with encodeURIComponent, and a space that becomes "+" on one
+        // side and "%20" on the other is two different URLs for one programme.
+        val user = uriEncode(source.username)
+        val pass = uriEncode(source.password)
+        val stamp = timeshiftStamp(startMillis)
+        val span = minutes.coerceAtLeast(1)
+        return listOf(
+            "$server/streaming/timeshift.php?username=$user&password=$pass" +
+                "&stream=${uriEncode(streamId)}&start=${uriEncode(stamp)}&duration=$span",
+            "$server/timeshift/$user/$pass/$span/$stamp/$streamId.m3u8",
+            "$server/timeshift/$user/$pass/$span/$stamp/$streamId.ts",
+        )
+    }
+
     fun normalizeServer(server: String): String {
         val trimmed = server.trim().trimEnd('/')
         val withScheme =
@@ -452,4 +534,14 @@ object XtreamClient {
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+    /**
+     * What `encodeURIComponent` does, which is not what `URLEncoder` does: the
+     * latter is a form encoder and turns a space into "+".
+     */
+    private fun uriEncode(value: String): String =
+        URLEncoder.encode(value, "UTF-8")
+            .replace("+", "%20")
+            .replace("%7E", "~")
+            .replace("*", "%2A")
 }

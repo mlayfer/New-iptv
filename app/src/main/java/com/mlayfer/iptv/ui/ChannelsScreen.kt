@@ -60,6 +60,7 @@ import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Filtering
 import com.mlayfer.iptv.data.Playback
+import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.XmltvParser
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -233,12 +234,15 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                     fullscreen = !browsing,
                     compact = browsing,
                     // A film has no other channels to flick through; live
-                    // television is the only place the list means anything.
-                    onBrowse = if (zappable) {
+                    // television is the only place the list means anything —
+                    // including while a stretch of a channel's archive is
+                    // playing, which is a recording but still television.
+                    onBrowse = if (state.catalog == Catalog.LIVE) {
                         { browsing = !browsing }
                     } else {
                         null
                     },
+                    onLeaveList = { browsing = false },
                     onToggleFullscreen = {
                         if (browsing) browsing = false else fullscreen = false
                     },
@@ -468,6 +472,20 @@ private const val UPCOMING = 2
 /** And how many the schedule under a parked picture has room for. */
 private const val SCHEDULE_AHEAD = 5
 
+/** How far back the same schedule reaches, where there is an archive to reach into. */
+private const val SCHEDULE_BEHIND = 3
+
+/** How far the rewind button winds back, and how much it asks for after that. */
+private const val REWIND_MINUTES = 10
+private const val ARCHIVE_RUN_ON = 240
+
+/** How long to ask the archive for. A programme with no end gets an hour. */
+private fun minutesOf(programme: Programme): Int {
+    val span = programme.stop - programme.start
+    if (span <= 0) return 60
+    return ((span / 60_000L).toInt()).coerceIn(1, 6 * 60)
+}
+
 /**
  * The clock, as something the screen can watch.
  *
@@ -538,6 +556,8 @@ private fun PlayerFor(
     fullscreen: Boolean,
     compact: Boolean = false,
     onBrowse: (() -> Unit)? = null,
+    /** Shut the channel list, for the things that are not more browsing. */
+    onLeaveList: () -> Unit = {},
     onToggleFullscreen: () -> Unit,
     onPrev: () -> Unit,
     onNext: () -> Unit,
@@ -552,18 +572,58 @@ private fun PlayerFor(
     val programmes = state.programmes(selected)
 
     val onNow = XmltvParser.programmeAt(programmes, clock)
+    // A channel the portal keeps can be wound back. Most cannot, and the offer
+    // is only made where it would work.
+    val archive = selected?.takeIf { it.kind == ChannelKind.LIVE && it.archiveDays > 0 }
+
     PlayerPanel(
         channel = selected,
         now = onNow,
         next = XmltvParser.nextProgramme(programmes, clock),
-        // What is on now, and the rest of the evening after it — the same list
-        // the guide draws, so the two never disagree.
+        // What has already been on, what is on now, and the rest of the evening
+        // — the same list the guide draws, so the two never disagree. What is
+        // behind is only worth listing where it can be played back.
         // Only where there is room for it: a phone's picture already reaches
         // the top of the list, and the list says what is on each channel anyway.
         schedule = if (compact && isWide) {
-            listOfNotNull(onNow) + XmltvParser.upcoming(programmes, clock, SCHEDULE_AHEAD)
+            val behind = if (archive != null) {
+                XmltvParser.alreadyOn(programmes, clock, SCHEDULE_BEHIND)
+            } else {
+                emptyList()
+            }
+            behind + listOfNotNull(onNow) + XmltvParser.upcoming(programmes, clock, SCHEDULE_AHEAD)
         } else {
             emptyList()
+        },
+        onCatchUp = archive?.let { channel ->
+            { programme: Programme ->
+                // Choosing a programme is choosing what to watch, not more
+                // browsing: the list goes and the picture comes back to the
+                // whole screen. Choosing a channel is the other thing, and that
+                // one leaves the list up.
+                onLeaveList()
+                viewModel.playCatchUp(
+                    channel = channel,
+                    title = programme.title,
+                    startMillis = programme.start,
+                    minutes = minutesOf(programme),
+                )
+            }
+        },
+        onRewindLive = archive?.let { channel ->
+            {
+                onLeaveList()
+                // Ten minutes back, and then enough of the archive to keep
+                // going: winding back is not the same as watching ten minutes
+                // and stopping.
+                val from = System.currentTimeMillis() - REWIND_MINUTES * 60_000L
+                viewModel.playCatchUp(
+                    channel = channel,
+                    title = XmltvParser.programmeAt(programmes, from)?.title.orEmpty(),
+                    startMillis = from,
+                    minutes = REWIND_MINUTES + ARCHIVE_RUN_ON,
+                )
+            }
         },
         isFavorite = selected != null && state.favorites.contains(selected.id),
         fullscreen = fullscreen,

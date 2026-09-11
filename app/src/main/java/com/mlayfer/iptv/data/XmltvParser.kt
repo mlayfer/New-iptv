@@ -100,6 +100,18 @@ object XmltvParser {
     fun nextProgramme(list: List<Programme>?, at: Long): Programme? =
         list?.filter { it.start > at }?.minByOrNull { it.start }
 
+    /**
+     * The last few things that were on, oldest first.
+     *
+     * Only useful where the portal kept them: a guide that lists what has
+     * already finished and cannot be played back is a list of regrets.
+     */
+    fun alreadyOn(list: List<Programme>?, at: Long, limit: Int): List<Programme> =
+        list.orEmpty()
+            .filter { it.stop <= at }
+            .sortedBy { it.start }
+            .takeLast(limit)
+
     /** The next few things on, in the order they will be on. */
     fun upcoming(list: List<Programme>?, at: Long, limit: Int? = null): List<Programme> {
         val ahead = list.orEmpty().filter { it.start > at }.sortedBy { it.start }

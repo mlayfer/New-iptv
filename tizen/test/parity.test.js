@@ -183,6 +183,10 @@ test('the guide agrees on what is on now and what follows', () => {
     core.upcoming(f.programmes, f.now, 2).map((x) => x.title),
     f.expected.upcoming,
   );
+  assert.deepStrictEqual(
+    core.alreadyOn(f.programmes, f.now, 3).map((x) => x.title),
+    f.expected.alreadyOn,
+  );
 
   // Past the end of everything the guide knows about, it says so rather than
   // holding the last programme on air for ever.
@@ -190,6 +194,10 @@ test('the guide agrees on what is on now and what follows', () => {
   assert.strictEqual(after.current, f.empty.current);
   assert.strictEqual(after.next, f.empty.next);
   assert.deepStrictEqual(core.upcoming(f.programmes, f.empty.now, 2), f.empty.upcoming);
+  assert.deepStrictEqual(
+    core.alreadyOn(f.programmes, f.empty.now, 3).map((x) => x.title),
+    f.empty.alreadyOn,
+  );
 });
 
 test('makes the same guess about which portal fields are base64', () => {
@@ -199,4 +207,25 @@ test('makes the same guess about which portal fields are base64', () => {
       `decoding ${JSON.stringify(c.input)}`,
     );
   });
+});
+
+test('winds a live channel back to the same addresses', () => {
+  const f = fixtures.catchup;
+  // The stamp is in local time because the portal's clock is the set's; the
+  // fixture names the zone so the test does not depend on the machine's.
+  const was = process.env.TZ;
+  process.env.TZ = f.timezone;
+  try {
+    assert.strictEqual(core.timeshiftStamp(f.start), f.stamp);
+    assert.deepStrictEqual(
+      core.catchupVariants(f.source, f.streamId, f.start, f.minutes),
+      f.expected,
+    );
+  } finally {
+    if (was === undefined) delete process.env.TZ; else process.env.TZ = was;
+  }
+
+  // Nothing to build an address out of is an empty list, not a broken URL.
+  assert.deepStrictEqual(core.catchupVariants(f.source, '', f.start, f.minutes), []);
+  assert.deepStrictEqual(core.catchupVariants({}, f.streamId, f.start, f.minutes), []);
 });

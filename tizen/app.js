@@ -329,7 +329,10 @@ async function loadXtream(){
         contentType: 'LIVE',
         url: `${server}/live/${enc(user)}/${enc(pass)}/${id}.m3u8`,
         logo: x.stream_icon || null,
-        streamId: id
+        streamId: id,
+        // How many days of this channel the portal keeps. Zero means it keeps
+        // none, and there is nothing to wind back to.
+        archiveDays: Number(x.tv_archive) === 1 ? Math.max(1, Number(x.tv_archive_duration) || 0) : 0
       });
     });
 
@@ -1167,11 +1170,17 @@ function epgFor(item){
   const key = item && item.streamId;
   if(!key) return Promise.resolve(null);
   if(epgCache[key]) return Promise.resolve(epgCache[key]);
-  const url = detailApi('get_short_epg', 'stream_id', key);
-  if(!url) return Promise.resolve(null);
-  return getText(url + '&limit=4').then(function(raw){
+  // The whole table, not the next few: catching up needs what has already been
+  // broadcast, and get_short_epg starts at now. A panel that will not answer for
+  // the table still answers for the short one, so that is the fallback rather
+  // than an empty guide.
+  const table = detailApi('get_simple_data_table', 'stream_id', key);
+  const short = detailApi('get_short_epg', 'stream_id', key);
+  if(!table && !short) return Promise.resolve(null);
+
+  const read = function(raw){
     const body = JSON.parse(raw) || {};
-    const list = (body.epg_listings || body.epg_listing || []).map(function(row){
+    return (body.epg_listings || body.epg_listing || []).map(function(row){
       return {
         title: decodeMaybeBase64(row.title),
         description: decodeMaybeBase64(row.description),
@@ -1179,6 +1188,12 @@ function epgFor(item){
         stop: epgTime(row.stop_timestamp || row.end, 0)
       };
     }).filter(function(row){ return row.title; });
+  };
+
+  return getText(table).then(read).then(function(list){
+    if(list.length) return list;
+    return getText(short + '&limit=4').then(read);
+  }).then(function(list){
     epgCache[key] = list;
     return list;
   }).catch(function(){ epgCache[key] = []; return []; });
@@ -1474,6 +1489,69 @@ function closeWatchList(){
 
 /** How many programmes ahead the schedule under the picture has room for. */
 const SCHEDULE_AHEAD = 5;
+/** And how far back it reaches, where there is an archive to reach into. */
+const SCHEDULE_BEHIND = 3;
+/** How far the rewind winds back, and how much it asks for after that. */
+const REWIND_MINUTES = 10;
+const ARCHIVE_RUN_ON = 240;
+
+/** The channel being watched, if the portal keeps it. */
+function archiveChannel(){
+  const item = state.current;
+  if(!item || item.kind !== 'LIVE') return null;
+  return item.archiveDays > 0 ? item : null;
+}
+
+/** How long to ask the archive for. A programme with no end gets an hour. */
+function minutesOf(entry){
+  const span = (entry.stop || 0) - (entry.start || 0);
+  if(span <= 0) return 60;
+  return Math.max(1, Math.min(Math.round(span / 60000), 6 * 60));
+}
+
+/**
+ * Play a stretch of a channel's archive.
+ *
+ * What comes out is not a channel: it is a finite, seekable recording with a
+ * beginning and an end. So it is made into one — a VOD item, which is what
+ * gives it a scrubber and keeps the channel keys from carrying you out of it.
+ */
+function playCatchUp(channel, title, startMillis, minutes){
+  const src = state.source || {};
+  if(src.type !== 'xtream' || !channel || !channel.streamId) return;
+  const urls = Core.catchupVariants(
+    { server: src.server, user: src.user, pass: src.pass },
+    channel.streamId, startMillis, minutes
+  );
+  if(!urls.length) return;
+
+  // Choosing a programme is choosing what to watch, not more browsing: the list
+  // goes and the picture comes back to the whole screen. Choosing a channel is
+  // the other thing, and that one leaves the list up.
+  closeWatchList();
+
+  activateItem({
+    id: 'catchup:' + channel.id + ':' + startMillis,
+    name: title ? title + ' · ' + channel.name : channel.name,
+    group: channel.group,
+    kind: 'VOD',
+    contentType: 'MOVIE',
+    url: urls[0],
+    logo: channel.logo
+  }, 0);
+}
+
+/** Wind the live picture back, without picking a programme out of a list. */
+function rewindLive(){
+  const channel = archiveChannel();
+  if(!channel) return;
+  const from = Date.now() - REWIND_MINUTES * 60000;
+  epgFor(channel).then(function(rows){
+    const slot = Core.nowOn(rows, from);
+    playCatchUp(channel, slot.current ? slot.current.title : '', from,
+      REWIND_MINUTES + ARCHIVE_RUN_ON);
+  });
+}
 
 /**
  * The rest of this channel's evening, under the picture.
@@ -1497,14 +1575,26 @@ function renderWatchSchedule(){
     if(!state.watchOpen || !state.current || state.current.id !== token) return;
     const at = Date.now();
     const slot = Core.nowOn(rows, at);
+    const archive = archiveChannel();
+    // What is behind is only worth listing where it can be played back.
+    const behind = archive ? Core.alreadyOn(rows, at, SCHEDULE_BEHIND) : [];
     const ahead = Core.upcoming(rows, at, SCHEDULE_AHEAD);
-    const all = (slot.current ? [slot.current] : []).concat(ahead);
+    const all = behind.concat(slot.current ? [slot.current] : []).concat(ahead);
     if(!all.length){ box.classList.add('hidden'); return; }
 
     list.innerHTML = '';
     all.forEach(function(entry){
-      const row = document.createElement('div');
-      row.className = 'watchScheduleRow' + (entry === slot.current ? ' onAir' : '');
+      const past = !!archive && entry.stop <= at;
+      // A row you can play is a button; one you cannot is a line of text.
+      const row = document.createElement(past ? 'button' : 'div');
+      row.className = 'watchScheduleRow' + (entry === slot.current ? ' onAir' : '') +
+        (past ? ' focusable canPlay' : '');
+      if(past){
+        row.dataset.nav = 'watchPast';
+        row.addEventListener('click', function(){
+          playCatchUp(archive, entry.title, entry.start, minutesOf(entry));
+        });
+      }
       row.innerHTML = '<div class="wsTime"></div><div class="wsName"></div>';
       text($('.wsTime', row), entry.start ? clockOfDay(entry.start) : '');
       text($('.wsName', row), entry.title);
@@ -1513,32 +1603,28 @@ function renderWatchSchedule(){
   });
 }
 
-/** The categories, as one line the arrows step through rather than a second
- *  thing to move focus into: four arrows have to reach thirteen thousand
- *  channels, and a focus axis that only holds chips is one axis too many. */
+/** The categories, reachable by going up from the top of the channel list —
+ *  the same way the guide screen reaches its own. */
 function renderWatchGroups(){
   const box = $('#watchGroups');
   if(!box) return;
   box.innerHTML = '';
-  groupList().slice(0, 40).forEach(g => {
-    const chip = document.createElement('div');
-    chip.className = 'groupChip' + (g === state.group ? ' active' : '');
+  groupList().slice(0, 40).forEach((g, idx) => {
+    const chip = document.createElement('button');
+    chip.className = 'focusable groupChip' + (g === state.group ? ' active' : '');
+    chip.dataset.nav = 'watchGroup';
+    chip.dataset.index = String(idx);
     chip.textContent = g;
+    chip.addEventListener('click', () => {
+      state.group = g;
+      state.watchIndex = 0;
+      state.watchStart = 0;
+      renderWatchGroups();
+      applyFilter();
+      focusWatchRow();
+    });
     box.appendChild(chip);
   });
-}
-
-function stepWatchGroup(delta){
-  const groups = groupList();
-  if(groups.length < 2) return;
-  const at = Math.max(0, groups.indexOf(state.group));
-  const next = groups[(at + delta + groups.length) % groups.length];
-  state.group = next;
-  state.watchIndex = 0;
-  state.watchStart = 0;
-  renderWatchGroups();
-  applyFilter();
-  focusWatchRow();
 }
 
 function renderWatchList(){
@@ -1604,14 +1690,42 @@ function moveWatch(delta){
   focusWatchRow();
 }
 
+/**
+ * Three things are on this screen and the remote has four arrows.
+ *
+ * The channel list is the middle of it; up from the top of it reaches the
+ * categories, and left reaches the schedule under the picture — which is on the
+ * left, so left is where it is. Right comes back.
+ */
 function navWatch(active, dir){
   wakePlayerUi();
-  if(dir === 'up'){ moveWatch(-1); return null; }
+  const type = active && active.dataset ? active.dataset.nav : null;
+  const past = visible('[data-nav="watchPast"]');
+  const chips = visible('[data-nav="watchGroup"]');
+
+  if(type === 'watchGroup'){
+    if(dir === 'left' || dir === 'right') return moveRtlRow(chips, active, dir) || active;
+    if(dir === 'down'){ focusWatchRow(); return null; }
+    return active;
+  }
+
+  if(type === 'watchPast'){
+    if(dir === 'up' || dir === 'down'){
+      const at = past.indexOf(active);
+      return past[at + (dir === 'down' ? 1 : -1)] || active;
+    }
+    if(dir === 'right'){ focusWatchRow(); return null; }
+    return active;
+  }
+
+  if(dir === 'up'){
+    if(state.watchIndex === 0) return chips[0] || active;
+    moveWatch(-1);
+    return null;
+  }
   if(dir === 'down'){ moveWatch(1); return null; }
-  // Right moves back through the categories, left moves forward: the chips read
-  // the way the rest of the app does.
-  if(dir === 'right'){ stepWatchGroup(-1); return null; }
-  if(dir === 'left'){ stepWatchGroup(1); return null; }
+  // The schedule is drawn under the picture, which is on the left.
+  if(dir === 'left') return past[past.length - 1] || active;
   return active;
 }
 
@@ -1736,6 +1850,8 @@ function renderControls(){
   show('fwd10', !live);
   // A film has no other channels to flick through.
   show('channels', live);
+  // And only a channel the portal keeps can be wound back.
+  show('rewind', live && !!archiveChannel());
   show('prevEp', !!episodeNeighbour(-1));
   show('nextEp', !!episodeNeighbour(1));
   setToggleIcon(state.paused);
@@ -1851,6 +1967,7 @@ function runControl(act){
   if(act === 'prevEp'){ playNeighbourEpisode(-1); return; }
   if(act === 'nextEp'){ playNeighbourEpisode(1); return; }
   if(act === 'channels'){ closeControls(); openWatchList(); return; }
+  if(act === 'rewind'){ closeControls(); rewindLive(); return; }
   if(act === 'audio'){ openTrackPanel('AUDIO'); return; }
   if(act === 'subs'){ openTrackPanel('TEXT'); return; }
 }

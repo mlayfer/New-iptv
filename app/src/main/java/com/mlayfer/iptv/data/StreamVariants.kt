@@ -13,7 +13,61 @@ object StreamVariants {
 
     private const val MAX_VARIANTS = 4
 
+    private val TIMESHIFT_PHP = Regex("^(.*?)/streaming/timeshift\\.php\\?(.*)$")
+    private val TIMESHIFT_PATH =
+        Regex("^(.*?)/timeshift/([^/]+)/([^/]+)/(\\d+)/([^/]+)/(\\d+)(\\.\\w+)?$")
+
+    /**
+     * The two shapes a panel serves its archive at.
+     *
+     * One is a script with a query, the other a path; a panel enables one of
+     * them and answers the other with an error page, so the one the address was
+     * built in is a guess until it plays.
+     */
+    fun timeshiftAlternatives(url: String): List<String> {
+        TIMESHIFT_PHP.find(url)?.let { m ->
+            val query = m.groupValues[2].split("&").mapNotNull { pair ->
+                val at = pair.indexOf('=')
+                if (at > 0) pair.substring(0, at) to pair.substring(at + 1) else null
+            }.toMap()
+
+            val id = query["stream"].orEmpty()
+            val start = query["start"].orEmpty()
+            val duration = query["duration"].orEmpty()
+            if (id.isEmpty() || start.isEmpty() || duration.isEmpty()) return emptyList()
+
+            val stamp = java.net.URLDecoder.decode(start, "UTF-8")
+            val stem = m.groupValues[1] + "/timeshift/" + query["username"].orEmpty() +
+                "/" + query["password"].orEmpty() + "/" + duration + "/" + stamp + "/" + id
+            return listOf("$stem.m3u8", "$stem.ts")
+        }
+
+        TIMESHIFT_PATH.find(url)?.let { m ->
+            val prefix = m.groupValues[1]
+            val user = m.groupValues[2]
+            val pass = m.groupValues[3]
+            val duration = m.groupValues[4]
+            val stamp = m.groupValues[5]
+            val id = m.groupValues[6]
+            val stem = "$prefix/timeshift/$user/$pass/$duration/$stamp/$id"
+            val other = if (m.groupValues[7] == ".ts") "$stem.m3u8" else "$stem.ts"
+            return listOf(
+                other,
+                "$prefix/streaming/timeshift.php?username=$user&password=$pass" +
+                    "&stream=$id&start=" + java.net.URLEncoder.encode(stamp, "UTF-8") +
+                    "&duration=$duration",
+            )
+        }
+        return emptyList()
+    }
+
     fun of(url: String): List<String> {
+        // An archive address is not a stream id with an extension on it, so the
+        // rewriting below would leave it alone; its alternatives are their own
+        // shape.
+        val shifted = timeshiftAlternatives(url)
+        if (shifted.isNotEmpty()) return (listOf(url) + shifted).take(MAX_VARIANTS)
+
         val out = LinkedHashSet<String>()
         out.add(url)
 

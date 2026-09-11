@@ -55,6 +55,12 @@ data class UiState(
     val guide: Map<String, List<Programme>> = emptyMap(),
     /** Channel tiles, or one channel per line with its schedule beside it. */
     val guideLayout: GuideLayout = GuideLayout.GRID,
+    /**
+     * Something being played that is in no list: a stretch of a channel's
+     * archive. It is made on the spot out of a channel and a time, so there is
+     * nowhere else for it to live.
+     */
+    val adHoc: Channel? = null,
     val favorites: Set<String> = emptySet(),
     val recent: List<RecentEntry> = emptyList(),
     /** Ticked off by hand; newest last, so the order says which was last. */
@@ -101,7 +107,8 @@ data class UiState(
 
     /** Episodes are playable too, so a selection can come from either list. */
     val selectedChannel: Channel?
-        get() = channels.firstOrNull { it.id == selectedId }
+        get() = adHoc?.takeIf { it.id == selectedId }
+            ?: channels.firstOrNull { it.id == selectedId }
             ?: episodes.firstOrNull { it.id == selectedId }
 
     /**
@@ -229,6 +236,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             episodes = emptyList(),
             epg = emptyMap(),
             guide = emptyMap(),
+            adHoc = null,
             group = null,
             error = null,
         )
@@ -419,7 +427,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun select(channel: Channel) {
         remember(channel, position = 0, duration = 0)
-        _state.value = _state.value.copy(selectedId = channel.id)
+        // Choosing anything from a list leaves the archive behind: what is on
+        // the screen is the thing that was chosen.
+        _state.value = _state.value.copy(selectedId = channel.id, adHoc = null)
+    }
+
+    /**
+     * Play a stretch of a channel's archive.
+     *
+     * A live channel the portal keeps can be wound back, and what comes out is
+     * not a channel: it is a finite, seekable recording with a beginning and an
+     * end. So it is made into one — VOD rather than LIVE, which is what gives it
+     * a scrubber and keeps the channel keys from carrying you out of it.
+     *
+     * @param minutes how much of the archive to ask for, from [startMillis].
+     */
+    fun playCatchUp(channel: Channel, title: String, startMillis: Long, minutes: Int) {
+        val source = _state.value.activePlaylist?.source as? PlaylistSource.Xtream ?: return
+        val streamId = channel.streamId ?: return
+        val url = XtreamClient
+            .catchupVariants(source, streamId, startMillis, minutes)
+            .firstOrNull() ?: return
+
+        val item = channel.copy(
+            id = "catchup:${channel.id}:$startMillis",
+            name = if (title.isBlank()) channel.name else "$title · ${channel.name}",
+            url = url,
+            kind = ChannelKind.VOD,
+        )
+        remember(item, position = 0, duration = 0)
+        _state.value = _state.value.copy(selectedId = item.id, adHoc = item)
     }
 
     /**

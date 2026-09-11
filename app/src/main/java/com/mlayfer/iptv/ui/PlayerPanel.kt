@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -137,6 +138,14 @@ fun PlayerPanel(
      * the natural place for it, and it is otherwise black.
      */
     schedule: List<Programme> = emptyList(),
+    /**
+     * Play a stretch of the channel's archive. Null where there is no archive —
+     * most channels have none, and an offer that does nothing is worse than no
+     * offer.
+     */
+    onCatchUp: ((Programme) -> Unit)? = null,
+    /** Wind the live picture back, without picking a programme out of a list. */
+    onRewindLive: (() -> Unit)? = null,
     /**
      * Opens the channel list beside the picture. Null where there is nothing to
      * browse — a film has no other channels. A phone has no D-pad to open it
@@ -574,14 +583,24 @@ fun PlayerPanel(
                                 tint = Ink.Bright,
                             )
                         }
-                        // Only a recording can be moved through; live has nowhere
-                        // to go.
+                        // A recording can be moved through. Live usually cannot
+                        // — but a channel the portal keeps can be wound back
+                        // into what it already broadcast, which is the same
+                        // button meaning the same thing.
                         if (duration > 0) {
                             IconButton(onClick = { player.seekBack() }) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_rewind),
                                     contentDescription = "אחורה",
                                     tint = Ink.Bright,
+                                )
+                            }
+                        } else if (onRewindLive != null) {
+                            IconButton(onClick = onRewindLive) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_rewind),
+                                    contentDescription = "אחורה בשידור",
+                                    tint = Ink.Accent,
                                 )
                             }
                         }
@@ -808,7 +827,21 @@ fun PlayerPanel(
                 )
                 for (entry in schedule) {
                     val onAir = entry === now
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // What has already finished can be played back, if the
+                    // portal kept it. What has not happened yet cannot.
+                    val past = onCatchUp != null && entry.stop <= System.currentTimeMillis()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = if (past) {
+                            Modifier
+                                .clip(RoundedCornerShape(tz(8)))
+                                .focusHighlight(RoundedCornerShape(tz(8)), border = false)
+                                .clickable { onCatchUp?.invoke(entry) }
+                                .padding(horizontal = tz(6), vertical = tz(2))
+                        } else {
+                            Modifier
+                        },
+                    ) {
                         Text(
                             text = formatTime(entry.start),
                             fontSize = tzSp(18),
@@ -822,10 +855,24 @@ fun PlayerPanel(
                             fontSize = tzSp(18),
                             lineHeight = tzSp(22),
                             fontWeight = if (onAir) FontWeight.Bold else FontWeight.Normal,
-                            color = if (onAir) Ink.Bright else Ink.Dim,
+                            color = when {
+                                onAir -> Ink.Bright
+                                past -> Ink.Accent
+                                else -> Ink.Dim
+                            },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
+                        if (past) {
+                            Spacer(Modifier.width(tz(10)))
+                            Text(
+                                text = "▸",
+                                fontSize = tzSp(16),
+                                color = Ink.Accent,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }

@@ -29,38 +29,112 @@
   "base64": {
     "_comment": "Xtream panels base64 some fields and not others, and nothing says which. Both apps must make the same guess: whole groups of four, at least eight characters, and a decode that reads as text.",
     "cases": [
-      { "input": "15fXk9ep15XXqiDXlNei16jXkQ==", "expected": "חדשות הערב" },
-      { "input": "TW92aWUgTmlnaHQ=", "expected": "Movie Night" },
-      { "input": "חדשות הערב", "expected": "חדשות הערב" },
-      { "input": "Newsroom", "expected": "Newsroom" },
-      { "input": "Documentary", "expected": "Documentary" },
-      { "input": "News", "expected": "News" },
-      { "input": "", "expected": "" }
+      {
+        "input": "15fXk9ep15XXqiDXlNei16jXkQ==",
+        "expected": "חדשות הערב"
+      },
+      {
+        "input": "TW92aWUgTmlnaHQ=",
+        "expected": "Movie Night"
+      },
+      {
+        "input": "חדשות הערב",
+        "expected": "חדשות הערב"
+      },
+      {
+        "input": "Newsroom",
+        "expected": "Newsroom"
+      },
+      {
+        "input": "Documentary",
+        "expected": "Documentary"
+      },
+      {
+        "input": "News",
+        "expected": "News"
+      },
+      {
+        "input": "",
+        "expected": ""
+      }
+    ]
+  },
+  "catchup": {
+    "_comment": "Winding a live channel back. The stamp is in the portal's own time, which is the set's, so the fixture pins a timezone rather than trusting whatever the machine running the test is set to.",
+    "timezone": "Asia/Jerusalem",
+    "source": {
+      "server": "http://ilvips.com:80",
+      "user": "u ser",
+      "pass": "p/ss"
+    },
+    "streamId": "1234",
+    "start": 1789125900000,
+    "minutes": 90,
+    "stamp": "2026-09-11:14-25",
+    "expected": [
+      "http://ilvips.com:80/streaming/timeshift.php?username=u%20ser&password=p%2Fss&stream=1234&start=2026-09-11%3A14-25&duration=90",
+      "http://ilvips.com:80/timeshift/u%20ser/p%2Fss/90/2026-09-11:14-25/1234.m3u8",
+      "http://ilvips.com:80/timeshift/u%20ser/p%2Fss/90/2026-09-11:14-25/1234.ts"
     ]
   },
   "guide": {
     "_comment": "Which programme is on, and what follows. Times are milliseconds so the fixture reads the same in both languages.",
     "now": 1757600000000,
     "programmes": [
-      { "title": "מהדורת הבוקר", "start": 1757589200000, "stop": 1757596400000 },
-      { "title": "חדשות הצהריים", "start": 1757596400000, "stop": 1757603600000 },
-      { "title": "שידור חוזר", "start": 1757599000000, "stop": 1757600100000 },
-      { "title": "מגזין ספורט", "start": 1757603600000, "stop": 1757607200000 },
-      { "title": "הסרט של הערב", "start": 1757607200000, "stop": 1757614400000 },
-      { "title": "סוף השידור", "start": 1757614400000, "stop": 1757618000000 }
+      {
+        "title": "מהדורת הבוקר",
+        "start": 1757589200000,
+        "stop": 1757596400000
+      },
+      {
+        "title": "חדשות הצהריים",
+        "start": 1757596400000,
+        "stop": 1757603600000
+      },
+      {
+        "title": "שידור חוזר",
+        "start": 1757599000000,
+        "stop": 1757600100000
+      },
+      {
+        "title": "מגזין ספורט",
+        "start": 1757603600000,
+        "stop": 1757607200000
+      },
+      {
+        "title": "הסרט של הערב",
+        "start": 1757607200000,
+        "stop": 1757614400000
+      },
+      {
+        "title": "סוף השידור",
+        "start": 1757614400000,
+        "stop": 1757618000000
+      }
     ],
     "expected": {
       "_comment": "Two entries cover the clock — a guide with a mistake in it. The one that started last is the one on air, whichever order they arrive in.",
       "current": "שידור חוזר",
       "next": "מגזין ספורט",
-      "upcoming": ["מגזין ספורט", "הסרט של הערב"]
+      "upcoming": [
+        "מגזין ספורט",
+        "הסרט של הערב"
+      ],
+      "alreadyOn": [
+        "מהדורת הבוקר"
+      ]
     },
     "empty": {
       "_comment": "A clock past everything the guide knows about.",
       "now": 1757700000000,
       "current": null,
       "next": null,
-      "upcoming": []
+      "upcoming": [],
+      "alreadyOn": [
+        "מגזין ספורט",
+        "הסרט של הערב",
+        "סוף השידור"
+      ]
     }
   },
   "servers": [
@@ -109,6 +183,23 @@
         "http://h/live/u/p/44",
         "http://h/live/u/p/44.m3u8",
         "http://h/u/p/44"
+      ]
+    },
+    {
+      "_comment": "An archive address: the panel serves one shape and answers the other with an error page, so both are worth trying.",
+      "url": "http://h/streaming/timeshift.php?username=u&password=p&stream=12&start=2026-09-11%3A14-25&duration=90",
+      "expected": [
+        "http://h/streaming/timeshift.php?username=u&password=p&stream=12&start=2026-09-11%3A14-25&duration=90",
+        "http://h/timeshift/u/p/90/2026-09-11:14-25/12.m3u8",
+        "http://h/timeshift/u/p/90/2026-09-11:14-25/12.ts"
+      ]
+    },
+    {
+      "url": "http://h/timeshift/u/p/90/2026-09-11:14-25/12.m3u8",
+      "expected": [
+        "http://h/timeshift/u/p/90/2026-09-11:14-25/12.m3u8",
+        "http://h/timeshift/u/p/90/2026-09-11:14-25/12.ts",
+        "http://h/streaming/timeshift.php?username=u&password=p&stream=12&start=2026-09-11%3A14-25&duration=90"
       ]
     }
   ],

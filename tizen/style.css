@@ -416,6 +416,15 @@ body.watching #liveOverlay{opacity:1}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .watchScheduleRow.onAir .wsTime{color:var(--accent)}
 .watchScheduleRow.onAir .wsName{color:var(--ink);font-weight:700}
+/* What has already been on can be played back where the portal kept it, so it
+   is a button and says so. */
+.watchScheduleRow.canPlay{width:100%;border:1px solid transparent;border-radius:10px;
+  padding:7px 10px;text-align:right;background:none}
+/* The mark belongs next to the name, not at the far end of the line: with the
+   name stretching, the arrow ended up half a screen away from the thing it
+   marks. */
+.watchScheduleRow.canPlay .wsName{color:var(--accent);flex:0 1 auto}
+.watchScheduleRow.canPlay::after{content:'▸';color:var(--accent);font-size:17px;flex:0 0 auto}
 
 .watchList{position:absolute;top:0;right:0;bottom:auto;left:auto;width:940px;height:1080px;z-index:3;
   background:rgba(10,10,11,.96);border-left:1px solid var(--line-soft);

@@ -3,6 +3,7 @@ package com.mlayfer.iptv
 import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.M3uParser
 import com.mlayfer.iptv.data.Playback
+import com.mlayfer.iptv.data.PlaylistSource
 import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.Search
 import com.mlayfer.iptv.data.StreamVariants
@@ -14,6 +15,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 import java.io.File
+import java.util.TimeZone
 
 /**
  * The Android app and the Tizen app are two implementations of one behaviour.
@@ -68,6 +70,43 @@ class ParityTest {
     }
 
     @Test
+    fun `winds a live channel back to the same addresses`() {
+        val spec = fixtures.getJSONObject("catchup")
+        val source = spec.getJSONObject("source")
+        val xtream = PlaylistSource.Xtream(
+            server = source.getString("server"),
+            username = source.getString("user"),
+            password = source.getString("pass"),
+            includeVod = true,
+        )
+        val start = spec.getLong("start")
+        val minutes = spec.getInt("minutes")
+
+        // The stamp is in local time because the portal's clock is the set's;
+        // the fixture names the zone so the test does not depend on whatever
+        // the machine running it happens to be set to.
+        val was = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone(spec.getString("timezone")))
+            assertEquals(spec.getString("stamp"), XtreamClient.timeshiftStamp(start))
+
+            val expected = spec.getJSONArray("expected")
+            assertEquals(
+                (0 until expected.length()).map { expected.getString(it) },
+                XtreamClient.catchupVariants(xtream, spec.getString("streamId"), start, minutes),
+            )
+        } finally {
+            TimeZone.setDefault(was)
+        }
+
+        // Nothing to build an address out of is an empty list, not a broken URL.
+        assertEquals(
+            emptyList<String>(),
+            XtreamClient.catchupVariants(xtream, "", start, minutes),
+        )
+    }
+
+    @Test
     fun `agrees on what is on now and what follows`() {
         val spec = fixtures.getJSONObject("guide")
         val now = spec.getLong("now")
@@ -91,6 +130,11 @@ class ParityTest {
             (0 until ahead.length()).map { ahead.getString(it) },
             XmltvParser.upcoming(programmes, now, 2).map { it.title },
         )
+        val behind = expected.getJSONArray("alreadyOn")
+        assertEquals(
+            (0 until behind.length()).map { behind.getString(it) },
+            XmltvParser.alreadyOn(programmes, now, 3).map { it.title },
+        )
 
         // Past the end of everything the guide knows about, it says so rather
         // than holding the last programme on air for ever.
@@ -98,6 +142,11 @@ class ParityTest {
         assertNull(XmltvParser.programmeAt(programmes, after))
         assertNull(XmltvParser.nextProgramme(programmes, after))
         assertEquals(emptyList<String>(), XmltvParser.upcoming(programmes, after, 2).map { it.title })
+        val afterBehind = spec.getJSONObject("empty").getJSONArray("alreadyOn")
+        assertEquals(
+            (0 until afterBehind.length()).map { afterBehind.getString(it) },
+            XmltvParser.alreadyOn(programmes, after, 3).map { it.title },
+        )
     }
 
     @Test

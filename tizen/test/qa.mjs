@@ -60,17 +60,29 @@ await page.route("**/player_api.php*", (route) => {
     stream_id: 1000 + i, name: i < israeli.length ? israeli[i] : `ערוץ ${i + 1} HD`,
     category_id: (i % liveCats.length) + 1,
     stream_icon: `http://ilvips.com:80/art/wide/${i}/${encodeURIComponent("ערוץ")}`,
+    // Some channels are kept and some are not, the way a real subscription is.
+    tv_archive: i % 3 === 0 ? 1 : 0,
+    tv_archive_duration: i % 3 === 0 ? 3 : 0,
   }))));
-  if (action === "get_short_epg") {
+  // The table carries what has already been on as well as what is next, which
+  // is what catching up needs; the short one starts at now.
+  if (action === "get_simple_data_table" || action === "get_short_epg") {
     // A real portal base64s its titles, and dates them in seconds.
     const now = Math.floor(Date.now() / 1000), half = 1800;
     const b64 = (t) => Buffer.from(t, "utf8").toString("base64");
-    return route.fulfill(json({ epg_listings: [
+    const listings = [
       { title: b64("מהדורת החדשות"), description: b64("מה קרה היום"),
         start_timestamp: now - half, stop_timestamp: now + half },
       { title: b64("סרט הערב"), description: b64("סרט"),
         start_timestamp: now + half, stop_timestamp: now + half * 4 },
-    ] }));
+    ];
+    if (action === "get_simple_data_table") {
+      listings.unshift(
+        { title: b64("בוקר טוב"), start_timestamp: now - half * 5, stop_timestamp: now - half * 3 },
+        { title: b64("תוכנית הצהריים"), start_timestamp: now - half * 3, stop_timestamp: now - half },
+      );
+    }
+    return route.fulfill(json({ epg_listings: listings }));
   }
   if (action === "get_vod_categories") return route.fulfill(json(vodCats.map((c, i) => ({ category_id: 50 + i, category_name: c }))));
   if (action === "get_vod_streams") return route.fulfill(json(Array.from({ length: N_VOD }, (_, i) => ({
@@ -247,6 +259,53 @@ await shot("3-while-watching");
 check("each channel says what is on it",
   (await page.textContent('[data-nav="watchItem"] .watchNow')).length > 0,
   await page.textContent('[data-nav="watchItem"] .watchNow'));
+
+// Catching up. This channel is one the portal keeps, so its schedule offers
+// what has already been on as something to play.
+check("the schedule under the picture lists what has already been on",
+  (await page.locator('[data-nav="watchPast"]').count()) > 0,
+  `${await page.locator('[data-nav="watchPast"]').count()} playable`);
+
+const archive = [];
+page.on("request", (r) => { if (/timeshift/.test(r.url())) archive.push(r.url()); });
+await page.locator('[data-nav="watchPast"]').first().click();
+await page.waitForTimeout(1200);
+check("choosing one winds the channel back to it",
+  archive.length > 0 && /timeshift/.test(archive[0]),
+  archive[0] || "no archive address was opened");
+check("what plays back is a recording, not a channel — so it can be scrubbed",
+  await shown("#scrubRow"));
+check("and the list is gone, because a programme was chosen and not a channel",
+  !(await shown("#watchList")));
+await shot("4-catch-up");
+
+// Out of the archive and back onto the channel itself.
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(700);
+await page.locator('[data-nav="item"]').first().click();
+await page.waitForTimeout(1200);
+
+// The other way back: the button on the control bar, with no list involved.
+await page.keyboard.press("Enter");
+await page.waitForTimeout(400);
+check("a channel the portal keeps offers to be wound back",
+  await page.evaluate(() => {
+    const b = document.querySelector('[data-act="rewind"]');
+    return !!b && !b.classList.contains("hidden");
+  }));
+const before = archive.length;
+await page.locator('[data-act="rewind"]').click();
+await page.waitForTimeout(1200);
+check("and the button winds it back", archive.length > before,
+  archive[archive.length - 1] || "no archive address was opened");
+
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(700);
+await page.locator('[data-nav="item"]').first().click();
+await page.waitForTimeout(1200);
+await page.keyboard.press("ArrowLeft");
+await page.waitForTimeout(700);
+check("and the list opens again over the live channel", await shown("#watchList"));
 
 await page.keyboard.press("ArrowDown");
 await page.keyboard.press("Enter");

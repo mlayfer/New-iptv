@@ -24,6 +24,12 @@ data class Channel(
      * app actually comes from.
      */
     val streamId: String? = null,
+    /**
+     * How many days of this channel the portal keeps. Zero means it keeps
+     * none — the channel is live and nothing else, and there is nothing to wind
+     * back to.
+     */
+    val archiveDays: Int = 0,
     /** Playback hints from the playlist. Unlike a browser, the app can honour these. */
     val userAgent: String? = null,
     val referrer: String? = null,
