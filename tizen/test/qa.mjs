@@ -193,9 +193,14 @@ await page.waitForTimeout(1000);
 check("choosing television opens the guide", await shown("#liveScreen"));
 check("the library's sections are not offered here",
   !(await shown("#navVod")) && !(await shown("#navSeries")));
+// Three rows of five: the tile carries what is on the channel as well as its
+// name, and four rows of the taller tile run off the bottom of the screen.
 check("the guide draws a window, not the catalogue",
-  (await page.locator('[data-nav="item"]').count()) === 20,
+  (await page.locator('[data-nav="item"]').count()) === 15,
   `${await page.locator('[data-nav="item"]').count()} tiles for ${N_LIVE} channels`);
+check("a tile says what is on the channel, not only its name",
+  (await page.textContent('[data-nav="item"] .tileNow')).length > 0,
+  await page.textContent('[data-nav="item"] .tileNow'));
 check("the guide says what is on now", await shown("#nowNext") &&
   (await page.textContent("#nnNow")).includes("מהדורת החדשות"),
   await page.textContent("#nnNow"));

@@ -477,6 +477,9 @@ fun ChannelTile(
     seen: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** What is on it now. A wall of channel names says what exists; this is
+     *  what turns it into a guide you can choose from without opening one. */
+    now: String? = null,
 ) {
     val shape = RoundedCornerShape(tz(16))
     Column(
@@ -525,9 +528,22 @@ fun ChannelTile(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = tz(10)).fillMaxWidth(),
         )
+        if (now != null) {
+            Text(
+                text = now,
+                fontSize = tzSp(18),
+                lineHeight = tzSp(22),
+                color = Ink.Accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         Text(
             text = meta,
             fontSize = tzSp(17),
+            lineHeight = tzSp(21),
             color = Ink.Faint,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

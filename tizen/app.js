@@ -1241,7 +1241,10 @@ const OVERLAY_MS = 4500;
  * five, and more of them down the screen.
  */
 const GRID_COLS = 5;
-const GRID_ROWS = 4;
+// Three rows, not four. The tile grew a line when it started saying what is on
+// the channel, and four rows of the taller tile run off the bottom of the
+// screen — a row cut in half is worse than a row fewer.
+const GRID_ROWS = 3;
 const LIST_ROWS = 6;
 
 function listMode(){ return state.guideLayout === 'list'; }
@@ -1304,10 +1307,20 @@ function channelTile(item, index){
   tile.className = 'focusable channelTile' + (state.current && state.current.id === item.id ? ' playing' : '');
   tile.dataset.nav = 'item';
   tile.dataset.index = String(index);
-  tile.innerHTML = '<div class="tileLogo"></div><div class="tileName"></div><div class="tileMeta"></div>';
+  tile.innerHTML = '<div class="tileLogo"></div><div class="tileName"></div>' +
+    '<div class="tileNow"></div><div class="tileMeta"></div>';
   $('.tileName', tile).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
   $('.tileMeta', tile).textContent = (index + 1) + ' · ' + item.group;
   fillArt($('.tileLogo', tile), item);
+
+  // A tile that says only what a channel is called is a list of names; what is
+  // on it is what makes a wall of them a guide. Only the tiles on screen are
+  // built, so only they are asked about.
+  epgFor(item).then(function(list){
+    if(!tile.isConnected) return;
+    const slot = Core.nowOn(list, Date.now());
+    if(slot.current) text($('.tileNow', tile), slot.current.title);
+  });
   tile.addEventListener('click', () => {
     state.liveIndex = index;
     activateItem(item);
@@ -1432,6 +1445,7 @@ function openWatchList(){
   document.body.classList.add('watching');
   $('#watchList').classList.remove('hidden');
   applyPictureRect();
+  renderWatchSchedule();
 
   const at = state.filtered.findIndex(x => state.current && x.id === state.current.id);
   state.watchIndex = at >= 0 ? at : 0;
@@ -1447,6 +1461,7 @@ function closeWatchList(){
   state.watchOpen = false;
   document.body.classList.remove('watching');
   $('#watchList').classList.add('hidden');
+  $('#watchSchedule').classList.add('hidden');
   applyPictureRect();
   // setFocus ignores a null, so the highlight has to be taken off by hand or it
   // stays lit on a row that is no longer on the screen.
@@ -1455,6 +1470,47 @@ function closeWatchList(){
     state.focusEl = null;
   }
   showOverlay();
+}
+
+/** How many programmes ahead the schedule under the picture has room for. */
+const SCHEDULE_AHEAD = 5;
+
+/**
+ * The rest of this channel's evening, under the picture.
+ *
+ * Drawn for whatever is playing, not for whatever is highlighted: the list
+ * beside it already answers the second question, and a panel that changed every
+ * time the highlight moved would be unreadable.
+ */
+function renderWatchSchedule(){
+  const box = $('#watchSchedule');
+  const list = $('#watchScheduleList');
+  if(!box || !list) return;
+  const item = state.current;
+  if(!state.watchOpen || !item){ box.classList.add('hidden'); return; }
+
+  const token = item.id;
+  list.innerHTML = '';
+  box.classList.remove('hidden');
+
+  epgFor(item).then(function(rows){
+    if(!state.watchOpen || !state.current || state.current.id !== token) return;
+    const at = Date.now();
+    const slot = Core.nowOn(rows, at);
+    const ahead = Core.upcoming(rows, at, SCHEDULE_AHEAD);
+    const all = (slot.current ? [slot.current] : []).concat(ahead);
+    if(!all.length){ box.classList.add('hidden'); return; }
+
+    list.innerHTML = '';
+    all.forEach(function(entry){
+      const row = document.createElement('div');
+      row.className = 'watchScheduleRow' + (entry === slot.current ? ' onAir' : '');
+      row.innerHTML = '<div class="wsTime"></div><div class="wsName"></div>';
+      text($('.wsTime', row), entry.start ? clockOfDay(entry.start) : '');
+      text($('.wsName', row), entry.title);
+      list.appendChild(row);
+    });
+  });
 }
 
 /** The categories, as one line the arrows step through rather than a second
@@ -1513,6 +1569,7 @@ function renderWatchList(){
       // with the list.
       activateItem(item);
       renderWatchList();
+      renderWatchSchedule();
       focusWatchRow();
     });
     box.appendChild(row);

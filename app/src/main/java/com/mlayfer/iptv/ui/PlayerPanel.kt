@@ -132,6 +132,12 @@ fun PlayerPanel(
      */
     compact: Boolean = false,
     /**
+     * The rest of this channel's evening, drawn under the picture while the
+     * list is open beside it. The space under a picture parked in a corner is
+     * the natural place for it, and it is otherwise black.
+     */
+    schedule: List<Programme> = emptyList(),
+    /**
      * Opens the channel list beside the picture. Null where there is nothing to
      * browse — a film has no other channels. A phone has no D-pad to open it
      * with, so this button is the only way in there, and it is the discoverable
@@ -783,6 +789,47 @@ fun PlayerPanel(
         }
 
         if (!fullscreen) controlRow()
+
+        // Parked beside the list: the picture, its controls, and then what is
+        // on this channel for the rest of the evening.
+        if (compact && schedule.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = tz(14), start = tz(4), end = tz(4)),
+                verticalArrangement = Arrangement.spacedBy(tz(8)),
+            ) {
+                Text(
+                    text = "לוח השידורים",
+                    fontSize = tzSp(20),
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = tzSp(24),
+                    color = Ink.Bright,
+                )
+                for (entry in schedule) {
+                    val onAir = entry === now
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = formatTime(entry.start),
+                            fontSize = tzSp(18),
+                            lineHeight = tzSp(22),
+                            color = if (onAir) Ink.Accent else Ink.Faint,
+                            maxLines = 1,
+                        )
+                        Spacer(Modifier.width(tz(14)))
+                        Text(
+                            text = entry.title,
+                            fontSize = tzSp(18),
+                            lineHeight = tzSp(22),
+                            fontWeight = if (onAir) FontWeight.Bold else FontWeight.Normal,
+                            color = if (onAir) Ink.Bright else Ink.Dim,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
 
         if (!fullscreen && !compact && now != null) {
             Column(

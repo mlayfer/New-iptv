@@ -364,6 +364,14 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                         .windowInsetsPadding(WindowInsets.navigationBars),
                 ) {
                     itemsIndexed(visible, key = { _, c -> c.id }) { index, channel ->
+                        // A tile that says only what a channel is called is a
+                        // list of names; what is on it is what makes it a guide.
+                        // Asked for from here, so only the tiles being looked at
+                        // cost a request.
+                        LaunchedEffect(channel.id) {
+                            delay(250)
+                            viewModel.loadGuide(channel)
+                        }
                         ChannelTile(
                             name = channel.name,
                             // A channel has no number of its own here; where it
@@ -375,6 +383,9 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                             logo = channel.logo,
                             playing = channel.id == state.selectedId,
                             seen = false,
+                            now = XmltvParser
+                                .programmeAt(state.programmes(channel), clock)
+                                ?.title,
                             onClick = {
                                 viewModel.select(channel)
                                 fullscreen = true
@@ -453,6 +464,9 @@ private fun GuideRow(
 
 /** How many programmes ahead a line of the guide carries. */
 private const val UPCOMING = 2
+
+/** And how many the schedule under a parked picture has room for. */
+private const val SCHEDULE_AHEAD = 5
 
 /**
  * The clock, as something the screen can watch.
@@ -537,10 +551,20 @@ private fun PlayerFor(
     val clock by rememberClock()
     val programmes = state.programmes(selected)
 
+    val onNow = XmltvParser.programmeAt(programmes, clock)
     PlayerPanel(
         channel = selected,
-        now = XmltvParser.programmeAt(programmes, clock),
+        now = onNow,
         next = XmltvParser.nextProgramme(programmes, clock),
+        // What is on now, and the rest of the evening after it — the same list
+        // the guide draws, so the two never disagree.
+        // Only where there is room for it: a phone's picture already reaches
+        // the top of the list, and the list says what is on each channel anyway.
+        schedule = if (compact && isWide) {
+            listOfNotNull(onNow) + XmltvParser.upcoming(programmes, clock, SCHEDULE_AHEAD)
+        } else {
+            emptyList()
+        },
         isFavorite = selected != null && state.favorites.contains(selected.id),
         fullscreen = fullscreen,
         compact = compact,

@@ -218,12 +218,13 @@ input::placeholder{color:var(--ink-faint)}
 .groupChip.active{background:var(--accent);color:#04142e;border-color:var(--accent);font-weight:700}
 
 .channelGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-content:start;overflow:hidden;min-height:0}
-.channelTile{height:172px;border:1px solid var(--line-soft);background:var(--surface);border-radius:16px;
-  padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.channelTile{height:196px;border:1px solid var(--line-soft);background:var(--surface);border-radius:16px;
+  padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
 .tileLogo{width:140px;height:64px;display:flex;align-items:center;justify-content:center;overflow:hidden;
   color:var(--accent);font-size:30px;font-weight:800}
 .tileLogo img{max-width:100%;max-height:100%;object-fit:contain}
 .tileName{font-size:22px;font-weight:700;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tileNow{font-size:18px;color:var(--accent);width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:22px}
 .tileMeta{font-size:17px;color:var(--ink-faint);width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .channelTile.playing{border-color:var(--accent)}
 .channelTile .tileNumber{position:absolute}
@@ -404,6 +405,17 @@ body.watching #liveOverlay .ovLogo{width:86px;height:52px}
 body.watching #liveOverlay .ovName{font-size:28px}
 body.watching #liveOverlay .ovMeta{font-size:19px}
 body.watching #liveOverlay{opacity:1}
+
+/* The rest of the evening, under the picture. It starts below the name block
+   and has the corner to itself. */
+.watchSchedule{position:absolute;top:640px;left:48px;right:auto;bottom:auto;width:860px;z-index:3}
+.watchScheduleTitle{font-size:24px;font-weight:800;margin-bottom:12px}
+.watchScheduleRow{display:flex;gap:16px;align-items:baseline;padding:7px 0}
+.wsTime{flex:0 0 auto;width:74px;font-size:19px;color:var(--ink-faint)}
+.wsName{flex:1;min-width:0;font-size:19px;color:var(--ink-dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.watchScheduleRow.onAir .wsTime{color:var(--accent)}
+.watchScheduleRow.onAir .wsName{color:var(--ink);font-weight:700}
 
 .watchList{position:absolute;top:0;right:0;bottom:auto;left:auto;width:940px;height:1080px;z-index:3;
   background:rgba(10,10,11,.96);border-left:1px solid var(--line-soft);
