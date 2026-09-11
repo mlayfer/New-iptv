@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -68,6 +70,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
@@ -459,14 +462,59 @@ fun PlayerPanel(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = channel?.name.orEmpty(),
-                    fontSize = tzSp(19),
-                    color = Ink.Dim,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                // Full screen, the channel's name is not the answer to "what am
+                // I watching" — the programme is. The strip under the picture is
+                // the only place that can say so, so it says both: the channel,
+                // and what is on it now, with what follows underneath.
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = channel?.name.orEmpty(),
+                        fontSize = tzSp(19),
+                        fontWeight = if (fullscreen && now != null) FontWeight.Bold else null,
+                        color = if (fullscreen && now != null) Ink.Bright else Ink.Dim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (fullscreen && now != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = now.title,
+                                fontSize = tzSp(21),
+                                fontWeight = FontWeight.Bold,
+                                color = Ink.Accent,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Spacer(Modifier.width(tz(12)))
+                            Text(
+                                text = "${formatTime(now.start)}–${formatTime(now.stop)}",
+                                fontSize = tzSp(17),
+                                color = Ink.Faint,
+                                maxLines = 1,
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { progressOf(now) },
+                            color = Ink.Accent,
+                            trackColor = Ink.Line,
+                            modifier = Modifier
+                                .padding(top = tz(6))
+                                .fillMaxWidth(if (isWide) 0.5f else 1f)
+                                .height(tz(5)),
+                        )
+                        if (next != null) {
+                            Text(
+                                text = "אחר כך · ${formatTime(next.start)} ${next.title}",
+                                fontSize = tzSp(17),
+                                color = Ink.Dim,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = tz(4)),
+                            )
+                        }
+                    }
+                }
                 extras()
             }
             // How far into a film this is — and a way to move it. A line that

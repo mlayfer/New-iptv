@@ -3,8 +3,10 @@ package com.mlayfer.iptv
 import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.M3uParser
 import com.mlayfer.iptv.data.Playback
+import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.Search
 import com.mlayfer.iptv.data.StreamVariants
+import com.mlayfer.iptv.data.XmltvParser
 import com.mlayfer.iptv.data.XtreamClient
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -49,6 +51,53 @@ class ParityTest {
             assertEquals(want.getString("url"), got.url)
             assertEquals(want.optString("userAgent").ifEmpty { null }, got.userAgent)
         }
+    }
+
+    @Test
+    fun `makes the same guess about which portal fields are base64`() {
+        val cases = fixtures.getJSONObject("base64").getJSONArray("cases")
+        for (i in 0 until cases.length()) {
+            val case = cases.getJSONObject(i)
+            val input = case.getString("input")
+            assertEquals(
+                "decoding ${'$'}{JSONObject.quote(input)}",
+                case.getString("expected"),
+                XtreamClient.decodeMaybeBase64(input),
+            )
+        }
+    }
+
+    @Test
+    fun `agrees on what is on now and what follows`() {
+        val spec = fixtures.getJSONObject("guide")
+        val now = spec.getLong("now")
+        val rows = spec.getJSONArray("programmes")
+        val programmes = (0 until rows.length()).map { i ->
+            val row = rows.getJSONObject(i)
+            Programme(row.getLong("start"), row.getLong("stop"), row.getString("title"))
+        }
+        val expected = spec.getJSONObject("expected")
+
+        assertEquals(
+            expected.getString("current"),
+            XmltvParser.programmeAt(programmes, now)?.title,
+        )
+        assertEquals(
+            expected.getString("next"),
+            XmltvParser.nextProgramme(programmes, now)?.title,
+        )
+        val ahead = expected.getJSONArray("upcoming")
+        assertEquals(
+            (0 until ahead.length()).map { ahead.getString(it) },
+            XmltvParser.upcoming(programmes, now, 2).map { it.title },
+        )
+
+        // Past the end of everything the guide knows about, it says so rather
+        // than holding the last programme on air for ever.
+        val after = spec.getJSONObject("empty").getLong("now")
+        assertNull(XmltvParser.programmeAt(programmes, after))
+        assertNull(XmltvParser.nextProgramme(programmes, after))
+        assertEquals(emptyList<String>(), XmltvParser.upcoming(programmes, after, 2).map { it.title })
     }
 
     @Test

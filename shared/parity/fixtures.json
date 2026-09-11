@@ -26,6 +26,43 @@
       }
     ]
   },
+  "base64": {
+    "_comment": "Xtream panels base64 some fields and not others, and nothing says which. Both apps must make the same guess: whole groups of four, at least eight characters, and a decode that reads as text.",
+    "cases": [
+      { "input": "15fXk9ep15XXqiDXlNei16jXkQ==", "expected": "חדשות הערב" },
+      { "input": "TW92aWUgTmlnaHQ=", "expected": "Movie Night" },
+      { "input": "חדשות הערב", "expected": "חדשות הערב" },
+      { "input": "Newsroom", "expected": "Newsroom" },
+      { "input": "Documentary", "expected": "Documentary" },
+      { "input": "News", "expected": "News" },
+      { "input": "", "expected": "" }
+    ]
+  },
+  "guide": {
+    "_comment": "Which programme is on, and what follows. Times are milliseconds so the fixture reads the same in both languages.",
+    "now": 1757600000000,
+    "programmes": [
+      { "title": "מהדורת הבוקר", "start": 1757589200000, "stop": 1757596400000 },
+      { "title": "חדשות הצהריים", "start": 1757596400000, "stop": 1757603600000 },
+      { "title": "שידור חוזר", "start": 1757599000000, "stop": 1757600100000 },
+      { "title": "מגזין ספורט", "start": 1757603600000, "stop": 1757607200000 },
+      { "title": "הסרט של הערב", "start": 1757607200000, "stop": 1757614400000 },
+      { "title": "סוף השידור", "start": 1757614400000, "stop": 1757618000000 }
+    ],
+    "expected": {
+      "_comment": "Two entries cover the clock — a guide with a mistake in it. The one that started last is the one on air, whichever order they arrive in.",
+      "current": "שידור חוזר",
+      "next": "מגזין ספורט",
+      "upcoming": ["מגזין ספורט", "הסרט של הערב"]
+    },
+    "empty": {
+      "_comment": "A clock past everything the guide knows about.",
+      "now": 1757700000000,
+      "current": null,
+      "next": null,
+      "upcoming": []
+    }
+  },
   "servers": [
     {
       "input": "portal.example.com:8080/",

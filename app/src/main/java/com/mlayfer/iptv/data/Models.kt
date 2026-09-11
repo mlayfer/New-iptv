@@ -17,6 +17,13 @@ data class Channel(
     val alias: String? = null,
     /** XMLTV id, used to join the channel with its guide entries. */
     val tvgId: String? = null,
+    /**
+     * The portal's own id for the stream. An XMLTV file is optional and most
+     * subscriptions come without one, but an Xtream panel will answer
+     * `get_short_epg` for any live stream — which is where the guide in this
+     * app actually comes from.
+     */
+    val streamId: String? = null,
     /** Playback hints from the playlist. Unlike a browser, the app can honour these. */
     val userAgent: String? = null,
     val referrer: String? = null,

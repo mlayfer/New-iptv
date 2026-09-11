@@ -228,6 +228,26 @@ input::placeholder{color:var(--ink-faint)}
 .channelTile.playing{border-color:var(--accent)}
 .channelTile .tileNumber{position:absolute}
 
+/* The other way to read the same channels: one per line, with its schedule
+   beside it. A guide is what a television has instead of a wall of logos. */
+.channelList{display:flex;flex-direction:column;gap:10px;align-content:start;overflow:hidden;min-height:0}
+.channelRow{flex:0 0 auto;height:104px;border:1px solid var(--line-soft);background:var(--surface);
+  border-radius:14px;padding:0 18px;display:flex;align-items:center;gap:18px;text-align:right}
+.channelRow.playing{border-color:var(--accent)}
+.rowLogo{width:120px;height:68px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;color:var(--accent);font-size:26px;font-weight:800}
+.rowLogo img{max-width:100%;max-height:100%;object-fit:contain}
+.rowIdentity{width:340px;flex:0 0 auto;min-width:0}
+.rowName{font-size:23px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowMeta{font-size:17px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowGuide{flex:1;min-width:0}
+.rowNowLine{display:flex;align-items:baseline;gap:12px;min-width:0}
+.rowNow{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowRange{font-size:17px;color:var(--ink-faint);white-space:nowrap;flex:0 0 auto}
+.rowBar{height:5px;border-radius:4px;background:rgba(255,255,255,.16);margin-top:8px;overflow:hidden}
+.rowFill{height:100%;width:0;background:var(--accent)}
+.rowNext{font-size:17px;color:var(--ink-dim);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
 /* Playback takes the whole screen; the bar tells you what you are on and fades. */
 /*
  * Everything below is written for the browser a television actually has. The

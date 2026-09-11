@@ -563,6 +563,68 @@
     return h ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
   }
 
+  /**
+   * A portal field that may or may not be base64.
+   *
+   * Xtream panels base64 some of their text and not the rest, and nothing says
+   * which is which — so the only test is whether it decodes to something a
+   * person could read. Plenty of ordinary words are valid base64, so the
+   * guards matter: real base64 comes in whole groups of four, and a decode that
+   * lands on control characters or on the replacement character decoded
+   * something that was never base64 to begin with.
+   */
+  function decodeMaybeBase64(value) {
+    const text = String(value == null ? '' : value);
+    const clean = text.replace(/\s/g, '');
+    if (clean.length < 8 || clean.length % 4 !== 0) return text;
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(clean)) return text;
+    try {
+      const bytes = atob(clean);
+      const out = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) out[i] = bytes.charCodeAt(i);
+      const decoded = typeof TextDecoder === 'function'
+        ? new TextDecoder('utf-8').decode(out)
+        : decodeURIComponent(bytes.split('').map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+      if (!decoded.trim()) return text;
+      if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffd]/.test(decoded)) return text;
+      return decoded;
+    } catch (e) {
+      return text;
+    }
+  }
+
+  // ---- the guide ------------------------------------------------------------
+  //
+  // Which of a channel's programmes is the one you are watching, and which come
+  // after it. Both apps ask this of the same list and must answer the same way,
+  // so the answer lives here rather than twice.
+
+  /** The entry covering `at`, plus the one after it. */
+  function nowOn(list, at) {
+    const when = at || Date.now();
+    let current = null, next = null;
+    (list || []).forEach(function (row) {
+      if (row.start <= when && (!row.stop || row.stop > when)) {
+        // A guide with overlapping entries is a guide with a mistake in it;
+        // the one that started last is the one on air.
+        if (!current || row.start > current.start) current = row;
+      } else if (row.start > when && (!next || row.start < next.start)) {
+        next = row;
+      }
+    });
+    return { current: current, next: next };
+  }
+
+  /** The next few things on, in the order they will be on. */
+  function upcoming(list, at, limit) {
+    const when = at || Date.now();
+    const ahead = (list || []).filter(function (row) { return row.start > when; });
+    ahead.sort(function (a, b) { return a.start - b.start; });
+    return limit == null ? ahead : ahead.slice(0, limit);
+  }
+
   /** The neighbour of what is playing, or null at either end of the season. */
   function stepInList(items, currentId, step) {
     const list = items || [];
@@ -810,6 +872,9 @@
     seekTarget: seekTarget,
     formatClock: formatClock,
     stepInList: stepInList,
+    decodeMaybeBase64: decodeMaybeBase64,
+    nowOn: nowOn,
+    upcoming: upcoming,
     SEEK_STEP: SEEK_STEP,
     SEEK_STEP_LONG: SEEK_STEP_LONG,
     mergeHistory: mergeHistory

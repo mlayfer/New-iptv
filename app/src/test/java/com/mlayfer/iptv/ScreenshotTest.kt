@@ -14,6 +14,7 @@ import com.mlayfer.iptv.ui.AppViewModel
 import com.mlayfer.iptv.ui.Catalog
 import com.mlayfer.iptv.ui.ChannelsScreen
 import com.mlayfer.iptv.ui.ChooseScreen
+import com.mlayfer.iptv.ui.GuideLayout
 import com.mlayfer.iptv.ui.HomeScreen
 import com.mlayfer.iptv.ui.LocalIsTv
 import com.mlayfer.iptv.ui.Screen
@@ -219,6 +220,48 @@ class ScreenshotTest {
             openSeries = Series(id = "s1", name = "ניתוק (2022)", group = "דרמה"),
             episodes = episodes,
         )
+    }
+
+    /**
+     * The guide, which is the other half of live television: a wall of logos
+     * says what exists, and this says what is on.
+     */
+    private fun guideState(): UiState {
+        val now = System.currentTimeMillis()
+        val titles = listOf(
+            listOf("מהדורת החדשות", "אולפן שישי", "הסרט של הערב"),
+            listOf("ארץ נהדרת", "חדשות הערב", "סדרת דרמה"),
+            listOf("משחק הליגה", "מגזין ספורט", "סיכום המחזור"),
+            listOf("בוקר טוב ישראל", "תוכנית אירוח", "מהדורה מרכזית"),
+        )
+        val guide = titles.mapIndexed { index, names ->
+            "l${index + 1}" to names.mapIndexed { slot, title ->
+                com.mlayfer.iptv.data.Programme(
+                    start = now - 1_500_000L + slot * 3_600_000L,
+                    stop = now - 1_500_000L + (slot + 1) * 3_600_000L,
+                    title = title,
+                )
+            }
+        }.toMap()
+
+        return catalogue().copy(
+            screen = Screen.CHANNELS,
+            catalog = Catalog.LIVE,
+            guideLayout = GuideLayout.LIST,
+            guide = guide,
+            selectedId = "l1",
+        )
+    }
+
+    @Test
+    fun `the guide as a list`() {
+        shoot("11-guide") { ChannelsScreen(guideState(), viewModel) }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun `the guide as a list on a phone`() {
+        onAPhone("12-phone-guide") { ChannelsScreen(guideState(), viewModel) }
     }
 
     @Test

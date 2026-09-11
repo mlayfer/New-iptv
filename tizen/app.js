@@ -25,6 +25,8 @@ const state = {
   // Windowed rendering: which item has focus, and where each window starts.
   liveIndex: 0,
   liveStart: 0,
+  // Tiles, or one channel per line with its schedule beside it.
+  guideLayout: 'grid',
   vodRow: 0,
   vodCol: 0,
   vodRowStart: 0,
@@ -126,11 +128,13 @@ function hideSplash(){
 const HISTORY_KEY = 'talohimHistoryV1';
 const FAVORITES_KEY = 'talohimFavoritesV1';
 const WATCHED_KEY = 'talohimWatchedV1';
+const LAYOUT_KEY = 'talohimGuideLayoutV1';
 
 function loadPrefs(){
   try { state.history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') || []; } catch(e) { state.history = []; }
   try { state.favorites = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') || []; } catch(e) { state.favorites = []; }
   try { state.marks = JSON.parse(localStorage.getItem(WATCHED_KEY) || '[]') || []; } catch(e) { state.marks = []; }
+  try { state.guideLayout = localStorage.getItem(LAYOUT_KEY) === 'list' ? 'list' : 'grid'; } catch(e) { state.guideLayout = 'grid'; }
   refreshSeen();
 }
 function savePrefs(){
@@ -710,7 +714,7 @@ function showChooser(){
     .forEach(sel => $(sel).classList.add('hidden'));
   $('#chooseScreen').classList.remove('hidden');
   $('#goHome').classList.add('hidden');
-  ['#navLive', '#navVod', '#navSeries', '#navSearch'].forEach(sel => $(sel).classList.add('hidden'));
+  ['#navLive', '#navLayout', '#navVod', '#navSeries', '#navSearch'].forEach(sel => $(sel).classList.add('hidden'));
 
   const live = state.items.filter(x => x.kind === 'LIVE').length;
   const series = state.items.filter(x => x.contentType === 'SERIES').length;
@@ -730,12 +734,15 @@ function enterWorld(world){
   $('#navSearch').classList.remove('hidden');
   if(world === 'LIVE'){
     $('#navLive').classList.remove('hidden');
+    $('#navLayout').classList.remove('hidden');
+    renderLayoutPill();
     $('#navVod').classList.add('hidden');
     $('#navSeries').classList.add('hidden');
     showMode('LIVE');
     return;
   }
   $('#navLive').classList.add('hidden');
+  $('#navLayout').classList.add('hidden');
   $('#navVod').classList.remove('hidden');
   $('#navSeries').classList.remove('hidden');
   showHome();
@@ -749,6 +756,7 @@ function showHome(){
   $('#searchScreen').classList.add('hidden');
   $('#detailScreen').classList.add('hidden');
   $('#homeScreen').classList.remove('hidden');
+  $('#navLayout').classList.add('hidden');
   renderNotes();
   buildHome();
   state.home.row = 0; state.home.col = 0; state.home.rowStart = 0;
@@ -791,23 +799,8 @@ const formatClock = Core.formatClock;
 
 const detail = { item: null, info: null, seasons: [], season: null, episodes: [], focus: 'action', index: 0, returnTo: 'home' };
 
-function decodeMaybeBase64(value){
-  const text = String(value == null ? '' : value);
-  if(!/^[A-Za-z0-9+/=\s]+$/.test(text) || text.length < 8) return text;
-  try {
-    const bytes = atob(text.replace(/\s/g, ''));
-    // A portal that base64s its titles encodes UTF-8 inside; anything else is
-    // already the text it means. TextDecoder does this in one pass — the older
-    // way built an escape sequence per byte, and this runs for every programme
-    // title in the guide.
-    const out = new Uint8Array(bytes.length);
-    for(let i = 0; i < bytes.length; i++) out[i] = bytes.charCodeAt(i);
-    if(typeof TextDecoder === 'function') return new TextDecoder('utf-8').decode(out);
-    return decodeURIComponent(bytes.split('').map(function(c){
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-  } catch(e) { return text; }
-}
+/** Shared with the Android app: a portal field that may or may not be base64. */
+const decodeMaybeBase64 = Core.decodeMaybeBase64;
 
 function detailApi(action, key, id){
   const src = state.source || {};
@@ -1136,6 +1129,7 @@ function showSearch(){
   $('#vodScreen').classList.add('hidden');
   $('#searchScreen').classList.remove('hidden');
   $('#goHome').classList.remove('hidden');
+  $('#navLayout').classList.add('hidden');
   state.search.row = 0; state.search.col = 0; state.search.rowStart = 0;
   renderSearch();
   setTimeout(() => setFocus($('#globalSearch')), 60);
@@ -1185,16 +1179,8 @@ function epgFor(item){
   }).catch(function(){ epgCache[key] = []; return []; });
 }
 
-/** The entry covering `at`, plus the one after it. */
-function nowOn(list, at){
-  const when = at || Date.now();
-  let current = null, next = null;
-  (list || []).forEach(function(row){
-    if(row.start <= when && (!row.stop || row.stop > when)) current = row;
-    else if(row.start > when && (!next || row.start < next.start)) next = row;
-  });
-  return { current: current, next: next };
-}
+/** The entry covering `at`, plus the one after it — shared with the Android app. */
+const nowOn = Core.nowOn;
 
 function epgLine(row){
   if(!row) return '';
@@ -1206,6 +1192,9 @@ function epgLine(row){
 function renderNowNext(){
   const strip = $('#nowNext');
   if(!strip) return;
+  // In list form every channel already carries its own schedule; a strip
+  // repeating one of them is a line of screen saying nothing new.
+  if(listMode()){ strip.classList.add('hidden'); return; }
   const item = state.filtered[state.liveIndex];
   if(!item || !item.streamId){ strip.classList.add('hidden'); return; }
 
@@ -1238,13 +1227,49 @@ function renderNowNext(){
 
 // ---- Live TV: a guide of channel tiles, then full-screen playback ----------
 
-const LIVE_COLS = 5;
-const LIVE_ROW_WINDOW = 4;
 const OVERLAY_MS = 4500;
+
+/**
+ * A wall of logos is the fastest way to find a channel you already know, and it
+ * cannot answer the other question — what is on. The list gives each channel a
+ * line long enough to carry its schedule, which means one across instead of
+ * five, and more of them down the screen.
+ */
+const GRID_COLS = 5;
+const GRID_ROWS = 4;
+const LIST_ROWS = 6;
+
+function listMode(){ return state.guideLayout === 'list'; }
+function liveCols(){ return listMode() ? 1 : GRID_COLS; }
+function liveRowWindow(){ return listMode() ? LIST_ROWS : GRID_ROWS; }
+
+/** How many programmes ahead a line of the guide carries. */
+const UPCOMING = 2;
+
+function setGuideLayout(layout){
+  state.guideLayout = layout === 'list' ? 'list' : 'grid';
+  try { localStorage.setItem(LAYOUT_KEY, state.guideLayout); } catch(e) {}
+  renderLayoutPill();
+  const box = $('#items');
+  if(box) box.className = listMode() ? 'channelList' : 'channelGrid';
+  // The window is measured in rows, and a row just changed size.
+  state.liveStart = 0;
+  renderItems();
+  if(state.filtered.length) focusChannel();
+}
+
+function renderLayoutPill(){
+  const pill = $('#navLayout');
+  if(!pill) return;
+  // The button says what it would give you, not where you are.
+  pill.textContent = listMode() ? 'אריחים' : 'לוח שידורים';
+  pill.classList.toggle('active', listMode());
+}
 
 function renderItems(){
   const box = $('#items');
   if(!box) return;
+  box.className = listMode() ? 'channelList' : 'channelGrid';
   box.innerHTML = '';
 
   const count = $('#liveCount');
@@ -1260,23 +1285,81 @@ function renderItems(){
     return;
   }
 
-  const size = LIVE_COLS * LIVE_ROW_WINDOW;
-  const start = Math.floor(state.liveStart / LIVE_COLS) * LIVE_COLS;
+  const cols = liveCols();
+  const size = cols * liveRowWindow();
+  const start = Math.floor(state.liveStart / cols) * cols;
   state.filtered.slice(start, start + size).forEach((item, offset) => {
     const index = start + offset;
-    const tile = document.createElement('button');
-    tile.className = 'focusable channelTile' + (state.current && state.current.id === item.id ? ' playing' : '');
-    tile.dataset.nav = 'item';
-    tile.dataset.index = String(index);
-    tile.innerHTML = '<div class="tileLogo"></div><div class="tileName"></div><div class="tileMeta"></div>';
-    $('.tileName', tile).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
-    $('.tileMeta', tile).textContent = (index + 1) + ' · ' + item.group;
-    fillArt($('.tileLogo', tile), item);
-    tile.addEventListener('click', () => {
-      state.liveIndex = index;
-      activateItem(item);
-    });
-    box.appendChild(tile);
+    box.appendChild(listMode() ? channelRow(item, index) : channelTile(item, index));
+  });
+}
+
+function channelTile(item, index){
+  const tile = document.createElement('button');
+  tile.className = 'focusable channelTile' + (state.current && state.current.id === item.id ? ' playing' : '');
+  tile.dataset.nav = 'item';
+  tile.dataset.index = String(index);
+  tile.innerHTML = '<div class="tileLogo"></div><div class="tileName"></div><div class="tileMeta"></div>';
+  $('.tileName', tile).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
+  $('.tileMeta', tile).textContent = (index + 1) + ' · ' + item.group;
+  fillArt($('.tileLogo', tile), item);
+  tile.addEventListener('click', () => {
+    state.liveIndex = index;
+    activateItem(item);
+  });
+  return tile;
+}
+
+/** A channel on one line: what it is, what is on it, and what follows. */
+function channelRow(item, index){
+  const row = document.createElement('button');
+  row.className = 'focusable channelRow' + (state.current && state.current.id === item.id ? ' playing' : '');
+  row.dataset.nav = 'item';
+  row.dataset.index = String(index);
+  row.innerHTML =
+    '<div class="rowLogo"></div>' +
+    '<div class="rowIdentity"><div class="rowName"></div><div class="rowMeta"></div></div>' +
+    '<div class="rowGuide">' +
+      '<div class="rowNowLine"><div class="rowNow"></div><div class="rowRange"></div></div>' +
+      '<div class="rowBar"><div class="rowFill"></div></div>' +
+      '<div class="rowNext"></div>' +
+    '</div>';
+  $('.rowName', row).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
+  $('.rowMeta', row).textContent = (index + 1) + ' · ' + item.group;
+  $('.rowNow', row).textContent = 'טוען לוח שידורים…';
+  fillArt($('.rowLogo', row), item);
+  row.addEventListener('click', () => {
+    state.liveIndex = index;
+    activateItem(item);
+  });
+
+  fillRowGuide(row, item);
+  return row;
+}
+
+function fillRowGuide(row, item){
+  epgFor(item).then(function(list){
+    // The list may have been rebuilt — by a search, a category or the other
+    // layout — while the portal was answering.
+    if(!row.isConnected) return;
+    if(!list || !list.length){
+      text($('.rowNow', row), 'אין לוח שידורים לערוץ הזה');
+      $('.rowBar', row).classList.add('hidden');
+      return;
+    }
+    const at = Date.now();
+    const slot = nowOn(list, at);
+    const current = slot.current;
+    text($('.rowNow', row), current ? current.title : 'אין לוח שידורים לערוץ הזה');
+    text($('.rowRange', row), current && current.start
+      ? clockOfDay(current.start) + '–' + clockOfDay(current.stop) : '');
+
+    const span = current && current.stop > current.start ? current.stop - current.start : 0;
+    const done = span ? Math.max(0, Math.min((at - current.start) / span, 1)) : 0;
+    $('.rowBar', row).classList.toggle('hidden', !span);
+    $('.rowFill', row).style.width = (done * 100).toFixed(1) + '%';
+
+    text($('.rowNext', row), Core.upcoming(list, at, UPCOMING).map(epgLine).join('   ·   '));
   });
 }
 
@@ -1285,12 +1368,13 @@ function focusChannel(){
   const index = Math.max(0, Math.min(state.liveIndex, state.filtered.length - 1));
   state.liveIndex = index;
 
-  const size = LIVE_COLS * LIVE_ROW_WINDOW;
-  const start = Math.floor(state.liveStart / LIVE_COLS) * LIVE_COLS;
+  const cols = liveCols();
+  const size = cols * liveRowWindow();
+  const start = Math.floor(state.liveStart / cols) * cols;
   if(index < start || index >= start + size){
     // Keep the focused row one row into the window, so there is always context.
-    const row = Math.floor(index / LIVE_COLS);
-    state.liveStart = Math.max(0, (row - 1) * LIVE_COLS);
+    const row = Math.floor(index / cols);
+    state.liveStart = Math.max(0, (row - 1) * cols);
     renderItems();
   }
 
@@ -1304,7 +1388,7 @@ function moveChannel(dRow, dCol){
   const last = state.filtered.length - 1;
   let index = state.liveIndex;
   if(dCol) index += dCol;
-  if(dRow) index += dRow * LIVE_COLS;
+  if(dRow) index += dRow * liveCols();
   state.liveIndex = Math.max(0, Math.min(index, last));
   focusChannel();
 }
@@ -1769,6 +1853,8 @@ function showMode(mode){
     $('#vodScreen').classList.add('hidden');
     $('#liveScreen').classList.remove('hidden');
     text($('#modeHeader'), 'טלוויזיה בלייב');
+    $('#navLayout').classList.remove('hidden');
+    renderLayoutPill();
     $('#search').value = '';
     renderGroups();
     applyFilter();
@@ -1781,6 +1867,7 @@ function showMode(mode){
 
   $('#liveScreen').classList.add('hidden');
   $('#vodScreen').classList.remove('hidden');
+  $('#navLayout').classList.add('hidden');
   const isSeries = mode === 'SERIES';
   text($('#vodHeroTitle'), isSeries ? 'סדרות' : 'סרטים');
   text($('#vodHeroMeta'), isSeries ? 'בחר סדרה כדי לראות את הפרקים' : 'בחר שורה ופריט');
@@ -1816,6 +1903,7 @@ function resetToSetup(){
   document.body.classList.remove('playerOpen');
   $('#playerScreen').classList.add('hidden');
   $('#navLive').classList.add('hidden');
+  $('#navLayout').classList.add('hidden');
   $('#navVod').classList.add('hidden');
   $('#navSeries').classList.add('hidden');
   $('#navSearch').classList.add('hidden');
@@ -2079,13 +2167,15 @@ function navLive(active, dir){
   const actions = visible('[data-nav="topAction"]');
 
   if(type === 'item'){
-    const col = state.liveIndex % LIVE_COLS;
-    if(dir === 'up' && state.liveIndex < LIVE_COLS) return groups[0] || $('#search');
+    const cols = liveCols();
+    const col = state.liveIndex % cols;
+    if(dir === 'up' && state.liveIndex < cols) return groups[0] || $('#search');
     if(dir === 'up'){ moveChannel(-1, 0); return null; }
     if(dir === 'down'){ moveChannel(1, 0); return null; }
-    // Right moves back along an RTL row, left moves forward.
+    // Right moves back along an RTL row, left moves forward. A list is one
+    // channel wide, so neither goes anywhere.
     if(dir === 'right'){ if(col > 0) moveChannel(0, -1); return null; }
-    if(dir === 'left'){ if(col < LIVE_COLS - 1) moveChannel(0, 1); return null; }
+    if(dir === 'left'){ if(col < cols - 1) moveChannel(0, 1); return null; }
     return active;
   }
   if(type === 'search'){
@@ -2361,7 +2451,7 @@ function wireStatic(){
 
   $('#search').dataset.nav = 'search';
   $('#vodSearch').dataset.nav = 'vodSearch';
-  ['#goHome', '#navLive', '#navVod', '#navSeries', '#navSearch', '#backToSetup']
+  ['#goHome', '#navLive', '#navLayout', '#navVod', '#navSeries', '#navSearch', '#backToSetup']
     .forEach(sel => { $(sel).dataset.nav = 'topAction'; });
   $('#worldLive').dataset.nav = 'world';
   $('#worldVod').dataset.nav = 'world';
@@ -2397,6 +2487,7 @@ function wireStatic(){
   $('#search').addEventListener('input', applyFilter);
   $('#vodSearch').addEventListener('input', applyFilter);
   $('#navLive').addEventListener('click', () => showMode('LIVE'));
+  $('#navLayout').addEventListener('click', () => setGuideLayout(listMode() ? 'grid' : 'list'));
   $('#navVod').addEventListener('click', () => showMode('MOVIES'));
   $('#navSeries').addEventListener('click', () => showMode('SERIES'));
   $('#navSearch').addEventListener('click', showSearch);

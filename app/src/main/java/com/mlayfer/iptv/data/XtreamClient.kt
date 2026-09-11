@@ -75,6 +75,7 @@ object XtreamClient {
                     group = liveCategories[item.opt("category_id")?.toString()],
                     logo = item.optString("stream_icon").ifBlank { null },
                     tvgId = item.optString("epg_channel_id").ifBlank { null },
+                    streamId = streamId,
                 )
             )
         }
@@ -277,6 +278,132 @@ object XtreamClient {
         }
 
         return episodes
+    }
+
+    /**
+     * The guide for one channel.
+     *
+     * An XMLTV dump is a file the subscription may or may not come with, and
+     * this one does not: the portal is the guide. `get_short_epg` answers with
+     * the next few programmes for a single stream, which is exactly the amount
+     * the screen shows — and it is cheap enough to ask for the channel under the
+     * cursor rather than for thirteen thousand of them up front.
+     */
+    fun shortEpg(source: PlaylistSource.Xtream, streamId: String, limit: Int = 6): List<Programme> {
+        val server = normalizeServer(source.server)
+        val url = api(server, source.username, source.password, "get_short_epg") +
+            "&stream_id=${encode(streamId)}&limit=$limit"
+        return parseShortEpg(Http.fetchText(url))
+    }
+
+    /** Split out from the request so a portal's shape can be tested without one. */
+    fun parseShortEpg(body: String): List<Programme> {
+        val root = try {
+            JSONObject(body)
+        } catch (e: Exception) {
+            return emptyList()
+        }
+        val listings = root.optJSONArray("epg_listings")
+            ?: root.optJSONArray("epg_listing")
+            ?: return emptyList()
+
+        val out = ArrayList<Programme>(listings.length())
+        for (i in 0 until listings.length()) {
+            val row = listings.optJSONObject(i) ?: continue
+            // Panels base64 the title and the description, and not always both.
+            val title = decodeMaybeBase64(row.optString("title")).trim()
+            if (title.isEmpty()) continue
+            val start = epgTime(row.opt("start_timestamp") ?: row.opt("start")) ?: continue
+            val stop = epgTime(row.opt("stop_timestamp") ?: row.opt("end"))
+                ?: (start + 3_600_000L)
+            val desc = decodeMaybeBase64(row.optString("description")).trim().ifEmpty { null }
+            out.add(Programme(start, stop, title, desc))
+        }
+        return out.sortedBy { it.start }
+    }
+
+    /**
+     * Panels date a programme two different ways: a unix second, or a string
+     * like `2026-09-11 17:30:00` carrying no zone at all. The string is read as
+     * a local time, which is what the set does with it and what the portal
+     * means by it.
+     */
+    private val PLAIN_TIME =
+        Regex("^(\\d{4})-(\\d{2})-(\\d{2})[ T](\\d{2}):(\\d{2})(?::(\\d{2}))?")
+
+    private fun epgTime(value: Any?): Long? {
+        val raw = value?.toString()?.trim().orEmpty()
+        if (raw.isEmpty()) return null
+        val asNumber = raw.toLongOrNull()
+        if (asNumber != null) return if (asNumber > 100_000L) asNumber * 1000L else null
+
+        val m = PLAIN_TIME.find(raw) ?: return null
+        val calendar = java.util.Calendar.getInstance()
+        calendar.clear()
+        calendar.set(
+            m.groupValues[1].toInt(),
+            m.groupValues[2].toInt() - 1,
+            m.groupValues[3].toInt(),
+            m.groupValues[4].toInt(),
+            m.groupValues[5].toInt(),
+            m.groupValues[6].ifEmpty { "0" }.toInt(),
+        )
+        return calendar.timeInMillis
+    }
+
+    /**
+     * Base64 if it decodes to something a person could read, otherwise the text
+     * as it came: a title is not tagged, so the only test is whether it works.
+     *
+     * Decoded by hand rather than through `android.util.Base64`, which is a stub
+     * that throws in a JVM test — and this is exactly the part worth testing,
+     * because a portal that base64s half its fields is how a guide ends up full
+     * of gibberish.
+     */
+    fun decodeMaybeBase64(value: String?): String {
+        val raw = value?.toString().orEmpty()
+        val clean = raw.filterNot { it.isWhitespace() }
+        // Plenty of ordinary words are valid base64, so the guards matter: real
+        // base64 comes in whole groups of four.
+        if (clean.length < 8 || clean.length % 4 != 0) return raw
+        if (!BASE64.matches(clean)) return raw
+
+        val bytes = decodeBase64(clean) ?: return raw
+        val text = String(bytes, Charsets.UTF_8)
+        if (text.isBlank()) return raw
+        // A decode that lands on control characters — or on the replacement
+        // character, which is what invalid UTF-8 becomes — decoded something
+        // that was never base64 to begin with.
+        if (text.any { it.code in 0..8 || it.code in 11..12 || it.code in 14..31 || it == '\uFFFD' }) {
+            return raw
+        }
+        return text
+    }
+
+    private val BASE64 = Regex("^[A-Za-z0-9+/]+={0,2}$")
+
+    private const val ALPHABET =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+    /** Null when the text is not base64 at all, rather than half a decode. */
+    private fun decodeBase64(value: String): ByteArray? {
+        val clean = value.trimEnd('=')
+        if (clean.length % 4 == 1) return null
+
+        val out = java.io.ByteArrayOutputStream(clean.length * 3 / 4)
+        var buffer = 0
+        var bits = 0
+        for (c in clean) {
+            val index = ALPHABET.indexOf(c)
+            if (index < 0) return null
+            buffer = (buffer shl 6) or index
+            bits += 6
+            if (bits >= 8) {
+                bits -= 8
+                out.write((buffer shr bits) and 0xFF)
+            }
+        }
+        return out.toByteArray()
     }
 
     fun normalizeServer(server: String): String {

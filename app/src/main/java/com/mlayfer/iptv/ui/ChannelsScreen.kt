@@ -16,17 +16,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+// Both lazy lists name their builders the same thing; the column's needs a name
+// of its own so the grid below can keep using the grid's.
+import androidx.compose.foundation.lazy.itemsIndexed as columnItemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,6 +45,10 @@ import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.Filtering
 import com.mlayfer.iptv.data.Playback
 import com.mlayfer.iptv.data.XmltvParser
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * The live guide.
@@ -50,6 +61,9 @@ import com.mlayfer.iptv.data.XmltvParser
  */
 @Composable
 fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
+    val list = state.guideLayout == GuideLayout.LIST
+    // A schedule is only true for as long as the minute it was drawn in.
+    val clock by rememberClock()
     var fullscreen by remember { mutableStateOf(false) }
     BackHandler(enabled = fullscreen) { fullscreen = false }
     // Back retraces the way in: out of the player, then out to the door.
@@ -187,6 +201,24 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                     onClick = { viewModel.setView(nextView(state.view)) },
                     selected = state.view != ListView.ALL,
                 )
+                // Two ways to read the same channels, and the button says which
+                // one it would give you rather than which one you are in.
+                NavPill(
+                    // A fifth pill does not fit across a phone, and the row
+                    // scrolls rather than shrinks — so the phone gets the short
+                    // word for the same thing.
+                    label = when {
+                        list -> "אריחים"
+                        isWide -> "לוח שידורים"
+                        else -> "לוח"
+                    },
+                    onClick = {
+                        viewModel.setGuideLayout(
+                            if (list) GuideLayout.GRID else GuideLayout.LIST
+                        )
+                    },
+                    selected = list,
+                )
                 NavPill("החלף מקור", { viewModel.setScreen(Screen.SOURCES) })
             }
 
@@ -213,7 +245,9 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
 
             GroupChips(state, viewModel)
 
-            NowNext(state)
+            // The strip above the grid says what is on the channel under the
+            // cursor; in list form every channel already carries its own.
+            if (!list) NowNext(state, viewModel, clock)
 
             when {
                 state.loading && visible.isEmpty() -> Box(
@@ -230,6 +264,28 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                         fontSize = tzSp(22),
                         color = Ink.Dim,
                     )
+                }
+
+                list -> LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(tz(10)),
+                    contentPadding = PaddingValues(top = tz(12), bottom = tz(28)),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.navigationBars),
+                ) {
+                    columnItemsIndexed(visible, key = { _, c -> c.id }) { index, channel ->
+                        GuideRow(
+                            channel = channel,
+                            number = index + 1,
+                            state = state,
+                            viewModel = viewModel,
+                            clock = clock,
+                            onOpen = {
+                                viewModel.select(channel)
+                                fullscreen = true
+                            },
+                        )
+                    }
                 }
 
                 // Five across is what the Tizen guide draws, and it is what
@@ -270,19 +326,89 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
 
 /** What is on the chosen channel now, and what follows it. */
 @Composable
-private fun NowNext(state: UiState) {
+private fun NowNext(state: UiState, viewModel: AppViewModel, clock: Long) {
     val selected = state.selectedChannel ?: return
-    val programmes = selected.tvgId?.let { state.epg[it] } ?: return
-    val clock = System.currentTimeMillis()
+    // The portal answers per channel, so the one under the cursor is the one
+    // worth asking about.
+    LaunchedEffect(selected.id) { viewModel.loadGuide(selected) }
+
+    val programmes = state.programmes(selected) ?: return
     val onNow = XmltvParser.programmeAt(programmes, clock) ?: return
+    val next = XmltvParser.nextProgramme(programmes, clock)
 
     NowNextStrip(
-        now = onNow.title,
-        next = XmltvParser.nextProgramme(programmes, clock)?.title,
+        now = "${hhmm(onNow.start)} · ${onNow.title}",
+        next = next?.let { "אחר כך · ${hhmm(it.start)} ${it.title}" },
         progress = progressOf(onNow.start, onNow.stop, clock),
         modifier = Modifier.padding(vertical = tz(12)),
     )
 }
+
+/**
+ * One line of the guide: the channel, and the next few things on it.
+ *
+ * The schedule is asked for from here rather than up front, because a lazy list
+ * only builds the rows it is showing — which makes "fetch what is on screen"
+ * fall out of the layout instead of needing to be tracked.
+ */
+@Composable
+private fun GuideRow(
+    channel: Channel,
+    number: Int,
+    state: UiState,
+    viewModel: AppViewModel,
+    clock: Long,
+    onOpen: () -> Unit,
+) {
+    LaunchedEffect(channel.id) {
+        // A list being scrolled fast composes rows it never shows; a moment's
+        // wait means the portal is only asked about the ones that settle.
+        delay(250)
+        viewModel.loadGuide(channel)
+    }
+
+    val programmes = state.programmes(channel)
+    val onNow = XmltvParser.programmeAt(programmes, clock)
+    val upcoming = XmltvParser.upcoming(programmes, clock, UPCOMING)
+        .map { "${hhmm(it.start)} · ${it.title}" }
+
+    ChannelLine(
+        name = channel.name,
+        meta = listOfNotNull(
+            number.toString(),
+            channel.group?.takeIf { it.isNotBlank() },
+        ).joinToString(" · "),
+        logo = channel.logo,
+        playing = channel.id == state.selectedId,
+        now = onNow?.title,
+        nowRange = onNow?.let { "${hhmm(it.start)}–${hhmm(it.stop)}" },
+        progress = onNow?.let { progressOf(it.start, it.stop, clock) } ?: 0f,
+        upcoming = upcoming,
+        onClick = onOpen,
+    )
+}
+
+/** How many programmes ahead a line of the guide carries. */
+private const val UPCOMING = 2
+
+/**
+ * The clock, as something the screen can watch.
+ *
+ * A schedule drawn once is wrong a minute later: the bar stops moving and a
+ * programme that has ended stays on. Half a minute is finer than anyone reads a
+ * guide and coarse enough to cost nothing.
+ */
+@Composable
+internal fun rememberClock(): State<Long> = produceState(System.currentTimeMillis()) {
+    while (true) {
+        delay(30_000)
+        value = System.currentTimeMillis()
+    }
+}
+
+/** A time of day, the way a guide writes one. */
+internal fun hhmm(millis: Long): String =
+    SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(millis))
 
 /**
  * All, then favourites, then what was on lately — one button rather than three.
@@ -295,7 +421,7 @@ private fun nextView(view: ListView): ListView = when (view) {
 }
 
 /** How far into a programme the clock has got, between nothing and all of it. */
-private fun progressOf(start: Long, stop: Long, now: Long): Float {
+internal fun progressOf(start: Long, stop: Long, now: Long): Float {
     if (stop <= start) return 0f
     return ((now - start).toFloat() / (stop - start)).coerceIn(0f, 1f)
 }
@@ -339,13 +465,17 @@ private fun PlayerFor(
     modifier: Modifier,
 ) {
     val selected = state.selectedChannel
-    val programmes = selected?.tvgId?.let { state.epg[it] }
-    val now = System.currentTimeMillis()
+    // Watching a channel is the moment the programme name matters most, so the
+    // guide for it is fetched here too rather than only when browsing.
+    LaunchedEffect(selected?.id) { selected?.let(viewModel::loadGuide) }
+
+    val clock by rememberClock()
+    val programmes = state.programmes(selected)
 
     PlayerPanel(
         channel = selected,
-        now = XmltvParser.programmeAt(programmes, now),
-        next = XmltvParser.nextProgramme(programmes, now),
+        now = XmltvParser.programmeAt(programmes, clock),
+        next = XmltvParser.nextProgramme(programmes, clock),
         isFavorite = selected != null && state.favorites.contains(selected.id),
         fullscreen = fullscreen,
         onToggleFullscreen = onToggleFullscreen,

@@ -89,9 +89,20 @@ object XmltvParser {
         return out.trim()
     }
 
+    /**
+     * What is on at `at`. A guide with overlapping entries is a guide with a
+     * mistake in it; the one that started last is the one on air. The JS twin
+     * in core.js answers the same way, and the parity fixtures hold them to it.
+     */
     fun programmeAt(list: List<Programme>?, at: Long): Programme? =
-        list?.firstOrNull { at >= it.start && at < it.stop }
+        list?.filter { at >= it.start && at < it.stop }?.maxByOrNull { it.start }
 
     fun nextProgramme(list: List<Programme>?, at: Long): Programme? =
-        list?.firstOrNull { it.start > at }
+        list?.filter { it.start > at }?.minByOrNull { it.start }
+
+    /** The next few things on, in the order they will be on. */
+    fun upcoming(list: List<Programme>?, at: Long, limit: Int? = null): List<Programme> {
+        val ahead = list.orEmpty().filter { it.start > at }.sortedBy { it.start }
+        return if (limit == null) ahead else ahead.take(limit)
+    }
 }

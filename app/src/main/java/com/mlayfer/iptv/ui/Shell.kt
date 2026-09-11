@@ -297,9 +297,13 @@ fun HeroBand(
                 modifier = Modifier.matchParentSize(),
             )
         }
-        // The words sit on the right, so a wash of artwork on the left never
-        // gets underneath them. Both washes match the band rather than fill it,
-        // so neither has a say in how tall it is.
+        // The words sit on the right — where a Hebrew page starts, and, on a
+        // television, clear of the few per cent of the left edge that the panel
+        // crops. They were on the left, which is how a long title ended up
+        // half-off a 75-inch screen. The wash darkens that right-hand side: a
+        // gradient is drawn in pixels and knows nothing of direction, so its
+        // dark end stays where the words actually are. Both washes match the
+        // band rather than fill it, so neither has a say in how tall it is.
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -314,8 +318,8 @@ fun HeroBand(
         // a title floating in it.
         Box(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = tz(24))
+                .align(Alignment.CenterEnd)
+                .padding(end = tz(24))
                 .height(tz(150))
                 .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(tz(10)))
@@ -341,10 +345,10 @@ fun HeroBand(
         }
         Column(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
+                .align(Alignment.CenterStart)
                 .fillMaxWidth(0.62f)
                 .padding(horizontal = tz(30)),
-            horizontalAlignment = Alignment.End,
+            horizontalAlignment = Alignment.Start,
         ) {
             if (kicker != null) {
                 Text(text = kicker, fontSize = tzSp(20), color = Ink.Accent, maxLines = 1)
@@ -356,7 +360,7 @@ fun HeroBand(
                 color = Ink.Bright,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.End,
+                textAlign = TextAlign.Start,
             )
             if (meta != null) {
                 Text(
@@ -555,16 +559,10 @@ fun NowNextStrip(now: String, next: String?, progress: Float, modifier: Modifier
             .border(1.dp, Ink.LineSoft, shape)
             .padding(horizontal = tz(20), vertical = tz(14)),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = next ?: "",
-            fontSize = tzSp(19),
-            color = Ink.Faint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Column(horizontalAlignment = Alignment.End, modifier = Modifier.fillMaxWidth(0.55f)) {
+        // What is on now reads first — which in Hebrew means the right-hand
+        // side. It was drawn on the left, behind what comes after it.
+        Column(modifier = Modifier.weight(0.55f)) {
             Text(
                 text = now,
                 fontSize = tzSp(21),
@@ -590,6 +588,15 @@ fun NowNextStrip(now: String, next: String?, progress: Float, modifier: Modifier
                 )
             }
         }
+        Spacer(Modifier.width(tz(20)))
+        Text(
+            text = next ?: "",
+            fontSize = tzSp(19),
+            color = Ink.Faint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(0.45f),
+        )
     }
 }
 
@@ -604,4 +611,142 @@ fun Faint(text: String, modifier: Modifier = Modifier, size: Int = 19) {
         overflow = TextOverflow.Ellipsis,
         modifier = modifier,
     )
+}
+
+/**
+ * One channel on a line, with its schedule beside it.
+ *
+ * A wall of logos is the fastest way to find a channel you already know, and
+ * useless for the other question — what is actually on. A guide answers that by
+ * giving each channel a line long enough to carry it: what is playing, how far
+ * in, and the next couple of programmes after it.
+ */
+@Composable
+fun ChannelLine(
+    name: String,
+    meta: String,
+    logo: String?,
+    playing: Boolean,
+    now: String?,
+    nowRange: String?,
+    progress: Float,
+    upcoming: List<String>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(tz(14))
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Ink.Surface)
+            .border(1.dp, if (playing) Ink.Accent else Ink.LineSoft, shape)
+            .focusHighlight(shape, border = false)
+            .clickable(onClick = onClick)
+            .padding(horizontal = tz(18), vertical = tz(14)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.width(tz(120)).height(tz(68)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (logo != null) {
+                AsyncImage(
+                    model = logo,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    text = name.take(2),
+                    fontSize = tzSp(26),
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Ink.Accent,
+                )
+            }
+        }
+        Spacer(Modifier.width(tz(18)))
+
+        // On a television the name and the schedule stand in two columns, so the
+        // eye runs down one of them. A phone has no room for two, so the same
+        // pieces stack instead of being squeezed until neither can be read.
+        val identity: @Composable () -> Unit = {
+            Text(
+                text = name,
+                fontSize = tzSp(23),
+                fontWeight = FontWeight.Bold,
+                color = Ink.Bright,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = meta,
+                fontSize = tzSp(17),
+                color = Ink.Faint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        val schedule: @Composable () -> Unit = {
+            if (now == null) {
+                Faint("אין לוח שידורים לערוץ הזה", size = 18)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = now,
+                        fontSize = tzSp(20),
+                        fontWeight = FontWeight.Bold,
+                        color = Ink.Bright,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (nowRange != null) {
+                        Spacer(Modifier.width(tz(12)))
+                        Faint(nowRange, size = 17)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .padding(top = tz(8))
+                        .fillMaxWidth()
+                        .height(tz(5))
+                        .clip(CircleShape)
+                        .background(Ink.Line),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .fillMaxHeight()
+                            .clip(CircleShape)
+                            .background(Ink.Accent)
+                    )
+                }
+                for (line in upcoming) {
+                    Text(
+                        text = line,
+                        fontSize = tzSp(17),
+                        color = Ink.Dim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = tz(6)),
+                    )
+                }
+            }
+        }
+
+        if (isWide) {
+            Column(modifier = Modifier.width(tz(340))) { identity() }
+            Spacer(Modifier.width(tz(24)))
+            Column(modifier = Modifier.weight(1f)) { schedule() }
+        } else {
+            Column(modifier = Modifier.weight(1f)) {
+                identity()
+                Spacer(Modifier.height(tz(8)))
+                schedule()
+            }
+        }
+    }
 }

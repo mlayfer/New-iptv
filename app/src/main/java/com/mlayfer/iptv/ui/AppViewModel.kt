@@ -7,11 +7,13 @@ import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
 import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.Playlist
+import com.mlayfer.iptv.data.PlaylistSource
 import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.RecentEntry
 import com.mlayfer.iptv.data.Repository
 import com.mlayfer.iptv.data.Series
 import com.mlayfer.iptv.data.Store
+import com.mlayfer.iptv.data.XtreamClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class ListView { ALL, FAVORITES, RECENT }
+
+/**
+ * How the live channels are laid out. A wall of tiles is the fastest way to
+ * find a logo you know; a list is the only way to read what is actually on,
+ * because a schedule needs a line of its own.
+ */
+enum class GuideLayout { GRID, LIST }
 
 /** What the list is showing: everything, live TV, films, or series. */
 enum class Catalog { ALL, LIVE, MOVIES, SERIES }
@@ -38,6 +47,14 @@ data class UiState(
     /** What the portal refused or cut short — shown instead of silently omitted. */
     val notes: List<String> = emptyList(),
     val epg: Map<String, List<Programme>> = emptyMap(),
+    /**
+     * The guide as the portal tells it, a channel at a time, keyed by channel
+     * id. An XMLTV file is optional and this subscription has none; the panel
+     * answers for every stream, so the guide is fetched for what is on screen.
+     */
+    val guide: Map<String, List<Programme>> = emptyMap(),
+    /** Channel tiles, or one channel per line with its schedule beside it. */
+    val guideLayout: GuideLayout = GuideLayout.GRID,
     val favorites: Set<String> = emptySet(),
     val recent: List<RecentEntry> = emptyList(),
     /** Ticked off by hand; newest last, so the order says which was last. */
@@ -63,6 +80,17 @@ data class UiState(
     val addError: String? = null,
 ) {
     val activePlaylist: Playlist? get() = playlists.firstOrNull { it.id == activeId }
+
+    /**
+     * One answer to "what is on this channel", wherever it came from: the
+     * portal's own guide if it has answered for this channel, otherwise the
+     * XMLTV file if the source came with one.
+     */
+    fun programmes(channel: Channel?): List<Programme>? {
+        if (channel == null) return null
+        guide[channel.id]?.let { if (it.isNotEmpty()) return it }
+        return channel.tvgId?.let { epg[it] }?.takeIf { it.isNotEmpty() }
+    }
 
     val kind: ChannelKind?
         get() = when (catalog) {
@@ -180,6 +208,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             favorites = store.favorites,
             recent = store.recent,
             watched = store.watched,
+            guideLayout = runCatching { GuideLayout.valueOf(store.guideLayout) }
+                .getOrDefault(GuideLayout.GRID),
             screen = if (playlists.isEmpty()) Screen.SOURCES else Screen.CHOOSE,
         )
         active?.let { selectPlaylist(it) }
@@ -188,6 +218,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun selectPlaylist(id: String) {
         val playlist = _state.value.playlists.firstOrNull { it.id == id } ?: return
         store.activeId = id
+        guideAsked.clear()
         _state.value = _state.value.copy(
             activeId = id,
             selectedId = null,
@@ -197,6 +228,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             openSeries = null,
             episodes = emptyList(),
             epg = emptyMap(),
+            guide = emptyMap(),
             group = null,
             error = null,
         )
@@ -206,6 +238,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun refresh() {
         val playlist = _state.value.activePlaylist ?: return
         repository.forget(playlist.id)
+        guideAsked.clear()
         load(playlist, force = true)
     }
 
@@ -256,6 +289,52 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Channels whose guide has been asked for, answered or not.
+     *
+     * Held outside the state because it is bookkeeping, not something a screen
+     * draws — and because a list scrolling past asks for the same channel every
+     * time it comes back into view. A portal that has nothing for a channel
+     * stays asked: an empty answer is an answer.
+     */
+    private val guideAsked = HashSet<String>()
+
+    /**
+     * Fetch the schedule for one channel, if it has not been fetched already.
+     *
+     * Called by whatever is on screen rather than for the whole catalogue: a
+     * subscription here is thirteen thousand channels, and asking the portal
+     * thirteen thousand times to fill a screen that shows eight of them is not
+     * a guide, it is a denial of service.
+     */
+    fun loadGuide(channel: Channel) {
+        if (channel.kind != ChannelKind.LIVE) return
+        val streamId = channel.streamId ?: return
+        val source = _state.value.activePlaylist?.source as? PlaylistSource.Xtream ?: return
+        if (!guideAsked.add(channel.id)) return
+
+        viewModelScope.launch {
+            val programmes = withContext(Dispatchers.IO) {
+                try {
+                    XtreamClient.shortEpg(source, streamId)
+                } catch (e: Exception) {
+                    // A guide is a bonus; a portal that will not answer for one
+                    // channel must not stop the rest of the screen.
+                    emptyList()
+                }
+            }
+            if (programmes.isEmpty()) return@launch
+            _state.value = _state.value.copy(
+                guide = _state.value.guide + (channel.id to programmes)
+            )
+        }
+    }
+
+    fun setGuideLayout(layout: GuideLayout) {
+        store.guideLayout = layout.name
+        _state.value = _state.value.copy(guideLayout = layout)
+    }
+
     private fun loadEpg(url: String, force: Boolean) {
         viewModelScope.launch {
             try {
@@ -279,6 +358,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 val playlists = _state.value.playlists + playlist
+                guideAsked.clear()
                 store.playlists = playlists
                 store.activeId = playlist.id
                 _state.value = _state.value.copy(
@@ -290,6 +370,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     selectedId = null,
                     group = null,
                     epg = emptyMap(),
+                    guide = emptyMap(),
                     addBusy = false,
                     addStage = null,
                     addError = null,

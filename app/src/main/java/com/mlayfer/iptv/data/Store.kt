@@ -48,6 +48,12 @@ class Store(context: Context) {
             prefs.edit().putString(KEY_WATCHED, array.toString()).apply()
         }
 
+    /** Tiles or lines, on the live guide. Named rather than a flag, so the
+     *  saved value still means something when a third layout turns up. */
+    var guideLayout: String
+        get() = prefs.getString(KEY_GUIDE_LAYOUT, "GRID") ?: "GRID"
+        set(value) = prefs.edit().putString(KEY_GUIDE_LAYOUT, value).apply()
+
     private fun readPlaylists(): List<Playlist> {
         val raw = prefs.getString(KEY_PLAYLISTS, null) ?: return emptyList()
         return try {
@@ -170,6 +176,7 @@ class Store(context: Context) {
         const val KEY_FAVORITES = "favorites"
         const val KEY_RECENT = "recent"
         const val KEY_WATCHED = "watched"
+        const val KEY_GUIDE_LAYOUT = "guideLayout"
         const val MAX_WATCHED = 4000
     }
 }

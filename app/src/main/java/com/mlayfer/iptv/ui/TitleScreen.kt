@@ -308,7 +308,7 @@ private fun Banner(
                 .matchParentSize()
                 .background(
                     Brush.horizontalGradient(
-                        listOf(Ink.SurfaceLow.copy(alpha = 0.55f), Ink.SurfaceLow.copy(alpha = 0.96f))
+                        listOf(Ink.SurfaceLow.copy(alpha = 0.96f), Ink.SurfaceLow.copy(alpha = 0.55f))
                     )
                 )
         )
@@ -352,7 +352,7 @@ private fun Banner(
             Spacer(Modifier.width(tz(30)))
             Column(
                 modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.End,
+                horizontalAlignment = Alignment.Start,
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
@@ -362,7 +362,7 @@ private fun Banner(
                     color = Ink.Bright,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.End,
+                    textAlign = TextAlign.Start,
                 )
                 Text(
                     text = meta,
@@ -371,7 +371,7 @@ private fun Banner(
                     modifier = Modifier.padding(top = tz(10)),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.End,
+                    textAlign = TextAlign.Start,
                 )
                 // Three pills do not fit across a phone, and a Row does not care:
                 // it simply draws the last two off the edge of the screen, which

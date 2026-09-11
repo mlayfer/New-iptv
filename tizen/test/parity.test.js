@@ -173,3 +173,30 @@ test('the prepared search answers exactly what walking the catalogue does', () =
     );
   });
 });
+
+test('the guide agrees on what is on now and what follows', () => {
+  const f = fixtures.guide;
+  const slot = core.nowOn(f.programmes, f.now);
+  assert.strictEqual(slot.current && slot.current.title, f.expected.current);
+  assert.strictEqual(slot.next && slot.next.title, f.expected.next);
+  assert.deepStrictEqual(
+    core.upcoming(f.programmes, f.now, 2).map((x) => x.title),
+    f.expected.upcoming,
+  );
+
+  // Past the end of everything the guide knows about, it says so rather than
+  // holding the last programme on air for ever.
+  const after = core.nowOn(f.programmes, f.empty.now);
+  assert.strictEqual(after.current, f.empty.current);
+  assert.strictEqual(after.next, f.empty.next);
+  assert.deepStrictEqual(core.upcoming(f.programmes, f.empty.now, 2), f.empty.upcoming);
+});
+
+test('makes the same guess about which portal fields are base64', () => {
+  fixtures.base64.cases.forEach((c) => {
+    assert.strictEqual(
+      core.decodeMaybeBase64(c.input), c.expected,
+      `decoding ${JSON.stringify(c.input)}`,
+    );
+  });
+});

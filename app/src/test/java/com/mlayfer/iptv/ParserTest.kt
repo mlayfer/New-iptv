@@ -96,4 +96,37 @@ class ParserTest {
         assertEquals("http://portal.example.com:8080", XtreamClient.normalizeServer("portal.example.com:8080/"))
         assertEquals("https://p.tv", XtreamClient.normalizeServer("https://p.tv/player_api.php?x=1"))
     }
+
+    /**
+     * The subscription this app is actually used with ships no XMLTV file, so
+     * the guide is whatever `get_short_epg` says — base64 in some fields, two
+     * different date formats, and the entries in no particular order.
+     */
+    @Test
+    fun `reads the portal's own guide`() {
+        val body = """
+            {"epg_listings":[
+              {"id":"2","title":"15TXodeo15gg16nXnCDXlNei16jXkQ==","start_timestamp":"1757607200","stop_timestamp":"1757614400"},
+              {"id":"1","title":"15fXk9ep15XXqiDXlNei16jXkQ==","description":"157XlNeT15XXqNeUINee16jXm9eW15nXqiDXotedINee15LXmdep15nXnQ==","start_timestamp":"1757596400","stop_timestamp":"1757603600"},
+              {"id":"3","title":"","start_timestamp":"1757614400"}
+            ]}
+        """.trimIndent()
+
+        val parsed = XtreamClient.parseShortEpg(body)
+
+        // Sorted by start, and the entry with no title at all is not a
+        // programme — it is a hole in the guide.
+        assertEquals(listOf("חדשות הערב", "הסרט של הערב"), parsed.map { it.title })
+        assertEquals(1757596400_000L, parsed[0].start)
+        assertEquals(1757603600_000L, parsed[0].stop)
+        assertEquals("מהדורה מרכזית עם מגישים", parsed[0].desc)
+        assertEquals(null, parsed[1].desc)
+    }
+
+    @Test
+    fun `a portal that answers with nothing is not a crash`() {
+        assertEquals(emptyList<Any>(), XtreamClient.parseShortEpg(""))
+        assertEquals(emptyList<Any>(), XtreamClient.parseShortEpg("<html>403</html>"))
+        assertEquals(emptyList<Any>(), XtreamClient.parseShortEpg("""{"epg_listings":[]}"""))
+    }
 }
