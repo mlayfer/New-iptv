@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -277,10 +278,11 @@ private fun Banner(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            // A phone gets a shorter band: the poster is the same shape either
-            // way, and at four hundred it took the screen and left the episodes
-            // below the fold.
-            .height(if (isWide) tz(400) else tz(300))
+            // A television gets a band of a fixed height. A phone gets a floor
+            // and no ceiling: its three buttons wrap onto a second line, and a
+            // fixed height simply cuts that line off — which is how two of them
+            // went missing rather than moving.
+            .then(if (isWide) Modifier.height(tz(400)) else Modifier.heightIn(min = tz(300)))
             .padding(top = tz(12))
             .clip(shape)
             .background(Ink.SurfaceLow)
@@ -305,14 +307,19 @@ private fun Banner(
                 )
         )
         Row(
-            modifier = Modifier.fillMaxSize().padding(tz(30)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (isWide) Modifier.fillMaxHeight() else Modifier)
+                .padding(tz(30)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // The poster stands at the right-hand edge, which in this direction
             // is where the eye starts.
             Box(
                 modifier = Modifier
-                    .fillMaxHeight(if (isWide) 1f else 0.8f)
+                    // Filling the height needs a height to fill; on a phone the
+                    // band has none of its own, so the poster names one.
+                    .then(if (isWide) Modifier.fillMaxHeight() else Modifier.height(tz(240)))
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(tz(12)))
                     .background(Brush.linearGradient(listOf(Color(0xFF232327), Color(0xFF111113))))
