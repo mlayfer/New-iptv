@@ -436,12 +436,12 @@ private fun SourceTab(label: String, active: Boolean, modifier: Modifier, onClic
             .border(1.dp, if (active) Ink.Accent else Ink.Line, shape)
             .focusHighlight(shape, border = false)
             .clickable(onClick = onClick)
-            .padding(tz(12)),
+            .padding(if (isWide) tz(12) else tz(9)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            fontSize = tzSp(22),
+            fontSize = if (isWide) tzSp(22) else tzSp(19),
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
             color = if (active) Ink.OnAccent else Ink.Bright,
             maxLines = 1,
@@ -506,7 +506,7 @@ private fun BigButton(
             .border(1.dp, if (enabled && primary) Ink.Accent else Ink.Line, shape)
             .focusHighlight(shape, border = false)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(tz(14)),
+            .padding(if (isWide) tz(14) else tz(11)),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -522,7 +522,7 @@ private fun BigButton(
         }
         Text(
             text = label,
-            fontSize = tzSp(23),
+            fontSize = if (isWide) tzSp(23) else tzSp(20),
             fontWeight = FontWeight.Bold,
             color = when {
                 !enabled -> Ink.Faint

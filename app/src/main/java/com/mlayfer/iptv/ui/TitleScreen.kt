@@ -386,7 +386,13 @@ private fun Banner(
     }
 }
 
-/** An action on a title page: a pill, filled when it is the obvious one. */
+/**
+ * An action on a title page: a pill, filled when it is the obvious one.
+ *
+ * A television's pill is sized to be hit with a remote from across a room. The
+ * same numbers in a hand make three chunky slabs out of what should be a row of
+ * choices, so a phone gets a smaller one.
+ */
 @Composable
 private fun DetailPill(label: String, onClick: () -> Unit, primary: Boolean = false) {
     val shape = RoundedCornerShape(tz(26))
@@ -397,11 +403,14 @@ private fun DetailPill(label: String, onClick: () -> Unit, primary: Boolean = fa
             .border(1.dp, if (primary) Ink.Accent else Ink.Line, shape)
             .focusHighlight(shape, border = false)
             .clickable(onClick = onClick)
-            .padding(horizontal = tz(28), vertical = tz(16)),
+            .padding(
+                horizontal = if (isWide) tz(28) else tz(20),
+                vertical = if (isWide) tz(16) else tz(11),
+            ),
     ) {
         Text(
             text = label,
-            fontSize = tzSp(22),
+            fontSize = if (isWide) tzSp(22) else tzSp(19),
             fontWeight = if (primary) FontWeight.Bold else FontWeight.Normal,
             color = if (primary) Ink.OnAccent else Ink.Bright,
             maxLines = 1,
@@ -420,7 +429,7 @@ private fun SeasonPill(label: String, active: Boolean, onClick: () -> Unit) {
             .border(1.dp, if (active) Ink.Accent else Ink.Line, shape)
             .focusHighlight(shape, border = false)
             .clickable(onClick = onClick)
-            .padding(vertical = tz(14)),
+            .padding(vertical = if (isWide) tz(14) else tz(10)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
