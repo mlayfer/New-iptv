@@ -128,22 +128,14 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-                Text(
-                    text = "טלוהים",
-                    fontSize = tzSp(38),
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Ink.Bright,
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                BrandBlock(
+                    title = "טלוהים",
+                    tagline = "טלוויזיה בלייב • סרטים • סדרות",
+                    counts = if (LocalIsTv.current) "Android TV" else null,
                 )
-                Text("טלוויזיה בלייב • סרטים • סדרות", fontSize = tzSp(18), color = Ink.Faint)
-                // Which box this is, said where there is room to say it. On a
-                // phone it is a third line of grey that tells you nothing you
-                // could not work out by looking at your hand.
-                if (isWide) {
-                    Text("Android TV", fontSize = tzSp(18), color = Ink.Faint)
-                }
             }
-            Spacer(Modifier.height(if (isWide) tz(40) else tz(24)))
+            Spacer(Modifier.height(if (isWide) tz(40) else tz(18)))
 
             val panel = RoundedCornerShape(tz(26))
             Column(
@@ -155,12 +147,12 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                         Brush.verticalGradient(listOf(Color(0xFF1A1A1D), Color(0xFF0E0E10)))
                     )
                     .border(1.dp, Ink.Line, panel)
-                    .padding(horizontal = if (isWide) tz(40) else tz(24), vertical = tz(26)),
-                verticalArrangement = Arrangement.spacedBy(tz(14)),
+                    .padding(horizontal = if (isWide) tz(40) else tz(24), vertical = if (isWide) tz(26) else tz(20)),
+                verticalArrangement = Arrangement.spacedBy(if (isWide) tz(14) else tz(10)),
             ) {
                 Text(
                     text = if (state.playlists.isEmpty()) "ברוכים הבאים לטלוהים" else "מקורות",
-                    fontSize = if (isWide) tzSp(38) else tzSp(30),
+                    fontSize = if (isWide) tzSp(38) else tzSp(26),
                     fontWeight = FontWeight.ExtraBold,
                     color = Ink.Bright,
                     textAlign = TextAlign.Center,

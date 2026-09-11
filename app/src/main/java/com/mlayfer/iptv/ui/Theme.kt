@@ -43,7 +43,7 @@ fun TelohimTheme(content: @Composable () -> Unit) {
         val wide = LocalConfiguration.current.screenWidthDp >= 600
         CompositionLocalProvider(
             LocalContentColor provides DarkScheme.onBackground,
-            LocalTzScale provides if (LocalIsTv.current || wide) 0.5f else 0.8f,
+            LocalTzScale provides if (LocalIsTv.current || wide) 0.5f else 0.72f,
             content = content,
         )
     }

@@ -198,7 +198,7 @@ fun TzTextField(
     val shape = RoundedCornerShape(tz(14))
     Box(
         modifier = modifier
-            .then(if (singleLine) Modifier.height(tz(60)) else Modifier)
+            .then(if (singleLine) Modifier.height(if (isWide) tz(60) else tz(56)) else Modifier)
             .bringIntoViewRequester(bring)
             .clip(shape)
             .background(Ink.SurfaceLow)
@@ -213,7 +213,7 @@ fun TzTextField(
             singleLine = singleLine,
             minLines = minLines,
             readOnly = isTv && !editing,
-            textStyle = TextStyle(color = Ink.Bright, fontSize = tzSp(22)),
+            textStyle = TextStyle(color = Ink.Bright, fontSize = tzSp(21)),
             cursorBrush = SolidColor(Ink.Accent),
             visualTransformation = if (password) {
                 PasswordVisualTransformation()

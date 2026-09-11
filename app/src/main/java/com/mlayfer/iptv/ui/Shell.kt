@@ -2,6 +2,7 @@ package com.mlayfer.iptv.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.mlayfer.iptv.R
 
 /**
  * The look, taken from the Tizen build.
@@ -112,33 +115,7 @@ fun TopChrome(
     // The name comes first, so it lands on the right — where a Hebrew page
     // starts — and what you can do lands on the left. It was the other way
     // round, which read as somebody else's app.
-    val name: @Composable () -> Unit = {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(tz(16)),
-        ) {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = title,
-                    fontSize = if (isWide) tzSp(38) else tzSp(30),
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Ink.Bright,
-                    maxLines = 1,
-                )
-                // A television is looked at from a sofa and has the room for a
-                // strapline and a count. A phone has neither: three lines of
-                // grey at the top of a small screen is a third of the screen
-                // spent saying what the screen is already showing.
-                if (isWide) {
-                    Text(text = tagline, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
-                    if (counts != null) {
-                        Text(text = counts, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
-                    }
-                }
-            }
-            BrandMark()
-        }
-    }
+    val name: @Composable () -> Unit = { BrandBlock(title, tagline, counts) }
 
     if (isWide) {
         Row(
@@ -171,30 +148,51 @@ fun TopChrome(
 }
 
 /**
- * The app's own mark, drawn rather than loaded: a light screen with a blue halo
- * behind it, which is what the launcher icon is. At this size a drawing beats a
- * bitmap, and it costs no decode.
+ * Who this is: the icon and the name, in that order from the right.
+ *
+ * Every screen that carries a heading carries this one, so the sign-in screen
+ * cannot end up the only page in the app without a logo on it — which is what
+ * it was, because it had written its own.
  */
 @Composable
-private fun BrandMark() {
-    Box(
-        modifier = Modifier
-            .size(tz(60))
-            .clip(RoundedCornerShape(tz(16)))
-            .background(Brush.linearGradient(listOf(Color(0xFFF2F4F8), Color(0xFFBFC7D6)))),
-        contentAlignment = Alignment.Center,
+fun BrandBlock(title: String, tagline: String, counts: String?) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(tz(16)),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.74f)
-                .fillMaxHeight(0.50f)
-                .clip(RoundedCornerShape(tz(6)))
-                .background(Ink.OnAccent),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("▶", fontSize = tzSp(22), color = Ink.Accent)
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = title,
+                fontSize = if (isWide) tzSp(38) else tzSp(28),
+                fontWeight = FontWeight.ExtraBold,
+                color = Ink.Bright,
+                maxLines = 1,
+            )
+            // A television is looked at from a sofa and has the room for a
+            // strapline and a count. A phone has neither: three lines of grey at
+            // the top of a small screen is a third of the screen spent saying
+            // what the screen is already showing.
+            if (isWide) {
+                Text(text = tagline, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
+                if (counts != null) {
+                    Text(text = counts, fontSize = tzSp(18), color = Ink.Faint, maxLines = 1)
+                }
+            }
         }
+        BrandMark()
     }
+}
+
+/** The launcher icon itself, rather than a drawing of it. */
+@Composable
+private fun BrandMark() {
+    Image(
+        painter = painterResource(R.mipmap.ic_launcher),
+        contentDescription = null,
+        modifier = Modifier
+            .size(if (isWide) tz(60) else tz(52))
+            .clip(RoundedCornerShape(tz(14))),
+    )
 }
 
 /** A top-bar button: a bordered pill, the shape the whole app is built from. */
