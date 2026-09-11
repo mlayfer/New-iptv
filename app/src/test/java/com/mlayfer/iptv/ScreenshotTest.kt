@@ -168,11 +168,11 @@ class ScreenshotTest {
 
     @Test
     fun `the live library`() {
+        // With a guide, because a tile that says what is on the channel is the
+        // point of the tile — and a catalogue with no guide draws a picture of
+        // the feature being absent.
         shoot("4-live") {
-            ChannelsScreen(
-                catalogue().copy(screen = Screen.CHANNELS, catalog = Catalog.LIVE),
-                viewModel,
-            )
+            ChannelsScreen(guideState().copy(guideLayout = GuideLayout.GRID), viewModel)
         }
     }
 

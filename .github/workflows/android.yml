@@ -88,7 +88,19 @@ jobs:
             -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             commit -q -m "מסכי אנדרואיד מבנייה ${{ github.run_number }}"
-          git -C "$work" push --force origin screens-build:screens
+          # Two builds in flight both force-push this branch, and one of them
+          # loses the race — which is how build 96 failed on a step that only
+          # publishes pictures. The pictures are uploaded as an artifact above
+          # either way, so a lost race is worth a retry and then a shrug, not a
+          # failed build.
+          for attempt in 1 2 3; do
+            if git -C "$work" push --force origin screens-build:screens; then
+              exit 0
+            fi
+            echo "screens push lost a race (attempt $attempt); retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::warning::could not publish the screens branch; they are in the artifact"
 
       - name: Build debug APK
         env:
