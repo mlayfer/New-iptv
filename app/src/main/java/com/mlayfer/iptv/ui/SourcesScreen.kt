@@ -469,18 +469,16 @@ private fun ServerSuggestion(address: String, modifier: Modifier, onClick: () ->
 /** A checkbox that reads as one from across a room. */
 @Composable
 private fun Tick(checked: Boolean) {
-    val shape = RoundedCornerShape(tz(7))
+    val shape = RoundedCornerShape(tz(8))
     Box(
         modifier = Modifier
-            .size(tz(26))
+            .size(tz(32))
             .clip(shape)
             .background(if (checked) Ink.Accent else Color.Transparent)
             .border(1.dp, if (checked) Ink.Accent else Ink.Line, shape),
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) {
-            Text("✓", fontSize = tzSp(18), fontWeight = FontWeight.ExtraBold, color = Ink.OnAccent)
-        }
+        if (checked) TickMark(Modifier.size(tz(22)))
     }
 }
 

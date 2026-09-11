@@ -1,5 +1,10 @@
 package com.mlayfer.iptv.ui
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
@@ -29,6 +34,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -415,12 +421,20 @@ fun PosterCard(
     modifier: Modifier = Modifier,
     /** How far in, between nothing and all of it. Nothing draws no bar. */
     progress: Float = 0f,
+    /**
+     * Landed on with the remote. The band at the top of the screen says what is
+     * under the cursor, and until this existed the only thing that moved the
+     * cursor as far as the band was concerned was pressing OK — by which point
+     * you had already left the screen.
+     */
+    onFocus: () -> Unit = {},
 ) {
     val shape = RoundedCornerShape(tz(14))
     Column(
         modifier = modifier
             .width(width)
             .clip(shape)
+            .onFocusChanged { if (it.isFocused) onFocus() }
             .focusHighlight(shape)
             .clickable(onClick = onClick)
             .padding(tz(6)),
@@ -574,6 +588,34 @@ fun ChannelTile(
     }
 }
 
+/**
+ * A tick, drawn rather than typed.
+ *
+ * It was the character "✓" in a Text, and in a box this size, in a
+ * right-to-left layout, the system chose a font for it and clipped what came
+ * back: the checkbox showed a faint diagonal smudge and nothing that reads as a
+ * tick from a sofa. Two strokes on a canvas are the same mark at every size,
+ * in every font, in either direction.
+ */
+@Composable
+fun TickMark(modifier: Modifier = Modifier, color: Color = Ink.OnAccent) {
+    Canvas(modifier = modifier) {
+        val wide = size.width
+        val tall = size.height
+        val stroke = (minOf(wide, tall) * 0.18f).coerceAtLeast(2f)
+        val path = Path().apply {
+            moveTo(wide * 0.20f, tall * 0.52f)
+            lineTo(wide * 0.42f, tall * 0.74f)
+            lineTo(wide * 0.80f, tall * 0.26f)
+        }
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
+        )
+    }
+}
+
 /** The mark on something already watched. */
 @Composable
 fun SeenTick(modifier: Modifier = Modifier) {
@@ -584,7 +626,7 @@ fun SeenTick(modifier: Modifier = Modifier) {
             .background(Ink.Accent),
         contentAlignment = Alignment.Center,
     ) {
-        Text("✓", fontSize = tzSp(16), fontWeight = FontWeight.ExtraBold, color = Ink.OnAccent)
+        TickMark(Modifier.size(tz(16)))
     }
 }
 

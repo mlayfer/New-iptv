@@ -237,6 +237,7 @@ private fun CardRow(
                     seen = card.id in seen,
                     progress = card.progress.toFloat(),
                     width = tz(124),
+                    onFocus = { onHighlight(card) },
                     onClick = { onHighlight(card); onOpen(card) },
                 )
             }
