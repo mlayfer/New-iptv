@@ -80,6 +80,14 @@ jobs:
           # A fresh orphan every time: the branch is a picture of the current
           # build, not a history, and a parentless commit cannot trip over the
           # shallow clone the checkout leaves behind.
+          # A commit that touches no Android source gets the tests from the
+          # build cache and leaves the drawing step up to date, so no pictures
+          # are written at all — which is how build 108 failed on a step whose
+          # only job is publishing them. Nothing new to show is not a failure.
+          if ! compgen -G 'app/src/test/screens/*.png' > /dev/null; then
+            echo "::warning::no screens were drawn this build; nothing in the Android sources changed"
+            exit 0
+          fi
           work="$RUNNER_TEMP/screens"
           git worktree add --orphan -b screens-build "$work"
           cp app/src/test/screens/*.png "$work"/
