@@ -9,6 +9,9 @@ media3 = "1.4.1"
 junit = "4.13.2"
 coil = "2.7.0"
 json = "20240303"
+# The QR encoder, so a phone can be handed the address of the television.
+# Pure Java, no Android parts, and it makes no requests of its own.
+zxing = "3.5.3"
 # Screenshot tests that render Compose on the JVM — no emulator, no device.
 # The last release built with a Kotlin 2.0 compiler: anything newer carries
 # metadata this project's compiler cannot read, and the build stops at
@@ -38,6 +41,7 @@ androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.re
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 json = { group = "org.json", name = "json", version.ref = "json" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
 roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }

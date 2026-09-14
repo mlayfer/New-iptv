@@ -82,6 +82,8 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var includeVod by remember { mutableStateOf(true) }
+    // The code that hands this screen over to a phone on the same network.
+    var pairing by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -110,6 +112,32 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                 epgUrl = epgUrl.trim().ifBlank { null },
                 createdAt = System.currentTimeMillis(),
             )
+        )
+    }
+
+    if (pairing) {
+        PairWithPhone(
+            prefillServer = server.trim(),
+            onDismiss = { pairing = false },
+            onHandoff = { handoff ->
+                // Filled in and connected in one go: what was typed on the phone
+                // is exactly what pressing the button here would have sent, and
+                // asking someone to cross the room to press it is the thing this
+                // whole flow exists to avoid.
+                server = handoff.server
+                username = handoff.username
+                password = handoff.password
+                includeVod = handoff.includeVod
+                pairing = false
+                submit(
+                    PlaylistSource.Xtream(
+                        server = handoff.server,
+                        username = handoff.username,
+                        password = handoff.password,
+                        includeVod = handoff.includeVod,
+                    )
+                )
+            },
         )
     }
 
@@ -243,6 +271,17 @@ fun SourcesScreen(state: UiState, viewModel: AppViewModel) {
                     }
 
                     SourceKind.XTREAM -> {
+                        // Typing a portal password with four arrows and an OK is
+                        // the worst thing this app asks of anyone, and it is the
+                        // first thing it asks. The phone in the room already has
+                        // a keyboard.
+                        BigButton(
+                            label = "מילוי מהטלפון",
+                            enabled = !state.addBusy,
+                            busy = false,
+                            primary = false,
+                        ) { pairing = true }
+
                         LabeledField(
                             label = "כתובת השרת",
                             value = server,

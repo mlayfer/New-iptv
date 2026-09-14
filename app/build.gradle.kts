@@ -121,6 +121,9 @@ dependencies {
 
     implementation(libs.coil.compose)
 
+    // Drawing the QR code that hands a phone the address of this television.
+    implementation(libs.zxing.core)
+
     testImplementation(libs.junit)
     // org.json ships with Android, but the unit-test android.jar only stubs it.
     testImplementation(libs.json)
