@@ -1496,6 +1496,13 @@ function archiveOf(item){
 function archiveChannel(){ return archiveOf(state.current); }
 
 /**
+ * Said where the wind-back would have happened. A subscription that keeps no
+ * archive of a channel is a fact about the subscription, and a screen that says
+ * nothing at all leaves it looking like a fault in the app.
+ */
+const NO_ARCHIVE = 'הפורטל לא שומר את הערוץ הזה — אי אפשר לחזור אחורה';
+
+/**
  * The channel the schedule is drawn for: the one under the cursor.
  *
  * It used to be whatever was playing, so moving through the list told you
@@ -1906,8 +1913,11 @@ function renderControls(){
   show('channels', live);
   // And only a channel the provider backs up has anything to choose between.
   show('sources', sourcesOf(state.current).length > 1);
-  // And only a channel the portal keeps can be wound back.
-  show('rewind', live && !!archiveChannel());
+  // On every live channel, whether or not the portal keeps it. A channel with
+  // no archive used to have no button and no explanation, which reads as a
+  // broken app rather than a subscription without an archive — the button says
+  // which it is when it is pressed.
+  show('rewind', live);
   show('prevEp', !!episodeNeighbour(-1));
   show('nextEp', !!episodeNeighbour(1));
   setToggleIcon(state.paused);
@@ -2023,7 +2033,10 @@ function runControl(act){
   if(act === 'prevEp'){ playNeighbourEpisode(-1); return; }
   if(act === 'nextEp'){ playNeighbourEpisode(1); return; }
   if(act === 'channels'){ closeControls(); openWatchList(); return; }
-  if(act === 'rewind'){ closeControls(); rewindLive(); return; }
+  if(act === 'rewind'){
+    if(!archiveChannel()){ flashMessage(NO_ARCHIVE); return; }
+    closeControls(); rewindLive(); return;
+  }
   if(act === 'sources'){ openTrackPanel('SOURCE'); return; }
   if(act === 'audio'){ openTrackPanel('AUDIO'); return; }
   if(act === 'subs'){ openTrackPanel('TEXT'); return; }

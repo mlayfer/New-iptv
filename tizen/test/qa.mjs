@@ -367,6 +367,30 @@ await page.waitForTimeout(1200);
 check("and the button winds it back", archive.length > before,
   archive[archive.length - 1] || "no archive address was opened");
 
+// A channel the portal keeps nothing of. The button is still there — it has to
+// be, or an absent feature is indistinguishable from a broken one — and says so.
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(700);
+await page.locator('[data-nav="item"]').nth(2).click();
+await page.waitForTimeout(1200);
+await page.keyboard.press("Enter");
+await page.waitForTimeout(400);
+check("a channel with no archive still offers the button",
+  await page.evaluate(() => {
+    const b = document.querySelector('[data-act="rewind"]');
+    return !!b && !b.classList.contains("hidden");
+  }));
+const beforeNothing = archive.length;
+await page.locator('[data-act="rewind"]').click();
+await page.waitForTimeout(500);
+check("and pressing it says the portal keeps nothing, rather than doing nothing",
+  (await page.textContent("#playerMessage")).includes("לא שומר את הערוץ") &&
+    archive.length === beforeNothing,
+  await page.textContent("#playerMessage"));
+// Put the control bar away again, so what follows starts one Back from the guide.
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(400);
+
 await page.keyboard.press("Backspace");
 await page.waitForTimeout(700);
 await page.locator('[data-nav="item"]').first().click();

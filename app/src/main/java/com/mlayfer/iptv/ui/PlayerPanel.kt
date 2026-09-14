@@ -239,7 +239,7 @@ fun PlayerPanel(
     // fresh state object per channel would leave it writing into the old one.
     // They are cleared where the channel changes instead.
     var liveSource by remember { mutableIntStateOf(-1) }
-    var sourceNotice by remember { mutableStateOf<String?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
     val sources = remember(channel?.id) { channel?.let(ChannelSources::sourcesOf) ?: emptyList() }
     var sourceMenu by remember { mutableStateOf(false) }
     val currentAttempts by rememberUpdatedState(attempts)
@@ -310,7 +310,7 @@ fun PlayerPanel(
                 if (liveSource == index) return
                 liveSource = index
                 onSourceWorked(index)
-                sourceNotice = if (index > 0) "עבר ל${sourceLabel(index)}" else null
+                notice = if (index > 0) "עבר ל${sourceLabel(index)}" else null
             }
 
             override fun onTracksChanged(available: Tracks) {
@@ -406,10 +406,10 @@ fun PlayerPanel(
         }
     }
 
-    LaunchedEffect(sourceNotice) {
-        if (sourceNotice == null) return@LaunchedEffect
+    LaunchedEffect(notice) {
+        if (notice == null) return@LaunchedEffect
         delay(3_000)
-        sourceNotice = null
+        notice = null
     }
 
     LaunchedEffect(channel?.id, reloadToken, chosenSource) {
@@ -420,7 +420,7 @@ fun PlayerPanel(
         retries = 0
         attemptIndex.intValue = 0
         liveSource = -1
-        sourceNotice = null
+        notice = null
         if (channel == null) {
             player.stop()
             player.clearMediaItems()
@@ -661,24 +661,40 @@ fun PlayerPanel(
                                 tint = Ink.Bright,
                             )
                         }
-                        // A recording can be moved through. Live usually cannot
-                        // — but a channel the portal keeps can be wound back
-                        // into what it already broadcast, which is the same
-                        // button meaning the same thing.
-                        if (duration > 0 || seekable) {
+                        // On a live channel, back means back into what was
+                        // already broadcast. It used to mean that only when the
+                        // player admitted the stream was not seekable — and a
+                        // live HLS stream with a few seconds of window reports
+                        // that it is, so the ordinary rewind was drawn instead
+                        // and the way back into the archive was never on screen
+                        // at all. What is playing decides now, not what ExoPlayer
+                        // says it can do with it: a channel winds back, a
+                        // recording seeks.
+                        //
+                        // And the button is on a live channel either way. A
+                        // channel the portal keeps nothing of used to have no
+                        // button and no explanation, which reads as a broken
+                        // app rather than a subscription without an archive.
+                        val liveChannel = channel != null && channel.kind == ChannelKind.LIVE
+                        if (liveChannel) {
+                            IconButton(
+                                onClick = {
+                                    if (onRewindLive != null) onRewindLive()
+                                    else notice = NO_ARCHIVE
+                                },
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_rewind),
+                                    contentDescription = "אחורה בשידור",
+                                    tint = if (onRewindLive != null) Ink.Accent else Ink.Dim,
+                                )
+                            }
+                        } else if (duration > 0 || seekable) {
                             IconButton(onClick = { player.seekBack() }) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_rewind),
                                     contentDescription = "אחורה",
                                     tint = Ink.Bright,
-                                )
-                            }
-                        } else if (onRewindLive != null) {
-                            IconButton(onClick = onRewindLive) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_rewind),
-                                    contentDescription = "אחורה בשידור",
-                                    tint = Ink.Accent,
                                 )
                             }
                         }
@@ -715,7 +731,9 @@ fun PlayerPanel(
                             }
                         }
 
-                        if (duration > 0 || seekable) {
+                        // Nothing to go forward to on a live channel: it is
+                        // already at the edge of what has been broadcast.
+                        if (!liveChannel && (duration > 0 || seekable)) {
                             IconButton(onClick = { player.seekForward() }) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_forward),
@@ -817,11 +835,12 @@ fun PlayerPanel(
                 )
             }
 
-            // A channel that quietly came up on its backup should say so. Once,
-            // briefly, low on the picture — it is news, not a state.
-            sourceNotice?.let { notice ->
+            // Something worth saying once — a channel that came up on its
+            // backup, or a portal that keeps nothing of this channel. Low on
+            // the picture and gone in three seconds: it is news, not a state.
+            notice?.let { line ->
                 Text(
-                    text = notice,
+                    text = line,
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
@@ -1389,6 +1408,13 @@ private fun TrackMenu(
         }
     }
 }
+
+/**
+ * Said where the wind-back would have happened. A subscription that keeps no
+ * archive of a channel is a fact about the subscription, and a screen that says
+ * nothing at all leaves it looking like a fault in the app.
+ */
+private const val NO_ARCHIVE = "הפורטל לא שומר את הערוץ הזה — אי אפשר לחזור אחורה"
 
 /** Long enough to read the row, short enough not to sit on top of a film. */
 private const val CONTROLS_LINGER = 4_500L
