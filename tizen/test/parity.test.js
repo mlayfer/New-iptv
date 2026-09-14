@@ -31,6 +31,16 @@ test('normalizes portal addresses', () => {
   }
 });
 
+test('folds backup channels into the channel they back up', () => {
+  const f = fixtures.sources;
+  const out = core.foldSources(f.channels);
+  assert.strictEqual(out.length, f.expected.length);
+  f.expected.forEach((want, i) => {
+    assert.strictEqual(out[i].name, want.name);
+    assert.deepStrictEqual((out[i].alternates || []).map((a) => a.name), want.alternates);
+  });
+});
+
 test('offers the same endpoint variants', () => {
   for (const c of fixtures.variants) {
     assert.deepStrictEqual(core.streamVariants(c.url), c.expected, c.url);

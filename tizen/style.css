@@ -242,6 +242,10 @@ input::placeholder{color:var(--ink-faint)}
 .tileName{font-size:22px;font-weight:700;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tileNow{font-size:18px;color:var(--accent);width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:22px}
 .tileMeta{font-size:17px;color:var(--ink-faint);width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* A channel that the provider backs up. Small on purpose: it is a fact about
+   the channel, not a thing to press. */
+.srcPill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:15px;font-weight:700;
+  background:var(--line-soft);color:var(--ink-dim);vertical-align:middle}
 .channelTile.playing{border-color:var(--accent)}
 .channelTile .tileNumber{position:absolute}
 

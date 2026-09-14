@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.mlayfer.iptv.data.Channel
 import com.mlayfer.iptv.data.ChannelKind
+import com.mlayfer.iptv.data.ChannelSources
 import com.mlayfer.iptv.data.Series
 import com.mlayfer.iptv.ui.AppViewModel
 import com.mlayfer.iptv.ui.Catalog
@@ -122,15 +123,24 @@ class ScreenshotTest {
     }
 
     private fun catalogue(): UiState {
-        val channels = (1..40).map { i ->
-            Channel(
-                id = "l$i",
-                name = if (i <= 4) listOf("כאן 11", "קשת 12", "רשת 13", "ספורט 1")[i - 1] else "ערוץ $i HD",
-                url = "http://example.test/$i",
-                kind = ChannelKind.LIVE,
-                group = listOf("ישראל", "ספורט", "חדשות", "ילדים")[i % 4],
-            )
-        } + (1..30).map { i ->
+        // A real subscription lists a channel's backups as channels of their
+        // own, right after it — and lists "ספורט 1" and "ספורט 2", which only
+        // look the same. Folded here exactly as the app folds what a portal
+        // hands it, so these pictures show the list people actually get.
+        val named = listOf(
+            "קשת 12", "קשת 12 גיבוי", "קשת 12 גיבוי 2", "כאן 11", "רשת 13", "ספורט 1", "ספורט 2",
+        )
+        val channels = ChannelSources.fold(
+            (1..40).map { i ->
+                Channel(
+                    id = "l$i",
+                    name = named.getOrNull(i - 1) ?: "ערוץ $i HD",
+                    url = "http://example.test/$i",
+                    kind = ChannelKind.LIVE,
+                    group = listOf("ישראל", "ספורט", "חדשות", "ילדים")[i % 4],
+                )
+            }
+        ) + (1..30).map { i ->
             Channel(
                 id = "v$i",
                 name = "סרט $i",
@@ -245,8 +255,11 @@ class ScreenshotTest {
             listOf("משחק הליגה", "מגזין ספורט", "סיכום המחזור"),
             listOf("בוקר טוב ישראל", "תוכנית אירוח", "מהדורה מרכזית"),
         )
+        // The ids of the channels that survive the fold: "l2" and "l3" are the
+        // two backups of "l1" and are no longer channels of their own.
+        val onScreen = listOf("l1", "l4", "l5", "l6")
         val guide = titles.mapIndexed { index, names ->
-            "l${index + 1}" to names.mapIndexed { slot, title ->
+            onScreen[index] to names.mapIndexed { slot, title ->
                 com.mlayfer.iptv.data.Programme(
                     start = now - 1_500_000L + slot * 3_600_000L,
                     stop = now - 1_500_000L + (slot + 1) * 3_600_000L,

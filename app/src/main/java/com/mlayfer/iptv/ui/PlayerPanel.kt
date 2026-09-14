@@ -102,6 +102,7 @@ import com.mlayfer.iptv.data.Http
 import com.mlayfer.iptv.data.Playback
 import com.mlayfer.iptv.data.Programme
 import com.mlayfer.iptv.data.StreamProbe
+import com.mlayfer.iptv.data.ChannelSources
 import com.mlayfer.iptv.data.StreamVariants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -168,6 +169,10 @@ fun PlayerPanel(
     /** What is playing after this — the episodes of an open series, in order. */
     queue: List<Channel> = emptyList(),
     onPlayItem: (Channel) -> Unit = {},
+    /** Which of this channel's sources played last time. Zero is its own feed. */
+    preferredSource: Int = 0,
+    /** Called with the source that actually produced a picture. */
+    onSourceWorked: (Int) -> Unit = {},
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -220,8 +225,23 @@ fun PlayerPanel(
     // Every way this channel might be reachable, in the order worth trying.
     // Not an effect key: the ladder is climbed from inside the error listener,
     // without tearing playback setup down and building it again.
-    val attempts = remember(channel?.id) { channel?.let(::attemptsFor) ?: emptyList() }
+    // Picked by hand from the source list; -1 until someone picks one, and reset
+    // whenever the channel changes.
+    var chosenSource by remember(channel?.id) { mutableIntStateOf(-1) }
+    val attempts = remember(channel?.id, chosenSource) {
+        channel?.let { attemptsFor(it, if (chosenSource >= 0) chosenSource else preferredSource) }
+            ?: emptyList()
+    }
     val attemptIndex = remember { mutableIntStateOf(0) }
+    // Which source is on screen, once something actually plays, and the one-line
+    // notice that says so when it is not the channel's own feed.
+    // Not keyed on the channel: the listener below captures these once, and a
+    // fresh state object per channel would leave it writing into the old one.
+    // They are cleared where the channel changes instead.
+    var liveSource by remember { mutableIntStateOf(-1) }
+    var sourceNotice by remember { mutableStateOf<String?>(null) }
+    val sources = remember(channel?.id) { channel?.let(ChannelSources::sourcesOf) ?: emptyList() }
+    var sourceMenu by remember { mutableStateOf(false) }
     val currentAttempts by rememberUpdatedState(attempts)
     val currentChannel by rememberUpdatedState(channel)
     val currentQueue by rememberUpdatedState(queue)
@@ -234,9 +254,11 @@ fun PlayerPanel(
         val channelNow = currentChannel
 
         // Unlike a browser, the app can send the headers the playlist asks for.
+        // They belong to the source being tried, not to the channel: a backup
+        // can sit behind a different CDN with rules of its own.
         httpFactory.setUserAgent(attempt.userAgent)
         val headers = HashMap<String, String>()
-        channelNow?.referrer?.let { headers["Referer"] = it }
+        (attempt.referrer ?: channelNow?.referrer)?.let { headers["Referer"] = it }
         httpFactory.setDefaultRequestProperties(headers)
 
         val builder = MediaItem.Builder().setUri(attempt.url)
@@ -280,6 +302,15 @@ fun PlayerPanel(
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
+                // A source is good when it produces a picture, not when it is
+                // asked to. Said out loud only when it is not the main feed —
+                // otherwise there is nothing to tell anyone.
+                if (!isPlaying) return
+                val index = currentAttempts.getOrNull(attemptIndex.intValue)?.sourceIndex ?: return
+                if (liveSource == index) return
+                liveSource = index
+                onSourceWorked(index)
+                sourceNotice = if (index > 0) "עבר ל${sourceLabel(index)}" else null
             }
 
             override fun onTracksChanged(available: Tracks) {
@@ -375,13 +406,21 @@ fun PlayerPanel(
         }
     }
 
-    LaunchedEffect(channel?.id, reloadToken) {
+    LaunchedEffect(sourceNotice) {
+        if (sourceNotice == null) return@LaunchedEffect
+        delay(3_000)
+        sourceNotice = null
+    }
+
+    LaunchedEffect(channel?.id, reloadToken, chosenSource) {
         error = null
         errorDetail = null
         report = null
         diagnosing = false
         retries = 0
         attemptIndex.intValue = 0
+        liveSource = -1
+        sourceNotice = null
         if (channel == null) {
             player.stop()
             player.clearMediaItems()
@@ -431,6 +470,35 @@ fun PlayerPanel(
             }
             IconButton(onClick = { reloadToken += 1 }, enabled = channel != null) {
                 Icon(Icons.Default.Refresh, contentDescription = "טעינה מחדש", tint = Ink.Dim)
+            }
+
+            // Only where the provider actually backs the channel up. This is
+            // where its backups went: they are no longer channels of their own
+            // in the list, so they have to be reachable from the channel.
+            if (sources.size > 1) {
+                Box {
+                    IconButton(onClick = { sourceMenu = true }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_sources),
+                            contentDescription = "מקורות",
+                            tint = if (liveSource > 0) Ink.Accent else Ink.Dim,
+                        )
+                    }
+                    SourceMenu(
+                        open = sourceMenu,
+                        sources = sources,
+                        playing = liveSource,
+                        onDismiss = { sourceMenu = false },
+                        onPick = { index ->
+                            sourceMenu = false
+                            // Picked by hand, so it is worth remembering — and
+                            // the rest of the ladder stays behind it, because
+                            // choosing a source is not switching falling back off.
+                            chosenSource = index
+                            onSourceWorked(index)
+                        },
+                    )
+                }
             }
 
             // Offered only when the stream actually carries a choice; a button
@@ -749,6 +817,21 @@ fun PlayerPanel(
                 )
             }
 
+            // A channel that quietly came up on its backup should say so. Once,
+            // briefly, low on the picture — it is news, not a state.
+            sourceNotice?.let { notice ->
+                Text(
+                    text = notice,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 96.dp)
+                        .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                )
+            }
+
             // A finger has no D-pad. The strip hides itself after a few seconds
             // and the only thing that brought it back was a key press, so on a
             // phone it hid in the middle of an episode and stayed hidden. The
@@ -997,8 +1080,17 @@ fun PlayerPanel(
     }
 }
 
-/** One thing to try: a URL, an optional container hint, and the headers to use. */
-private data class Attempt(val url: String, val mimeType: String?, val userAgent: String)
+/**
+ * One thing to try: a URL, an optional container hint, the headers to use, and
+ * which of the channel's sources it belongs to.
+ */
+private data class Attempt(
+    val url: String,
+    val mimeType: String?,
+    val userAgent: String,
+    val referrer: String?,
+    val sourceIndex: Int,
+)
 
 private const val MAX_ATTEMPTS = 8
 
@@ -1006,27 +1098,51 @@ private const val MAX_ATTEMPTS = 8
  * Ordered from "what the playlist says" to "what a browser hitting the panel's
  * other endpoints would get". Cheap to walk: a wrong guess fails in one request.
  */
-private fun attemptsFor(channel: Channel): List<Attempt> {
-    val listUserAgent = channel.userAgent ?: Http.DEFAULT_USER_AGENT
-    val urls = StreamVariants.of(channel.url)
+private fun attemptsOneSource(source: Channel, sourceIndex: Int, budget: Int): List<Attempt> {
+    val listUserAgent = source.userAgent ?: Http.DEFAULT_USER_AGENT
+    val urls = StreamVariants.of(source.url)
     val primary = urls.first()
     val out = LinkedHashSet<Attempt>()
+    fun add(url: String, mime: String?, agent: String) {
+        out.add(Attempt(url, mime, agent, source.referrer, sourceIndex))
+    }
 
     // The URL as given: extension first, then HLS for the extension-less case,
     // then no hint at all so the bytes themselves decide.
-    out.add(Attempt(primary, mimeFor(primary), listUserAgent))
-    out.add(Attempt(primary, MimeTypes.APPLICATION_M3U8, listUserAgent))
-    out.add(Attempt(primary, null, listUserAgent))
+    add(primary, mimeFor(primary), listUserAgent)
+    add(primary, MimeTypes.APPLICATION_M3U8, listUserAgent)
+    add(primary, null, listUserAgent)
 
     // The same channel at the panel's other endpoints.
-    for (url in urls.drop(1)) out.add(Attempt(url, mimeFor(url), listUserAgent))
+    for (url in urls.drop(1)) add(url, mimeFor(url), listUserAgent)
 
     // Last resort: some CDNs serve only what looks like a browser.
     if (listUserAgent != BROWSER_USER_AGENT) {
-        for (url in urls) out.add(Attempt(url, mimeFor(url), BROWSER_USER_AGENT))
+        for (url in urls) add(url, mimeFor(url), BROWSER_USER_AGENT)
     }
 
-    return out.take(MAX_ATTEMPTS)
+    return out.take(budget)
+}
+
+/**
+ * The whole ladder for a channel: its own feed first, then each backup the
+ * provider listed for it — unless one of the backups is the one that worked
+ * last time, which goes first instead. A dead main feed is then a channel that
+ * simply opens, rather than one that fails for ten seconds first.
+ *
+ * Every source keeps a share of the budget, so a channel with backups does not
+ * spend the whole ladder on endpoints of a feed that is plainly gone.
+ */
+private fun attemptsFor(channel: Channel, preferred: Int = 0): List<Attempt> {
+    val sources = ChannelSources.sourcesOf(channel)
+    if (sources.size <= 1) return attemptsOneSource(channel, 0, MAX_ATTEMPTS)
+
+    val order = buildList {
+        if (preferred in 1 until sources.size) add(preferred)
+        addAll(sources.indices.filterNot { it == preferred })
+    }
+    val share = (MAX_ATTEMPTS / sources.size).coerceAtLeast(2)
+    return order.flatMap { attemptsOneSource(sources[it], it, share) }
 }
 
 private fun mimeFor(url: String): String? {
@@ -1210,6 +1326,35 @@ private fun progressOf(programme: Programme): Float {
  * beats a dialog, and the one in use carries a tick so you can see where you
  * are without reading every line.
  */
+/** "ראשי" is the channel's own feed; the rest are the provider's backups. */
+private fun sourceLabel(index: Int): String = if (index == 0) "ראשי" else "גיבוי $index"
+
+/**
+ * The feeds behind one channel, under the names the provider gave them — so a
+ * channel that was folded together wrongly is visible here rather than hidden
+ * behind the fold.
+ */
+@Composable
+private fun SourceMenu(
+    open: Boolean,
+    sources: List<Channel>,
+    playing: Int,
+    onDismiss: () -> Unit,
+    onPick: (Int) -> Unit,
+) {
+    DropdownMenu(expanded = open, onDismissRequest = onDismiss) {
+        sources.forEachIndexed { index, source ->
+            DropdownMenuItem(
+                text = { Text("${sourceLabel(index)} · ${source.name}") },
+                onClick = { onPick(index) },
+                leadingIcon = {
+                    if (index == playing) Icon(Icons.Default.Check, contentDescription = null)
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun TrackMenu(
     open: Boolean,

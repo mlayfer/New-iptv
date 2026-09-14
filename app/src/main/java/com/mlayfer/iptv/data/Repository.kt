@@ -24,8 +24,12 @@ class Repository {
         }
 
         if (parsed.channels.isEmpty()) throw Http.HttpException("לא נמצאו ערוצים ברשימה")
-        playlistCache[playlist.id] = parsed
-        return parsed
+        // One funnel, so every screen — the list, search, the guide, the home
+        // rows — sees a channel and its backups as one thing without knowing
+        // anything about backups.
+        val folded = parsed.copy(channels = ChannelSources.fold(parsed.channels))
+        playlistCache[playlist.id] = folded
+        return folded
     }
 
     /** Blocking: call from a background dispatcher. */

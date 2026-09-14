@@ -1,5 +1,8 @@
 package com.mlayfer.iptv
 
+import com.mlayfer.iptv.data.Channel
+import com.mlayfer.iptv.data.ChannelKind
+import com.mlayfer.iptv.data.ChannelSources
 import com.mlayfer.iptv.data.HomeRows
 import com.mlayfer.iptv.data.M3uParser
 import com.mlayfer.iptv.data.Playback
@@ -159,6 +162,34 @@ class ParityTest {
                 case.getString("expected"),
                 XtreamClient.normalizeServer(case.getString("input")),
             )
+        }
+    }
+
+    @Test
+    fun `folds backup channels into the channel they back up`() {
+        val spec = fixtures.getJSONObject("sources")
+        val given = spec.getJSONArray("channels")
+        val channels = (0 until given.length()).map { i ->
+            val c = given.getJSONObject(i)
+            Channel(
+                id = c.getString("id"),
+                name = c.getString("name"),
+                url = c.getString("url"),
+                kind = ChannelKind.valueOf(c.getString("kind")),
+                group = c.optString("group").ifBlank { null },
+            )
+        }
+
+        val folded = ChannelSources.fold(channels)
+        val expected = spec.getJSONArray("expected")
+        assertEquals(expected.length(), folded.size)
+        for (i in 0 until expected.length()) {
+            val want = expected.getJSONObject(i)
+            assertEquals(want.getString("name"), folded[i].name)
+            val alternates = want.getJSONArray("alternates").let { array ->
+                (0 until array.length()).map { array.getString(it) }
+            }
+            assertEquals(want.getString("name"), alternates, folded[i].alternates.map { it.name })
         }
     }
 

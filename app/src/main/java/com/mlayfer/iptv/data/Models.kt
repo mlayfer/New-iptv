@@ -33,6 +33,13 @@ data class Channel(
     /** Playback hints from the playlist. Unlike a browser, the app can honour these. */
     val userAgent: String? = null,
     val referrer: String? = null,
+    /**
+     * The provider's backup feeds for this same channel, folded in by
+     * [ChannelSources] so the list shows the channel once. Empty for almost
+     * every channel; when it is not, the player walks them in order before
+     * calling the channel dead.
+     */
+    val alternates: List<Channel> = emptyList(),
 )
 
 sealed class PlaylistSource {

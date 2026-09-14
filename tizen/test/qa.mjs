@@ -16,7 +16,10 @@ const N_LIVE = 2200, N_VOD = 1500, N_SERIES = 320;
 const liveCats = ["ישראל", "ספורט", "חדשות", "ילדים"];
 const vodCats = ["חדש בקולנוע", "אקשן", "קומדיה"];
 const seriesCats = ["דרמה", "Apple TV+"];
-const israeli = ["כאן 11", "קשת 12", "רשת 13", "ספורט 1", "i24NEWS"];
+// A real subscription lists a channel's backups as channels of their own, flat,
+// right after it — and lists "ספורט 1" and "ספורט 2", which only look the same.
+const israeli = ["קשת 12", "קשת 12 גיבוי", "קשת 12 גיבוי 2", "כאן 11", "רשת 13",
+  "ספורט 1", "ספורט 2", "i24NEWS"];
 const shows = ["ניתוק (2022)", "ברייקינג באד", "על תנועת כדור הארץ", "פאודה"];
 const json = (b) => ({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(b) });
 
@@ -213,6 +216,16 @@ check("the guide draws a window, not the catalogue",
 check("both ways of reading the channels are offered, and one is lit",
   await shown("#navGrid") && await shown("#navVideo") &&
     await page.evaluate(() => document.querySelector("#navGrid").classList.contains("active")));
+const tileNames = await page.locator('[data-nav="item"] .tileName').allTextContents();
+check("a channel and its backups are one channel in the list",
+  tileNames.length > 0 && tileNames.every((n) => !n.includes("גיבוי")),
+  tileNames.slice(0, 4).join(" | "));
+check("two channels that only look alike stay two channels",
+  tileNames.filter((n) => /^ספורט [12]$/.test(n.trim())).length === 2,
+  tileNames.filter((n) => n.includes("ספורט")).join(" | "));
+check("the channel that has backups says so, quietly",
+  (await page.textContent('[data-nav="item"] .srcPill')) === "+2",
+  await page.textContent('[data-nav="item"] .tileMeta'));
 check("a tile says what is on the channel, not only its name",
   (await page.textContent('[data-nav="item"] .tileNow')).length > 0,
   await page.textContent('[data-nav="item"] .tileNow'));
@@ -264,6 +277,27 @@ check("a channel has no timeline to scrub", !(await shown("#scrubRow")));
 check("the picture is captioned with the programme, not the group",
   (await page.textContent("#itemMeta")).includes("עכשיו · מהדורת החדשות"),
   await page.textContent("#itemMeta"));
+
+// The backups are not gone, they moved: the list shows the channel once and the
+// player is where you reach the feeds behind it.
+check("a channel with backups offers to choose between them",
+  (await page.locator('[data-act="sources"]:visible').count()) === 1);
+await page.locator('[data-act="sources"]').click();
+await page.waitForTimeout(400);
+const srcNames = await page.locator("#trackPanel:not(.hidden) .trackBtn").allTextContents();
+check("each source is offered under the name the provider gave it",
+  srcNames.length === 3 && srcNames[0].includes("ראשי") && srcNames[0].includes("קשת 12") &&
+    srcNames[1].includes("גיבוי 1") && srcNames[2].includes("גיבוי 2"),
+  srcNames.join(" | "));
+await shot("6-sources");
+// Back closes what is over the picture, one layer at a time: the list, then
+// the bar — and the channel is still playing underneath both.
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(300);
+await page.keyboard.press("Backspace");
+await page.waitForTimeout(300);
+check("closing the sources leaves the channel playing",
+  await shown("#playerScreen") && !(await shown("#trackPanel")));
 
 // Looking for the next thing while the current thing carries on.
 await page.keyboard.press("ArrowLeft");

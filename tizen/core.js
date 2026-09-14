@@ -935,8 +935,151 @@
     return out;
   }
 
+  /*
+   * A channel and its backups are one channel, not three.
+   *
+   * The twin of ChannelSources.kt — same rule, same order, same refusals, and
+   * the shared fixtures make sure it stays that way.
+   */
+  const MAX_SOURCES = 6;
+
+  const BACKUP_WORDS = ['גיבוי', 'גיבויים', 'רזרבה', 'רזרבי', 'חלופי', 'חלופה', 'משני',
+    'backup', 'bkup', 'bck', 'bk', 'alt', 'alternate', 'alternative',
+    'mirror', 'reserve', 'spare', 'second', 'secondary'];
+
+  const QUALITY_WORDS = ['hd', 'fhd', 'uhd', 'sd', '4k', '8k', 'h265', 'h264', 'hevc', 'avc',
+    '1080p', '720p', '576p', '480p', '1080i', '50fps', '60fps', 'fps', 'raw'];
+
+  const CATEGORY_MARKS = ['גיבוי', 'רזרב', 'backup', 'back up', 'mirror'];
+
+  const WEAK_MAX = 9, INDEX_MAX = 20;
+  const EDGE = /^[-–—_,.:;־״׳"'`]+|[-–—_,.:;־״׳"'`]+$/g;
+
+  function sourceWords(name) {
+    return String(name || '').split(/[\s()\[\]{}|/\\]+/)
+      .map(function (w) { return w.replace(EDGE, ''); })
+      .filter(function (w) { return w.length > 0; });
+  }
+
+  function isQuality(w) { return QUALITY_WORDS.indexOf(w.toLowerCase()) !== -1; }
+  function isBackupWord(w) { return BACKUP_WORDS.indexOf(w.toLowerCase()) !== -1; }
+
+  function wholeNumber(w) {
+    return /^\d+$/.test(w) ? parseInt(w, 10) : null;
+  }
+
+  function joinLower(list) {
+    return list.filter(function (w) { return !isQuality(w); })
+      .map(function (w) { return w.toLowerCase(); }).join(' ');
+  }
+
+  function parseSourceName(name) {
+    let list = sourceWords(name);
+    const full = joinLower(list);
+    let explicit = false, index = null;
+
+    if (list.length && isBackupWord(list[0])) { explicit = true; list = list.slice(1); }
+
+    let scanning = true;
+    while (scanning && list.length) {
+      const last = list[list.length - 1].toLowerCase();
+      const number = wholeNumber(last);
+      if (isQuality(last)) list = list.slice(0, -1);
+      else if (number !== null && index === null && number >= 2 && number <= INDEX_MAX) {
+        index = number; list = list.slice(0, -1);
+      } else if (isBackupWord(last)) {
+        explicit = true; if (index === null) index = 1; list = list.slice(0, -1);
+      } else scanning = false;
+    }
+
+    return { base: joinLower(list), full: full, index: index, explicit: explicit };
+  }
+
+  function categorySaysBackup(group) {
+    const g = String(group || '').toLowerCase();
+    return CATEGORY_MARKS.some(function (m) { return g.indexOf(m) !== -1; });
+  }
+
+  function weakHolds(base) {
+    const parts = String(base || '').split(' ');
+    return wholeNumber(parts[parts.length - 1] || '') !== null;
+  }
+
+  function foldSources(channels) {
+    const list = channels || [];
+    let live = 0;
+    list.forEach(function (c) { if ((c.kind || 'LIVE') === 'LIVE') live++; });
+    if (live < 2) return list;
+
+    // Keyed by position, never by id: a portal is free to hand out the same id
+    // twice, and two channels sharing one would erase each other here.
+    const parsed = new Array(list.length);
+    const primaryOf = new Map();
+
+    list.forEach(function (c, i) {
+      if ((c.kind || 'LIVE') !== 'LIVE' || !c.url) return;
+      const p = parseSourceName(c.name);
+      parsed[i] = p;
+      const marked = p.explicit || categorySaysBackup(c.group);
+      if (!marked && !primaryOf.has(p.full)) primaryOf.set(p.full, i);
+    });
+
+    const attach = new Map();
+    list.forEach(function (c, i) {
+      const p = parsed[i];
+      if (!p) return;
+      const marked = p.explicit || categorySaysBackup(c.group);
+      let key = null;
+      if (marked) key = p.base || p.full;
+      else if (p.index !== null && p.index <= WEAK_MAX && weakHolds(p.base)) key = p.base;
+      else return;
+      if (!primaryOf.has(key)) return;
+      const target = primaryOf.get(key);
+      if (target !== i) attach.set(i, target);
+    });
+
+    if (!attach.size) return list;
+    const froms = Array.from(attach.keys()).sort(function (a, b) { return a - b; });
+
+    function root(start) {
+      let at = start, guard = 0;
+      while (attach.has(at) && guard++ < MAX_SOURCES) at = attach.get(at);
+      return at;
+    }
+
+    const extras = new Map();
+    froms.forEach(function (from) {
+      const r = root(from);
+      if (!extras.has(r)) extras.set(r, []);
+      extras.get(r).push(list[from]);
+    });
+
+    const out = [];
+    list.forEach(function (c, i) {
+      if (attach.has(i)) return;
+      const more = extras.get(i);
+      if (!more || !more.length) { out.push(c); return; }
+      const copy = {};
+      Object.keys(c).forEach(function (k) { copy[k] = c[k]; });
+      copy.alternates = more.slice(0, MAX_SOURCES - 1);
+      out.push(copy);
+    });
+    return out;
+  }
+
+  function sourcesOf(channel) {
+    if (!channel) return [];
+    const self = {};
+    Object.keys(channel).forEach(function (k) { if (k !== 'alternates') self[k] = channel[k]; });
+    return [self].concat(channel.alternates || []).slice(0, MAX_SOURCES);
+  }
+
   return {
     normalizeServer: normalizeServer,
+    foldSources: foldSources,
+    sourcesOf: sourcesOf,
+    parseSourceName: parseSourceName,
+    MAX_SOURCES: MAX_SOURCES,
     attrs: attrs,
     looksLikeSeries: looksLikeSeries,
     guessKind: guessKind,

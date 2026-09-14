@@ -1206,5 +1206,225 @@
         "expected": "פרק מיוחד"
       }
     ]
+  },
+  "sources": {
+    "_comment": "ערוצי גיבוי מתקפלים לתוך הערוץ שהם מגבים — וערוצים שרק נראים דומים לא.",
+    "channels": [
+      {
+        "id": "l0",
+        "name": "קשת 12",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/0.m3u8"
+      },
+      {
+        "id": "l1",
+        "name": "קשת 12 גיבוי",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/1.m3u8"
+      },
+      {
+        "id": "l2",
+        "name": "קשת 12 גיבוי 2",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/2.m3u8"
+      },
+      {
+        "id": "l3",
+        "name": "כאן 11 HD",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/3.m3u8"
+      },
+      {
+        "id": "l4",
+        "name": "כאן 11 גיבוי",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/4.m3u8"
+      },
+      {
+        "id": "l5",
+        "name": "רשת 13",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/5.m3u8"
+      },
+      {
+        "id": "l6",
+        "name": "רשת 13 2",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/6.m3u8"
+      },
+      {
+        "id": "l7",
+        "name": "רשת 13 3",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/7.m3u8"
+      },
+      {
+        "id": "l8",
+        "name": "ספורט 1",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/8.m3u8"
+      },
+      {
+        "id": "l9",
+        "name": "ספורט 2",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/9.m3u8"
+      },
+      {
+        "id": "l10",
+        "name": "ספורט 3",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/10.m3u8"
+      },
+      {
+        "id": "l11",
+        "name": "ערוץ 9",
+        "group": "ישראל",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/11.m3u8"
+      },
+      {
+        "id": "l12",
+        "name": "i24NEWS",
+        "group": "חדשות",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/12.m3u8"
+      },
+      {
+        "id": "l13",
+        "name": "i24NEWS BACKUP",
+        "group": "חדשות",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/13.m3u8"
+      },
+      {
+        "id": "l14",
+        "name": "יס דוקו",
+        "group": "תעודה",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/14.m3u8"
+      },
+      {
+        "id": "l15",
+        "name": "יס דוקו",
+        "group": "גיבוי ערוצים",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/15.m3u8"
+      },
+      {
+        "id": "l16",
+        "name": "ONE",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/16.m3u8"
+      },
+      {
+        "id": "l17",
+        "name": "גיבוי ONE",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/17.m3u8"
+      },
+      {
+        "id": "l18",
+        "name": "Sport 5 HD",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/18.m3u8"
+      },
+      {
+        "id": "l19",
+        "name": "Sport 5 FHD",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/19.m3u8"
+      },
+      {
+        "id": "l20",
+        "name": "Discovery ALT",
+        "group": "תעודה",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/20.m3u8"
+      }
+    ],
+    "expected": [
+      {
+        "name": "קשת 12",
+        "alternates": [
+          "קשת 12 גיבוי",
+          "קשת 12 גיבוי 2"
+        ]
+      },
+      {
+        "name": "כאן 11 HD",
+        "alternates": [
+          "כאן 11 גיבוי"
+        ]
+      },
+      {
+        "name": "רשת 13",
+        "alternates": [
+          "רשת 13 2",
+          "רשת 13 3"
+        ]
+      },
+      {
+        "name": "ספורט 1",
+        "alternates": []
+      },
+      {
+        "name": "ספורט 2",
+        "alternates": []
+      },
+      {
+        "name": "ספורט 3",
+        "alternates": []
+      },
+      {
+        "name": "ערוץ 9",
+        "alternates": []
+      },
+      {
+        "name": "i24NEWS",
+        "alternates": [
+          "i24NEWS BACKUP"
+        ]
+      },
+      {
+        "name": "יס דוקו",
+        "alternates": [
+          "יס דוקו"
+        ]
+      },
+      {
+        "name": "ONE",
+        "alternates": [
+          "גיבוי ONE"
+        ]
+      },
+      {
+        "name": "Sport 5 HD",
+        "alternates": []
+      },
+      {
+        "name": "Sport 5 FHD",
+        "alternates": []
+      },
+      {
+        "name": "Discovery ALT",
+        "alternates": []
+      }
+    ]
   }
 }

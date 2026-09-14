@@ -48,6 +48,30 @@ class Store(context: Context) {
             prefs.edit().putString(KEY_WATCHED, array.toString()).apply()
         }
 
+    /**
+     * Which of a channel's sources actually played, by channel id. A provider's
+     * main feed can be dead for a week while its backup is fine; remembering
+     * which one worked means the channel opens on the one that works instead of
+     * failing its way down the ladder every single night.
+     */
+    var goodSources: Map<String, Int>
+        get() = prefs.getString(KEY_GOOD_SOURCES, null)?.let { raw ->
+            try {
+                val json = JSONObject(raw)
+                json.keys().asSequence().associateWith { json.optInt(it, 0) }
+                    .filterValues { it > 0 }
+            } catch (e: Exception) {
+                emptyMap()
+            }
+        } ?: emptyMap()
+        set(value) {
+            val json = JSONObject()
+            value.entries.take(MAX_GOOD_SOURCES).forEach { (id, index) ->
+                if (index > 0) json.put(id, index)
+            }
+            prefs.edit().putString(KEY_GOOD_SOURCES, json.toString()).apply()
+        }
+
     /** Tiles or lines, on the live guide. Named rather than a flag, so the
      *  saved value still means something when a third layout turns up. */
     var guideLayout: String
@@ -177,6 +201,8 @@ class Store(context: Context) {
         const val KEY_RECENT = "recent"
         const val KEY_WATCHED = "watched"
         const val KEY_GUIDE_LAYOUT = "guideLayout"
+        const val KEY_GOOD_SOURCES = "goodSources"
         const val MAX_WATCHED = 4000
+        const val MAX_GOOD_SOURCES = 2000
     }
 }

@@ -360,6 +360,7 @@ fun ChannelsScreen(state: UiState, viewModel: AppViewModel) {
                             now = XmltvParser
                                 .programmeAt(state.programmes(channel), clock)
                                 ?.title,
+                            sources = 1 + channel.alternates.size,
                             onClick = {
                                 viewModel.select(channel)
                                 fullscreen = true
@@ -562,6 +563,11 @@ private fun PlayerFor(
 
     PlayerPanel(
         channel = selected,
+        // Which way in worked last time. A provider's main feed can be dead for
+        // a week while its backup is fine, and starting there saves failing
+        // down the ladder every night before the picture appears.
+        preferredSource = selected?.let { state.goodSources[it.id] } ?: 0,
+        onSourceWorked = { index -> selected?.let { viewModel.noteGoodSource(it.id, index) } },
         now = onNow,
         next = XmltvParser.nextProgramme(watching, clock),
         scheduleFor = guideOf?.name,
@@ -751,6 +757,7 @@ internal fun WhatElseIsOn(
                     now = onNow?.title,
                     range = onNow?.let { "${hhmm(it.start)}–${hhmm(it.stop)}" },
                     playing = playing,
+                    sources = 1 + channel.alternates.size,
                     // Pressing the one you are already watching is not "watch
                     // it again" — there is nothing else it could mean but
                     // "give it the whole screen".
@@ -788,6 +795,8 @@ private fun WatchRow(
     onClick: () -> Unit,
     onFocus: () -> Unit,
     modifier: Modifier = Modifier,
+    /** More than one means the provider backs this channel up. */
+    sources: Int = 1,
 ) {
     val shape = RoundedCornerShape(tz(12))
     Row(
@@ -826,15 +835,19 @@ private fun WatchRow(
         Column(modifier = Modifier.weight(1f)) {
             // Named line heights, or the two lines of a row sit a whole blank
             // line apart and the list reads as twice as long as it is.
-            Text(
-                text = "$number · $name",
-                fontSize = tzSp(20),
-                lineHeight = tzSp(24),
-                fontWeight = FontWeight.Bold,
-                color = Ink.Bright,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "$number · $name",
+                    fontSize = tzSp(20),
+                    lineHeight = tzSp(24),
+                    fontWeight = FontWeight.Bold,
+                    color = Ink.Bright,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (sources > 1) SourcePill(sources)
+            }
             Text(
                 text = now ?: "אין לוח שידורים לערוץ הזה",
                 fontSize = tzSp(17),

@@ -517,6 +517,12 @@ fun ChannelTile(
     /** What is on it now. A wall of channel names says what exists; this is
      *  what turns it into a guide you can choose from without opening one. */
     now: String? = null,
+    /**
+     * How many ways in this channel has. More than one means the provider backs
+     * it up, and the backups are folded in here rather than sitting in the list
+     * as channels of their own.
+     */
+    sources: Int = 1,
 ) {
     val shape = RoundedCornerShape(tz(16))
     Column(
@@ -577,17 +583,44 @@ fun ChannelTile(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Text(
-            text = meta,
-            fontSize = tzSp(17),
-            lineHeight = tzSp(21),
-            color = Ink.Faint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
+        Row(
             modifier = Modifier.fillMaxWidth(),
-        )
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = meta,
+                fontSize = tzSp(17),
+                lineHeight = tzSp(21),
+                color = Ink.Faint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (sources > 1) SourcePill(sources)
+        }
     }
+}
+
+/**
+ * A channel that the provider backs up, said quietly. Small on purpose: it is a
+ * fact about the channel, not a thing to press — the feeds themselves are
+ * chosen in the player, which is the only place choosing one means anything.
+ */
+@Composable
+fun SourcePill(sources: Int) {
+    Text(
+        text = "+${sources - 1}",
+        fontSize = tzSp(15),
+        fontWeight = FontWeight.Bold,
+        color = Ink.Dim,
+        maxLines = 1,
+        modifier = Modifier
+            .padding(start = tz(6))
+            .background(Ink.LineSoft, RoundedCornerShape(999.dp))
+            .padding(horizontal = tz(8), vertical = tz(1)),
+    )
 }
 
 /**

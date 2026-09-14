@@ -59,6 +59,12 @@ data class UiState(
     /** Channel tiles, or one channel per line with its schedule beside it. */
     val guideLayout: GuideLayout = GuideLayout.GRID,
     /**
+     * Which source of a channel last actually played, by channel id. Absent for
+     * almost every channel: it only says something when the main feed failed
+     * and a backup did not.
+     */
+    val goodSources: Map<String, Int> = emptyMap(),
+    /**
      * Something being played that is in no list: a stretch of a channel's
      * archive. It is made on the spot out of a channel and a time, so there is
      * nowhere else for it to live.
@@ -222,6 +228,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             watched = store.watched,
             guideLayout = runCatching { GuideLayout.valueOf(store.guideLayout) }
                 .getOrDefault(GuideLayout.GRID),
+            goodSources = store.goodSources,
             screen = if (playlists.isEmpty()) Screen.SOURCES else Screen.CHOOSE,
         )
         active?.let { selectPlaylist(it) }
@@ -341,6 +348,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 guide = _state.value.guide + (channel.id to programmes)
             )
         }
+    }
+
+    /**
+     * Remember which way in to a channel worked, so the next time it is opened
+     * starts there. Index zero is the channel's own feed and is the default,
+     * so it is remembered by being forgotten.
+     */
+    fun noteGoodSource(channelId: String, index: Int) {
+        val now = _state.value.goodSources
+        if ((now[channelId] ?: 0) == index) return
+        val next = if (index > 0) now + (channelId to index) else now - channelId
+        store.goodSources = next
+        _state.value = _state.value.copy(goodSources = next)
     }
 
     fun setGuideLayout(layout: GuideLayout) {

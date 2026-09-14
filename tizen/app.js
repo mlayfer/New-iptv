@@ -20,6 +20,8 @@ const state = {
   // The endpoint ladder for whatever is playing, and how far down it we are.
   candidates: [],
   candidateIndex: 0,
+  // Which of the channel's sources is actually on screen, once something plays.
+  liveSourceIndex: null,
   // Catalogues the portal refused, shown instead of quietly missing.
   notes: [],
   // Windowed rendering: which item has focus, and where each window starts.
@@ -426,7 +428,10 @@ function buildSearchIndexSoon(){
 }
 
 function finishLoad(items){
-  state.items = items;
+  // A channel and its backups arrive as separate channels, one after the
+  // other. They are one channel with several ways in, and the list should say
+  // so once rather than three times.
+  state.items = Core.foldSources(items);
   buildSearchIndexSoon();
   state.current = null;
   state.mode = null;
@@ -1338,6 +1343,22 @@ function renderItems(){
   });
 }
 
+/**
+ * A channel with backups says so quietly — one mark, not three tiles. The
+ * names of the feeds themselves live in the player, where choosing one is
+ * something you can actually do.
+ */
+function addSourcePill(host, item){
+  const extra = (item && item.alternates || []).length;
+  if(!host || !extra) return;
+  const pill = document.createElement('span');
+  pill.className = 'srcPill';
+  pill.textContent = '+' + extra;
+  pill.setAttribute('aria-label', 'עוד ' + extra + ' מקורות לערוץ');
+  host.appendChild(document.createTextNode(' '));
+  host.appendChild(pill);
+}
+
 function channelTile(item, index){
   const tile = document.createElement('button');
   tile.className = 'focusable channelTile' + (state.current && state.current.id === item.id ? ' playing' : '');
@@ -1347,6 +1368,7 @@ function channelTile(item, index){
     '<div class="tileNow"></div><div class="tileMeta"></div>';
   $('.tileName', tile).textContent = (isFavorite(item) ? '★ ' : '') + item.name;
   $('.tileMeta', tile).textContent = (index + 1) + ' · ' + item.group;
+  addSourcePill($('.tileMeta', tile), item);
   fillArt($('.tileLogo', tile), item);
 
   // A tile that says only what a channel is called is a list of names; what is
@@ -1660,6 +1682,7 @@ function renderWatchList(){
       '<div class="watchOn">משודר</div>';
     $('.watchName', row).textContent = (index + 1) + ' · ' + (isFavorite(item) ? '★ ' : '') + item.name;
     $('.watchNow', row).textContent = item.group || '';
+    addSourcePill($('.watchNow', row), item);
     fillArt($('.watchLogo', row), item);
     row.addEventListener('click', () => {
       // Pressing the one you are already watching is not "watch it again" —
@@ -1881,6 +1904,8 @@ function renderControls(){
   show('fwd10', !live);
   // A film has no other channels to flick through.
   show('channels', live);
+  // And only a channel the provider backs up has anything to choose between.
+  show('sources', sourcesOf(state.current).length > 1);
   // And only a channel the portal keeps can be wound back.
   show('rewind', live && !!archiveChannel());
   show('prevEp', !!episodeNeighbour(-1));
@@ -1999,6 +2024,7 @@ function runControl(act){
   if(act === 'nextEp'){ playNeighbourEpisode(1); return; }
   if(act === 'channels'){ closeControls(); openWatchList(); return; }
   if(act === 'rewind'){ closeControls(); rewindLive(); return; }
+  if(act === 'sources'){ openTrackPanel('SOURCE'); return; }
   if(act === 'audio'){ openTrackPanel('AUDIO'); return; }
   if(act === 'subs'){ openTrackPanel('TEXT'); return; }
 }
@@ -2024,8 +2050,26 @@ function openTrackPanel(type){
   const list = $('#trackList');
   if(!panel || !list) return;
   state.trackType = type;
-  text($('#trackTitle'), type === 'AUDIO' ? 'שפת שמע' : 'כתוביות');
+  text($('#trackTitle'), type === 'AUDIO' ? 'שפת שמע' : type === 'SOURCE' ? 'מקורות הערוץ' : 'כתוביות');
   list.innerHTML = '';
+
+  // The channel's own feeds, by the name the provider gave each one — so a fold
+  // that got it wrong is visible here rather than hidden behind it.
+  if(type === 'SOURCE'){
+    const sources = sourcesOf(state.current);
+    sources.forEach((src, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'focusable trackBtn' + (state.liveSourceIndex === i ? ' active' : '');
+      btn.dataset.nav = 'track';
+      btn.textContent = sourceLabel(i) + ' · ' + src.name;
+      btn.addEventListener('click', () => { playSource(i); closeTrackPanel(); closeControls(); });
+      list.appendChild(btn);
+    });
+    panel.classList.remove('hidden');
+    const firstSource = $('.trackBtn', list);
+    if(firstSource) setFocus(firstSource);
+    return;
+  }
 
   const tracks = availableTracks(type);
   if(!tracks.length){
@@ -2306,6 +2350,16 @@ function playerMessage(msg){
   el.style.display = msg ? 'flex' : 'none';
 }
 
+/** Something worth saying once, not something worth leaving on the picture. */
+function flashMessage(msg){
+  const el = $('#playerMessage');
+  playerMessage(msg);
+  if(state.flashTimer) clearTimeout(state.flashTimer);
+  state.flashTimer = setTimeout(() => {
+    if(el.textContent === msg) playerMessage('');
+  }, 2500);
+}
+
 /**
  * Put the player back where a new stream can be opened.
  *
@@ -2369,7 +2423,7 @@ function playHtml(url){
   v.ontimeupdate = () => { state.position = v.currentTime || 0; state.duration = v.duration || state.duration; renderProgress(); };
   v.onended = () => { rememberPosition(); if(!playNeighbourEpisode(1)) playerMessage('ההפעלה הסתיימה'); };
   v.onpause = () => { state.paused = true; renderControls(); };
-  v.onplay = () => { state.paused = false; renderControls(); };
+  v.onplay = () => { state.paused = false; noteSourceWorks(); renderControls(); };
   v.src = url;
   v.play().catch(() => nextCandidate('הנגן המובנה לא הצליח לנגן את התוכן'));
 }
@@ -2395,15 +2449,20 @@ function nextCandidate(reason){
     return;
   }
   const tried = (state.candidates || []).length;
+  const sources = new Set((state.candidates || []).map(c => c.sourceIndex)).size;
   playerMessage((reason || 'לא הצלחתי לנגן את הפריט') +
-    (tried > 1 ? ' · נוסו ' + tried + ' כתובות' : ''));
+    (tried > 1 ? ' · נוסו ' + tried + ' כתובות' : '') +
+    (sources > 1 ? ' ב־' + sources + ' מקורות' : ''));
 }
 
 function playCandidate(){
-  const url = (state.candidates || [])[state.candidateIndex];
-  if(!url){ playerMessage('אין כתובת ניגון לפריט זה'); return; }
+  const cand = (state.candidates || [])[state.candidateIndex];
+  if(!cand){ playerMessage('אין כתובת ניגון לפריט זה'); return; }
+  const url = cand.url;
 
-  const item = state.current || {};
+  // The headers belong to the source being tried, not to the channel: a backup
+  // can sit behind a different CDN with rules of its own.
+  const item = cand.source || state.current || {};
   playerMessage('טוען...');
   stopPlayback();
 
@@ -2422,7 +2481,7 @@ function playCandidate(){
       try { webapis.avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX'); } catch(e) {}
       webapis.avplay.setListener({
         onbufferingstart: () => playerMessage('טוען...'),
-        onbufferingcomplete: () => playerMessage(''),
+        onbufferingcomplete: () => { playerMessage(''); noteSourceWorks(); },
         onstreamcompleted: () => {
           rememberPosition();
           // A finished episode rolls into the next one, the way a season is watched.
@@ -2471,8 +2530,87 @@ async function activateItem(item, resumeAt){
   openPlayer(item, returnTo === 'player' ? state.playerReturn : returnTo);
   noteWatched(item, state.resumeAt, 0);
   startProgressTicker();
-  state.candidates = streamVariants(item.url);
+  state.candidates = candidatesFor(item);
   state.candidateIndex = 0;
+  state.liveSourceIndex = null;
+  playCandidate();
+}
+
+// ---- a channel's sources ---------------------------------------------------
+
+const GOOD_SOURCE_KEY = 'maskhaiGoodSourceV1';
+
+/** Every way in to the channel now playing, the channel itself first. */
+function sourcesOf(item){ return Core.sourcesOf(item); }
+
+function sourceLabel(index){ return index === 0 ? 'ראשי' : 'גיבוי ' + index; }
+
+/**
+ * The whole ladder for a channel: every endpoint of the main feed, then every
+ * endpoint of each backup. The one that worked last time goes first — after a
+ * week of a dead main feed the backup simply is the channel, without anyone
+ * having to pick it every night.
+ */
+function candidatesFor(item){
+  const sources = sourcesOf(item);
+  const order = [];
+  const good = goodSourceFor(item);
+  if(good > 0 && good < sources.length) order.push(good);
+  sources.forEach((_, i) => { if(order.indexOf(i) === -1) order.push(i); });
+
+  const out = [];
+  order.forEach(i => {
+    streamVariants(sources[i].url).forEach(url => {
+      out.push({ url: url, source: sources[i], sourceIndex: i });
+    });
+  });
+  return out;
+}
+
+function goodSourceFor(item){
+  if(!item) return 0;
+  try {
+    const saved = JSON.parse(localStorage.getItem(GOOD_SOURCE_KEY) || '{}') || {};
+    return Number(saved[item.id]) || 0;
+  } catch(e) { return 0; }
+}
+
+function rememberGoodSource(item, index){
+  if(!item) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(GOOD_SOURCE_KEY) || '{}') || {};
+    if(index > 0) saved[item.id] = index; else delete saved[item.id];
+    localStorage.setItem(GOOD_SOURCE_KEY, JSON.stringify(saved));
+  } catch(e) {}
+}
+
+/** Called the moment something actually plays, not when it is asked to. */
+function noteSourceWorks(){
+  const cand = (state.candidates || [])[state.candidateIndex];
+  if(!cand || !state.current) return;
+  if(state.liveSourceIndex === cand.sourceIndex) return;
+  state.liveSourceIndex = cand.sourceIndex;
+  rememberGoodSource(state.current, cand.sourceIndex);
+  if(cand.sourceIndex > 0) flashMessage('עבר ל' + sourceLabel(cand.sourceIndex));
+}
+
+/** Jump straight to a source, because the viewer asked for it by name. */
+function playSource(index){
+  const item = state.current;
+  if(!item) return;
+  const sources = sourcesOf(item);
+  if(index < 0 || index >= sources.length) return;
+  const all = [];
+  sources.forEach((src, i) => {
+    streamVariants(src.url).forEach(url => all.push({ url: url, source: src, sourceIndex: i }));
+  });
+  // The one that was asked for first, the rest still behind it: a source picked
+  // by hand should not turn off the falling back.
+  state.candidates = all.filter(c => c.sourceIndex === index)
+    .concat(all.filter(c => c.sourceIndex !== index));
+  state.candidateIndex = 0;
+  state.liveSourceIndex = null;
+  rememberGoodSource(item, index);
   playCandidate();
 }
 
