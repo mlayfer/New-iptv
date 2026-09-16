@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.view.WindowCompat
+import com.mlayfer.iptv.data.CrashLog
 import com.mlayfer.iptv.ui.AppRoot
 import com.mlayfer.iptv.ui.LocalIsTv
 import com.mlayfer.iptv.ui.TelohimTheme
@@ -17,6 +18,10 @@ import com.mlayfer.iptv.ui.RemoteKeys
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // First thing, before any of ours runs: a crash on the way up is the
+        // one most worth having a trace of, and it is the one nobody can reach
+        // with a cable.
+        CrashLog.install(this, BuildConfig.VERSION_NAME)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         // The app is dark everywhere, so the system bar icons have to be light.

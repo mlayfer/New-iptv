@@ -27,7 +27,17 @@ class Repository {
         // One funnel, so every screen — the list, search, the guide, the home
         // rows — sees a channel and its backups as one thing without knowing
         // anything about backups.
-        val folded = parsed.copy(channels = ChannelSources.fold(parsed.channels))
+        //
+        // Guarded, because tidying the list is a convenience and the catalogue
+        // is not: whatever a portal puts in a channel name, failing to fold it
+        // has to cost the fold and not the app. The failure is carried in the
+        // notes, which the screen already shows, so it is survivable without
+        // being silent.
+        val folded = try {
+            parsed.copy(channels = ChannelSources.fold(parsed.channels))
+        } catch (e: Exception) {
+            parsed.copy(notes = parsed.notes + "איחוד ערוצי הגיבוי נכשל: ${e.javaClass.simpleName}")
+        }
         playlistCache[playlist.id] = folded
         return folded
     }
