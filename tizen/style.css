@@ -31,9 +31,19 @@ button,input{font-family:inherit;color:inherit}
 .topbar{height:88px;display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
 .brandIdentity{display:flex;align-items:center;gap:16px}
 .brandIcon{width:60px;height:60px;border-radius:16px;object-fit:cover;box-shadow:0 8px 24px rgba(0,0,0,.5)}
-.brandTitle{font-size:38px;font-weight:800;letter-spacing:.5px}
-.brandSub{font-size:18px;color:var(--ink-faint);margin-top:4px}
+/* Tight, the way a wordmark is set: letters at this size and weight need
+   pulling together, not spacing out. */
+.brandTitle{font-size:38px;font-weight:800;letter-spacing:-.5px}
+/* Smaller and tracked out, so the strapline reads as a label under the name
+   rather than as another sentence competing with it. */
+.brandSub{font-size:16px;color:var(--ink-dim);letter-spacing:1.4px;margin-top:3px}
 .brandSub.warn{color:#ffb4a8}
+/* The size of the catalogue is a fact about the subscription, not more
+   strapline — so it is set as its own small object rather than a third grey
+   line under the first two. */
+.brandCount{display:inline-block;margin-top:7px;padding:3px 10px;border-radius:999px;
+  background:var(--line-soft);color:var(--ink-dim);font-size:15px;font-weight:500;letter-spacing:.4px}
+.brandCount.warn{color:#ffb4a8}
 .topActions{display:flex;gap:12px}
 .pill{border:1px solid var(--line);border-radius:14px;padding:14px 24px;background:var(--surface);font-size:22px}
 /* Two ways of doing the same thing, as one object: the filled half is where

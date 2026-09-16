@@ -10,9 +10,11 @@
 <body>
   <div id="app">
     <header class="topbar">
+      <!-- The count belongs under the name, not under the whole lockup: the
+           three lines share one left edge that way, which is what the Android
+           build does too. -->
       <div class="brandBlock">
-        <div class="brandIdentity"><img src="brand-icon.png" class="brandIcon" alt=""/><div><div class="brandTitle">טלוהים</div><div class="brandSub">טלוויזיה בלייב • סרטים • סדרות</div></div></div>
-        <div class="brandSub" id="catalogSummary">Samsung Tizen TV</div>
+        <div class="brandIdentity"><img src="brand-icon.png" class="brandIcon" alt=""/><div><div class="brandTitle">טלוהים</div><div class="brandSub">טלוויזיה בלייב • סרטים • סדרות</div><div class="brandCount" id="catalogSummary">Samsung Tizen TV</div></div></div>
       </div>
       <div class="topActions" id="topNav">
         <button id="goHome" class="focusable pill hidden">בית</button>

@@ -2,7 +2,7 @@
 <widget xmlns="http://www.w3.org/ns/widgets"
         xmlns:tizen="http://tizen.org/ns/widgets"
         id="http://mlayfer.com/maskhai2"
-        version="1.5.1"
+        version="1.5.2"
         viewmodes="maximized">
   <!-- MlayferTV2, not MlayferTV1. The old package is stuck on the television:
        it was signed with one certificate and every build since with another,

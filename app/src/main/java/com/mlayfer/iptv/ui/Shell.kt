@@ -158,11 +158,23 @@ fun BrandBlock(title: String, tagline: String, counts: String?) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (isWide) tz(16) else tz(10)),
     ) {
-        Column(horizontalAlignment = Alignment.End) {
+        // The mark leads, which right-to-left means it sits furthest right and
+        // the name reads away from it — the way the Tizen build has always had
+        // it, and the way a Hebrew lockup is read. It was last here, so the
+        // icon hung off the inside edge of the name and the whole block read
+        // like a left-to-right lockup that had been flipped.
+        BrandMark()
+        // Start is the right-hand edge here, End is the left. This was End, so
+        // the name was pushed away from the margin the lines under it were
+        // aligned to, and nothing in the block lined up with anything else.
+        Column(horizontalAlignment = Alignment.Start) {
             Text(
                 text = title,
                 fontSize = if (isWide) tzSp(38) else tzSp(26),
                 fontWeight = FontWeight.ExtraBold,
+                // Tight, the way a wordmark is set. Letters at this size and
+                // weight need pulling together, not spacing out.
+                letterSpacing = if (isWide) (-0.8).sp else (-0.5).sp,
                 color = Ink.Bright,
                 maxLines = 1,
             )
@@ -173,24 +185,43 @@ fun BrandBlock(title: String, tagline: String, counts: String?) {
             if (isWide) {
                 Text(
                     text = tagline,
-                    fontSize = tzSp(18),
-                    color = Ink.Faint,
+                    // Smaller and tracked out: the strapline is read as a label
+                    // under the name rather than as another sentence competing
+                    // with it.
+                    fontSize = tzSp(16),
+                    letterSpacing = 1.4.sp,
+                    color = Ink.Dim,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = tz(3)),
                 )
-                if (counts != null) {
-                    Text(
-                        text = counts,
-                        fontSize = tzSp(18),
-                        color = Ink.Faint,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                // A third line of grey read as more strapline. A count is a
+                // fact about the subscription, so it is set as one: its own
+                // small object, under the name rather than beside it.
+                if (counts != null) CountPill(counts)
             }
         }
-        BrandMark()
     }
+}
+
+/** The size of the catalogue, as a thing rather than as another grey line. */
+@Composable
+private fun CountPill(counts: String) {
+    val shape = RoundedCornerShape(tz(999))
+    Text(
+        text = counts,
+        fontSize = tzSp(15),
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.4.sp,
+        color = Ink.Dim,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .padding(top = tz(7))
+            .clip(shape)
+            .background(Ink.LineSoft)
+            .padding(horizontal = tz(10), vertical = tz(3)),
+    )
 }
 
 /** The launcher icon itself, rather than a drawing of it. */
