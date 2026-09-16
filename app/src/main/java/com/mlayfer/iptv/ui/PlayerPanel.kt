@@ -1114,6 +1114,13 @@ private data class Attempt(
 private const val MAX_ATTEMPTS = 8
 
 /**
+ * A backup gets the rungs that matter and not the long tail: by the time the
+ * ladder is on the third feed of one channel, another address of the same dead
+ * thing is worth less than getting to the next feed.
+ */
+private const val BACKUP_ATTEMPTS = 4
+
+/**
  * Ordered from "what the playlist says" to "what a browser hitting the panel's
  * other endpoints would get". Cheap to walk: a wrong guess fails in one request.
  */
@@ -1160,8 +1167,20 @@ private fun attemptsFor(channel: Channel, preferred: Int = 0): List<Attempt> {
         if (preferred in 1 until sources.size) add(preferred)
         addAll(sources.indices.filterNot { it == preferred })
     }
-    val share = (MAX_ATTEMPTS / sources.size).coerceAtLeast(2)
-    return order.flatMap { attemptsOneSource(sources[it], it, share) }
+    // Whichever source is tried first gets the whole ladder; the others follow
+    // with a short one each.
+    //
+    // Splitting the budget evenly, which is what this did, cut the first
+    // source down to two rungs the moment a channel had backups — and the
+    // third rung is "no container hint at all, let the bytes decide", which is
+    // the one that plays a panel whose .m3u8 address answers with something
+    // that is not a manifest. Backups turned channels that worked into
+    // channels that failed with ERROR_CODE_PARSING_MANIFEST_MALFORMED, which
+    // is the opposite of the point of them.
+    return order.mapIndexed { position, index ->
+        val budget = if (position == 0) MAX_ATTEMPTS else BACKUP_ATTEMPTS
+        attemptsOneSource(sources[index], index, budget)
+    }.flatten()
 }
 
 private fun mimeFor(url: String): String? {

@@ -128,7 +128,8 @@ class ScreenshotTest {
         // look the same. Folded here exactly as the app folds what a portal
         // hands it, so these pictures show the list people actually get.
         val named = listOf(
-            "קשת 12", "קשת 12 גיבוי", "קשת 12 גיבוי 2", "כאן 11", "רשת 13", "ספורט 1", "ספורט 2",
+            "קשת 12", "קשת 12 - (גיבוי 1)", "קשת 12 - (גיבוי 2)", "כאן 11", "רשת 13",
+            "ספורט 1", "ספורט 2",
         )
         val channels = ChannelSources.fold(
             (1..40).map { i ->

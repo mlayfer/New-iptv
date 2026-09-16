@@ -1,6 +1,7 @@
 package com.mlayfer.iptv.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,6 +81,16 @@ fun HomeScreen(state: UiState, viewModel: AppViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // An opaque floor under the whole screen.
+            //
+            // Every other screen paints one — the door, the guide, the sources
+            // form and the title page all sit on a Surface of their own — and
+            // this screen alone relied on the window background showing through
+            // from behind it. On a television box that never cleared: the screen
+            // it was opened from stayed underneath it, and every scroll painted
+            // the rows on top of the rows before them until the whole thing was
+            // unreadable. A screen has to own its background.
+            .background(Ink.SurfaceLow)
             .windowInsetsPadding(WindowInsets.statusBars)
             .tvSafeArea()
     ) {

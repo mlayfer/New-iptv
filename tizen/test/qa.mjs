@@ -18,7 +18,7 @@ const vodCats = ["חדש בקולנוע", "אקשן", "קומדיה"];
 const seriesCats = ["דרמה", "Apple TV+"];
 // A real subscription lists a channel's backups as channels of their own, flat,
 // right after it — and lists "ספורט 1" and "ספורט 2", which only look the same.
-const israeli = ["קשת 12", "קשת 12 גיבוי", "קשת 12 גיבוי 2", "כאן 11", "רשת 13",
+const israeli = ["קשת 12", "קשת 12 - (גיבוי 1)", "קשת 12 - (גיבוי 2)", "כאן 11", "רשת 13",
   "ספורט 1", "ספורט 2", "i24NEWS"];
 const shows = ["ניתוק (2022)", "ברייקינג באד", "על תנועת כדור הארץ", "פאודה"];
 const json = (b) => ({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(b) });

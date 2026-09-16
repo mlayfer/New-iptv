@@ -984,8 +984,18 @@
     while (scanning && list.length) {
       const last = list[list.length - 1].toLowerCase();
       const number = wholeNumber(last);
+      // The word before the number decides what the number is. "גיבוי 1" is the
+      // first backup; "ספורט 1" is a channel. Reading the number on its own is
+      // what made every "X - (גיבוי 1)" on a real portal fall straight past the
+      // rule meant to catch it.
+      const after = list.length >= 2 ? list[list.length - 2].toLowerCase() : null;
       if (isQuality(last)) list = list.slice(0, -1);
-      else if (number !== null && index === null && number >= 2 && number <= INDEX_MAX) {
+      else if (number !== null && index === null && number >= 1 && number <= INDEX_MAX &&
+               after !== null && isBackupWord(after)) {
+        index = number; list = list.slice(0, -1);
+      } else if (number !== null && index === null && number >= 2 && number <= INDEX_MAX) {
+        // A bare index, with no word to say what it counts. Narrower on
+        // purpose, and it still has to survive weakHolds().
         index = number; list = list.slice(0, -1);
       } else if (isBackupWord(last)) {
         explicit = true; if (index === null) index = 1; list = list.slice(0, -1);

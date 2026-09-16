@@ -1208,7 +1208,7 @@
     ]
   },
   "sources": {
-    "_comment": "ערוצי גיבוי מתקפלים לתוך הערוץ שהם מגבים — וערוצים שרק נראים דומים לא.",
+    "_comment": "ערוצי גיבוי מתקפלים לתוך הערוץ שהם מגבים — וערוצים שרק נראים דומים לא. השמות כאן הם מה שפורטל אמיתי שולח, כולל הצורה \"X - (גיבוי 1)\".",
     "channels": [
       {
         "id": "l0",
@@ -1275,87 +1275,115 @@
       },
       {
         "id": "l9",
-        "name": "ספורט 2",
+        "name": "ספורט 1 - (גיבוי 1)",
         "group": "ספורט",
         "kind": "LIVE",
         "url": "http://h/live/u/p/9.m3u8"
       },
       {
         "id": "l10",
-        "name": "ספורט 3",
+        "name": "ספורט 2",
         "group": "ספורט",
         "kind": "LIVE",
         "url": "http://h/live/u/p/10.m3u8"
       },
       {
         "id": "l11",
-        "name": "ערוץ 9",
-        "group": "ישראל",
+        "name": "ספורט 2 - (גיבוי 1)",
+        "group": "ספורט",
         "kind": "LIVE",
         "url": "http://h/live/u/p/11.m3u8"
       },
       {
         "id": "l12",
-        "name": "i24NEWS",
-        "group": "חדשות",
+        "name": "ספורט 5",
+        "group": "ספורט",
         "kind": "LIVE",
         "url": "http://h/live/u/p/12.m3u8"
       },
       {
         "id": "l13",
-        "name": "i24NEWS BACKUP",
-        "group": "חדשות",
+        "name": "ספורט 5 4K",
+        "group": "ספורט",
         "kind": "LIVE",
         "url": "http://h/live/u/p/13.m3u8"
       },
       {
         "id": "l14",
-        "name": "יס דוקו",
-        "group": "תעודה",
+        "name": "ספורט 5 - (גיבוי 1)",
+        "group": "ספורט",
         "kind": "LIVE",
         "url": "http://h/live/u/p/14.m3u8"
       },
       {
         "id": "l15",
-        "name": "יס דוקו",
-        "group": "גיבוי ערוצים",
+        "name": "ספורט 5 PLUS",
+        "group": "ספורט",
         "kind": "LIVE",
         "url": "http://h/live/u/p/15.m3u8"
       },
       {
         "id": "l16",
-        "name": "ONE",
+        "name": "ספורט 5 PLUS - (גיבוי 1)",
         "group": "ספורט",
         "kind": "LIVE",
         "url": "http://h/live/u/p/16.m3u8"
       },
       {
         "id": "l17",
-        "name": "גיבוי ONE",
-        "group": "ספורט",
+        "name": "ערוץ 9",
+        "group": "ישראל",
         "kind": "LIVE",
         "url": "http://h/live/u/p/17.m3u8"
       },
       {
         "id": "l18",
-        "name": "Sport 5 HD",
-        "group": "ספורט",
+        "name": "i24NEWS",
+        "group": "חדשות",
         "kind": "LIVE",
         "url": "http://h/live/u/p/18.m3u8"
       },
       {
         "id": "l19",
-        "name": "Sport 5 FHD",
-        "group": "ספורט",
+        "name": "i24NEWS BACKUP",
+        "group": "חדשות",
         "kind": "LIVE",
         "url": "http://h/live/u/p/19.m3u8"
       },
       {
         "id": "l20",
-        "name": "Discovery ALT",
+        "name": "יס דוקו",
         "group": "תעודה",
         "kind": "LIVE",
         "url": "http://h/live/u/p/20.m3u8"
+      },
+      {
+        "id": "l21",
+        "name": "יס דוקו",
+        "group": "גיבוי ערוצים",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/21.m3u8"
+      },
+      {
+        "id": "l22",
+        "name": "ONE",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/22.m3u8"
+      },
+      {
+        "id": "l23",
+        "name": "גיבוי ONE",
+        "group": "ספורט",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/23.m3u8"
+      },
+      {
+        "id": "l24",
+        "name": "Discovery ALT",
+        "group": "תעודה",
+        "kind": "LIVE",
+        "url": "http://h/live/u/p/24.m3u8"
       }
     ],
     "expected": [
@@ -1381,15 +1409,31 @@
       },
       {
         "name": "ספורט 1",
-        "alternates": []
+        "alternates": [
+          "ספורט 1 - (גיבוי 1)"
+        ]
       },
       {
         "name": "ספורט 2",
+        "alternates": [
+          "ספורט 2 - (גיבוי 1)"
+        ]
+      },
+      {
+        "name": "ספורט 5",
+        "alternates": [
+          "ספורט 5 - (גיבוי 1)"
+        ]
+      },
+      {
+        "name": "ספורט 5 4K",
         "alternates": []
       },
       {
-        "name": "ספורט 3",
-        "alternates": []
+        "name": "ספורט 5 PLUS",
+        "alternates": [
+          "ספורט 5 PLUS - (גיבוי 1)"
+        ]
       },
       {
         "name": "ערוץ 9",
@@ -1412,14 +1456,6 @@
         "alternates": [
           "גיבוי ONE"
         ]
-      },
-      {
-        "name": "Sport 5 HD",
-        "alternates": []
-      },
-      {
-        "name": "Sport 5 FHD",
-        "alternates": []
       },
       {
         "name": "Discovery ALT",

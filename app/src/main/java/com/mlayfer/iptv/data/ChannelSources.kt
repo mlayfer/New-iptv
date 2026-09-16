@@ -79,8 +79,22 @@ object ChannelSources {
         while (scanning && list.isNotEmpty()) {
             val last = list.last().lowercase()
             val number = last.toIntOrNull()
+            // The word before the number decides what the number is. "גיבוי 1"
+            // is the first backup; "ספורט 1" is a channel. Reading the number
+            // on its own is what made every "X - (גיבוי 1)" on a real portal
+            // fall straight past the rule meant to catch it: the 1 was refused
+            // for looking like a channel number, and the word behind it was
+            // never reached.
+            val after = list.getOrNull(list.size - 2)?.lowercase()
             when {
                 QUALITY_WORDS.contains(last) -> list = list.dropLast(1)
+                number != null && index == null && number in 1..INDEX_MAX &&
+                    after != null && BACKUP_WORDS.contains(after) -> {
+                    index = number
+                    list = list.dropLast(1)
+                }
+                // A bare index, with no word to say what it counts. Narrower on
+                // purpose, and it still has to survive [weakHolds].
                 number != null && index == null && number in 2..INDEX_MAX -> {
                     index = number
                     list = list.dropLast(1)
